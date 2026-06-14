@@ -175,6 +175,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .fund-tx-row:last-child { border-bottom: none; }
 .fund-tx-type { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
 .fund-tx-dep { background: var(--green-bg); color: var(--green); }
+.fund-tx-with { background: var(--red-bg); color: var(--red); }
 .fund-tx-pay { background: var(--blue-bg); color: var(--blue); }
 .fund-tx-desc { flex: 1; color: var(--text); }
 .fund-tx-amt { font-weight: 700; color: var(--green-mid); }
@@ -341,6 +342,7 @@ const famFundBal=fid=>(fund.famBalances[String(fid)]||0);
 const col=id=>COLORS[(id-1)%COLORS.length];
 const ini=n=>n.replace('משפחת','').trim().slice(0,2);
 const getFam=id=>families.find(f=>f.id===id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const evCost=ev=>ev.totalCost!=null?ev.totalCost:ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0);
 const evShare=ev=>{ if(ev.totalCost!=null) return Math.round(ev.totalCost/ev.participants.length); const n=ev.participants.length; return n?Math.round(evCost(ev)/n):0; };
 const evBalance=ev=>{ const share=evShare(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-share; }); return res; };
@@ -540,20 +542,20 @@ function evCard(ev){
     const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
     return`<div class="exp-input-row">
       <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
-      <span class="mname">${f.name.replace('משפחת','').trim()}</span>
+      <span class="mname">${esc(f.name.replace('משפחת','').trim())}</span>
       <input class="exp-inp" type="number" min="0" inputmode="numeric" placeholder="₪0"
         value="${spent||''}" oninput="liveUpdateCard(${ev.id},this,${fid})" onchange="updateExpense(${ev.id},${fid},this.value)">
       <span class="exp-tag ${tagClass}" id="tag-${ev.id}-${fid}">${tagText}</span>
     </div>`;
   }).join('');
-  const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>f.name.replace('משפחת','').trim()).join(', ')}</div>`:'';
+  const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
   const settleLines=transfers.map(t=>{
     const canFund = canPayFromFund(t.fromFid, t.amt);
     return`<div class="settle-row" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 0">
-      <span style="font-size:12px">👈 <b>${t.from}</b> מעביר ל<b>${t.to}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
+      <span style="font-size:12px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${canFund?`<button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferFromFund(${ev.id},'${t.from}',${t.fromFid},'${t.to}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
-        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferDirect(${ev.id},'${t.from}','${t.to}',${t.amt})">✓ שולם ישירות</button>
+        ${canFund?`<button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferFromFund(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
+        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferDirect(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם ישירות</button>
       </div>
     </div>`;
   }).join('');
@@ -564,16 +566,16 @@ function evCard(ev){
       ?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 7px;border-radius:10px">קופה</span>'
       :'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 7px;border-radius:10px">ישיר</span>';
     return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">'
-      +icon+'</span><span><b style="color:var(--text)">'+s.from+'</b> העביר ל<b style="color:var(--text)">'+s.to+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
+      +icon+'</span><span><b style="color:var(--text)">'+esc(s.from)+'</b> העביר ל<b style="color:var(--text)">'+esc(s.to)+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
   }).join('')+'</div>' : '';
   const settleBar=cost>0?`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (חלק שווה: ₪${share.toLocaleString()}/משפחה)</div>${transfers.length?settleLines:'<div style="font-size:12px;color:var(--green);padding:4px 0">✅ כולם מסודרים!</div>'}${doneHtml}</div>`:'';
   return`<div class="ecard" id="ecard-${ev.id}">
     <div class="ecard-head">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
-        <div class="ecard-title">${ev.name}</div>
+        <div class="ecard-title">${esc(ev.name)}</div>
         <span class="badge ${balanced&&cost>0?'badge-green':'badge-amber'}">${balanced&&cost>0?'מאוזן':'פעיל'}</span>
       </div>
-      <div class="ecard-meta">${ev.date}</div>
+      <div class="ecard-meta">${esc(ev.date)}</div>
     </div>
     <div class="members-list" id="mlist-${ev.id}">${mems}</div>
     ${exclLine}
@@ -610,7 +612,7 @@ function liveUpdateCard(evId,inputEl,changedFid){
   const sb=document.getElementById('settlebar-'+evId);
   if(sb&&cost>0){
     const lines=transfers.map(t=>`<div class="settle-row" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 0">
-      <span style="font-size:12px">👈 <b>${t.from}</b> מעביר ל<b>${t.to}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
+      <span style="font-size:12px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
     </div>`).join('');
     sb.innerHTML=`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (חלק שווה: ₪${share.toLocaleString()}/משפחה)</div>${transfers.length?lines:`<div style="font-size:12px;color:var(--green)">✅ כולם מסודרים!</div>`}</div>`;
   } else if(sb) sb.innerHTML='';
@@ -633,7 +635,7 @@ function renderArchive(){
     <div class="metric"><div class="metric-lbl">בארכיון</div><div class="metric-val g">${closed.length}</div></div>
     <div class="metric"><div class="metric-lbl">הוצאות</div><div class="metric-val">₪${total.toLocaleString()}</div></div>`;
   document.getElementById('yearRow').innerHTML=['all',...years].map(y=>
-    `<button class="ypill ${actYear===y?'active':''}" onclick="setYear('${y}')">${y==='all'?'הכל':y}</button>`).join('');
+    `<button class="ypill ${actYear===y?'active':''}" onclick="setYear('${esc(y)}')">${y==='all'?'הכל':esc(y)}</button>`).join('');
   const filtered=actYear==='all'?closed:closed.filter(e=>e.date.includes(actYear));
   if(!filtered.length){document.getElementById('archList').innerHTML=`<div class="empty"><span class="empty-ico">🗂️</span>${closed.length?'אין אירועים לשנה זו':'הארכיון ריק'}</div>`;return;}
   document.getElementById('archList').innerHTML=filtered.map(ev=>{
@@ -645,17 +647,17 @@ function renderArchive(){
       const b=evBalance(ev)[fid];
       return`<div class="amrow">
         <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px">${ini(f.name)}</div>
-        <span style="font-size:13px;font-weight:600;flex:1">${f.name.replace('משפחת','').trim()}</span>
+        <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
         <span style="font-size:12px;color:var(--text2)">שילם ₪${spent.toLocaleString()}</span>
         <span class="badge ${b>=0?'badge-green':'badge-amber'}" style="font-size:10px">${b>=0?'קיבל ₪'+b:'החזיר ₪'+Math.abs(b)}</span>
       </div>`;
     }).join('');
-    const exclLine=excl.length?`<div class="excl">לא השתתפו: ${excl.map(f=>f.name.replace('משפחת','').trim()).join(', ')}</div>`:'';
+    const exclLine=excl.length?`<div class="excl">לא השתתפו: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
     return`<div class="acard">
       <div class="acard-head">
         <div style="flex:1">
-          <div class="acard-title">🔒 ${ev.name}</div>
-          <div class="acard-meta">${ev.date} · ${ev.participants.length} משפחות · ₪${share.toLocaleString()}/משפחה</div>
+          <div class="acard-title">🔒 ${esc(ev.name)}</div>
+          <div class="acard-meta">${esc(ev.date)} · ${ev.participants.length} משפחות · ₪${share.toLocaleString()}/משפחה</div>
           ${ev.closedOn?`<div class="acard-closed">נסגר: ${ev.closedOn}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -676,7 +678,7 @@ function renderDebts(){
   families.forEach(f=>{debts[f.id]={total:0,evs:[]};});
   events.filter(e=>e.open).forEach(ev=>{
     const bal=evBalance(ev);
-    ev.participants.forEach(fid=>{ if(bal[fid]<0){debts[fid].total+=Math.abs(bal[fid]);debts[fid].evs.push(ev.name);} });
+    ev.participants.forEach(fid=>{ if(bal[fid]<0){debts[fid].total+=Math.abs(bal[fid]);debts[fid].evs.push(esc(ev.name));} });
   });
   const has=families.filter(f=>debts[f.id]?.total>0);
   const none=families.filter(f=>debts[f.id]?.total===0);
@@ -688,12 +690,12 @@ function renderDebts(){
     return`<div class="drow">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
-        <div><div class="dname">${f.name}</div><div class="devents">${d.evs.join(' · ')}</div></div>
+        <div><div class="dname">${esc(f.name)}</div><div class="devents">${d.evs.join(' · ')}</div></div>
       </div>
       <div><div class="damt">₪${d.total.toLocaleString()}</div><div class="dcnt">${d.evs.length} אירוע${d.evs.length>1?'ות':''}</div></div>
     </div>`;
   }).join('');
-  if(none.length)html+=`<div class="clean-row">✓ ללא חוב: ${none.map(f=>f.name.replace('משפחת','').trim()).join(', ')}</div>`;
+  if(none.length)html+=`<div class="clean-row">✓ ללא חוב: ${none.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`;
   html+=`</div>`;
   document.getElementById('debtList').innerHTML=html;
 }
@@ -702,7 +704,7 @@ function renderFamilies(){
     const cl=col(f.id);const cnt=events.filter(e=>e.participants.includes(f.id)).length;
     return`<div class="fcard">
       <div class="ava" style="background:${cl.bg};color:${cl.c};width:38px;height:38px">${ini(f.name)}</div>
-      <div><div class="fname">${f.name}</div><div class="fevents">${cnt} אירועים</div></div>
+      <div><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים</div></div>
       <button class="action-btn red" onclick="delFam(${f.id})">הסר</button>
     </div>`;
   }).join('');
@@ -734,7 +736,7 @@ function updateTotalPreview(){
     +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">חלוקה שווה: ₪'+share.toLocaleString()+' לכל משפחה</div>'
     +selected.map(f=>{ const cl=col(f.id); return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
       +'<div class="ava" style="background:'+cl.bg+';color:'+cl.c+';width:26px;height:26px;font-size:10px;flex-shrink:0">'+ini(f.name)+'</div>'
-      +'<span style="font-size:13px;flex:1">'+f.name.replace('משפחת','').trim()+'</span>'
+      +'<span style="font-size:13px;flex:1">'+esc(f.name.replace('משפחת','').trim())+'</span>'
       +'<span style="font-size:13px;font-weight:700;color:var(--green-mid)">₪'+share.toLocaleString()+'</span>'
       +'</div>'; }).join('')
     +'</div>';
@@ -744,7 +746,7 @@ function showForm(){
   document.getElementById('f-date').value='';
   ['e-name','e-cost','e-fams'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('show'); });
   document.getElementById('famChips').innerHTML=families.map(f=>
-    `<button class="chip on" id="chip-${f.id}" onclick="toggleChip(${f.id})">${f.name.replace('משפחת','').trim()}</button>`
+    `<button class="chip on" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
   ).join('');
   expMode='total';
   setExpMode('total');
@@ -768,7 +770,7 @@ function updateExpenseInputs(){
     const cl=col(f.id);
     return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
-      <span style="flex:1;font-size:13px;font-weight:600">${f.name.replace('משפחת','').trim()}</span>
+      <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
       <input class="exp-inp" type="number" min="0" inputmode="numeric" placeholder="₪0" id="fexp-${f.id}" oninput="updateFormTotal()">
     </div>`;
   }).join('');
@@ -865,7 +867,7 @@ function renderFund(){
     return`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
       <div class="ava" style="background:${cl.bg};color:${cl.c};width:36px;height:36px;flex-shrink:0">${ini(f.name)}</div>
       <div style="flex:1">
-        <div style="font-size:14px;font-weight:700">${f.name.replace('משפחת','').trim()}</div>
+        <div style="font-size:14px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div>
         <div style="font-size:13px;font-weight:600;color:${balColor};margin-top:2px">${balText}</div>
       </div>
       <div style="display:flex;gap:6px">
@@ -885,7 +887,7 @@ function renderFund(){
     const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
     return`<div class="fund-tx-row">
       <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
-      <span class="fund-tx-desc">${tx.desc}</span>
+      <span class="fund-tx-desc">${esc(tx.desc)}</span>
       <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
     </div>`;
   }).join('')}</div>`;
@@ -903,7 +905,7 @@ function openDepositSheet(famId, mode){
   const balColor=bal>0?'var(--green-mid)':bal===0?'var(--text3)':'var(--red-mid)';
   document.getElementById('depositFields').innerHTML=`
     <div style="font-size:13px;color:var(--text2);margin-bottom:10px">
-      ${isDeposit?'הפקדה':'משיכה'} עבור: <b>${name}</b> · יתרה נוכחית: <b style="color:${balColor}">₪${bal.toLocaleString()}</b>
+      ${isDeposit?'הפקדה':'משיכה'} עבור: <b>${esc(name)}</b> · יתרה נוכחית: <b style="color:${balColor}">₪${bal.toLocaleString()}</b>
     </div>
     <input type="number" min="0" inputmode="numeric" id="depositAmt" placeholder="${isDeposit?'סכום להפקדה':'סכום למשיכה'} (₪)"
       style="width:100%;border:1.5px solid ${isDeposit?'var(--green-mid)':'var(--red-mid)'};border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
@@ -964,42 +966,6 @@ const manifest = {
 };
 const mblob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 document.getElementById('manifestLink').href=URL.createObjectURL(mblob);
-
-// Detect platform and whether already installed
-const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
-const isAndroid=/android/i.test(navigator.userAgent);
-const isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
-
-let deferredPrompt=null;
-window.addEventListener('beforeinstallprompt',e=>{
-  e.preventDefault();
-  deferredPrompt=e;
-  setAndroidMode();
-});
-window.addEventListener('appinstalled',()=>{ document.getElementById('installBanner').style.display='none'; });
-
-function setAndroidMode(){
-  document.getElementById('installSubText').textContent='לחץ כדי להוסיף למסך הבית';
-  const btn=document.getElementById('installBtn');
-  if(btn) btn.style.display='block';
-}
-function setIOSMode(){
-  document.getElementById('installSubText').innerHTML='לחץ ⬆️ ← <b>הוסף למסך הבית</b>';
-}
-
-function doInstall(){
-  if(deferredPrompt){ deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('installBanner').style.display='none';}); }
-}
-
-function showInstallTip(){
-  if(isStandalone){ alert('האפליקציה כבר מותקנת! 🎉'); return; }
-  if(deferredPrompt){ doInstall(); return; }
-  if(isIOS){
-    alert('להוספה למסך הבית:\n\n1. לחץ על כפתור השיתוף ⬆️ בתחתית ספארי\n2. גלול ובחר "הוסף למסך הבית"\n3. לחץ "הוסף"');
-  } else {
-    alert('להוספה למסך הבית:\n\n1. לחץ על תפריט ⋮ (שלוש נקודות) בכרום\n2. בחר "הוסף למסך הבית"\n3. לחץ "הוסף"');
-  }
-}
 </script>
 </body>
 </html>
