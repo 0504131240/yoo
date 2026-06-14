@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -346,17 +347,12 @@ const evBalance=ev=>{ const share=evShare(ev); const res={}; ev.participants.for
 
 const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx-yCCHWiPlRQ1TjJs2OgbAY-jxjB9xKj12dpzsPkaP6HTlULDBSFfbDjoX4IQf115f/exec';
 
-function jsonp(url, params){
-  return new Promise((resolve,reject)=>{
-    const cb='_cb'+Date.now()+'_'+Math.random().toString(36).slice(2);
-    const t=setTimeout(()=>{cleanup();reject(new Error('timeout'));},20000);
-    function cleanup(){try{delete window[cb];}catch(e){}const s=document.getElementById(cb);if(s)s.remove();}
-    window[cb]=(r)=>{clearTimeout(t);cleanup();r&&r.ok!==false?resolve(r):reject(new Error(r&&r.error||'err'));};
-    const qs=Object.entries({...params,callback:cb}).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&');
-    const s=document.createElement('script');s.id=cb;s.src=url+'?'+qs;
-    s.onerror=()=>{clearTimeout(t);cleanup();reject(new Error('network error'));};
-    document.head.appendChild(s);
-  });
+async function jsonp(url, params){
+  const qs=Object.entries(params).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&');
+  const res=await fetch(url+'?'+qs);
+  const json=await res.json();
+  if(json&&json.ok===false) throw new Error(json.error||'error');
+  return json;
 }
 
 
