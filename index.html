@@ -348,12 +348,12 @@ const evShare=ev=>{ if(ev.totalCost!=null) return Math.round(ev.totalCost/ev.par
 const evBalance=ev=>{ const share=evShare(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-share; }); return res; };
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyA0MZMuGBBIXckhdiOZRZXRC_NPEte7pMA",
+  authDomain: "yossi20361.firebaseapp.com",
+  projectId: "yossi20361",
+  storageBucket: "yossi20361.firebasestorage.app",
+  messagingSenderId: "789621490367",
+  appId: "1:789621490367:web:e62376e9d46a86903f7c0a"
 };
 
 let _fb=null;
