@@ -106,7 +106,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .exp-input-row { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
 .exp-inp { width: 90px; border: 1.5px solid var(--border); border-radius: var(--r2); padding: 6px 9px; font-size: 14px; font-family: var(--font); background: var(--bg); color: var(--text); text-align: left; direction: ltr; }
 .exp-inp:focus { outline: none; border-color: var(--green-mid); }
-.exp-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; border: none; cursor: pointer; font-family: var(--font); flex-shrink: 0; white-space: nowrap; }
+.exp-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; border: none; font-family: var(--font); flex-shrink: 0; white-space: nowrap; }
+.exp-tag-clickable { cursor: pointer; }
 .exp-tag-pos { background: var(--red-bg); color: var(--red); }
 .exp-tag-neg { background: var(--green-bg); color: var(--green); }
 .exp-tag-zero { background: var(--surface2); color: var(--text2); }
@@ -575,12 +576,15 @@ function evCard(ev){
     const b=adjBal[fid];
     const tagClass=b>0.5?'exp-tag-neg':b<-0.5?'exp-tag-pos':'exp-tag-zero';
     const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
+    const tagTag=ev.totalCost!=null?'button':'span';
+    const tagClick=ev.totalCost!=null?` onclick="markSettled(${ev.id},${fid})"`:'';
+    const tagCls='exp-tag '+tagClass+(ev.totalCost!=null?' exp-tag-clickable':'');
     return`<div class="exp-input-row">
       <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
       <span class="mname">${esc(f.name.replace('משפחת','').trim())}</span>
       <input class="exp-inp" id="expinp-${ev.id}-${fid}" type="number" min="0" inputmode="numeric" placeholder="₪0"
         value="${spent||''}" oninput="liveUpdateCard(${ev.id},this,${fid})" onchange="updateExpense(${ev.id},${fid},this.value)">
-      <button class="exp-tag ${tagClass}" id="tag-${ev.id}-${fid}" onclick="markSettled(${ev.id},${fid})">${tagText}</button>
+      <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
     </div>`;
   }).join('');
   const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
@@ -638,7 +642,7 @@ function liveUpdateCard(evId,inputEl,changedFid){
     const spent=fid===changedFid?tmpExp[fid]:(ev.expenses[fid]||0);
     const b=bal[fid];
     const tag=document.getElementById('tag-'+evId+'-'+fid);if(!tag)return;
-    tag.className='exp-tag '+(b>0?'exp-tag-neg':b<0?'exp-tag-pos':'exp-tag-zero');
+    tag.className='exp-tag '+(b>0?'exp-tag-neg':b<0?'exp-tag-pos':'exp-tag-zero')+(ev.totalCost!=null?' exp-tag-clickable':'');
     tag.textContent=b>0?'מקבל ₪'+b.toLocaleString():b<0?'מחזיר ₪'+Math.abs(b).toLocaleString():'מסודר';
   });
   const bar=document.getElementById('totalbar-'+evId);
