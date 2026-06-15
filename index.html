@@ -1102,7 +1102,7 @@ function renderFund(){
       </div>
       <div style="display:flex;gap:6px">
         <button onclick="openDepositSheet(${f.id},'withdraw')" style="padding:8px 12px;border-radius:var(--r2);border:1px solid var(--border);background:var(--red-bg);color:var(--red);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">משיכה</button>
-        <button onclick="openDepositSheet(${f.id},'deposit')" style="padding:8px 12px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">הפקד</button>
+        <button onclick="openDepositSheet(${f.id},'deposit')" style="padding:8px 12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">הפקד</button>
       </div>
     </div>`;
   }).join('');
@@ -1240,13 +1240,13 @@ function openDepositSheet(famId, mode){
       ${isDeposit?'הפקדה':'משיכה'} עבור: <b>${esc(name)}</b> · יתרה נוכחית: <b style="color:${balColor}">₪${bal.toLocaleString()}</b>
     </div>
     <input type="number" min="0" inputmode="numeric" id="depositAmt" placeholder="${isDeposit?'סכום להפקדה':'סכום למשיכה'} (₪)"
-      style="width:100%;border:1.5px solid ${isDeposit?'var(--green-mid)':'var(--red-mid)'};border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+      style="width:100%;border:1.5px solid ${isDeposit?'var(--blue-mid)':'var(--red-mid)'};border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
   `;
   // update confirm button color and text
   const btn=document.querySelector('#depositSheet .fund-dep-btn');
   if(btn){
     btn.textContent=isDeposit?'✓ אשר הפקדה':'✓ אשר משיכה';
-    btn.style.background=isDeposit?'var(--green-mid)':'var(--red-mid)';
+    btn.style.background=isDeposit?'var(--blue-mid)':'var(--red-mid)';
   }
   document.getElementById('depositSheet').style.display='block';
   document.getElementById('depositSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
