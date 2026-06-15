@@ -406,6 +406,15 @@ const COLORS=[
 let families=[];
 let events=[];
 let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
+let collapsedEvents=new Set(),collapsedGoals=new Set();
+function toggleEvCollapse(evId){
+  if(collapsedEvents.has(evId))collapsedEvents.delete(evId);else collapsedEvents.add(evId);
+  renderOpenList();
+}
+function toggleGoalCollapse(goalId){
+  if(collapsedGoals.has(goalId))collapsedGoals.delete(goalId);else collapsedGoals.add(goalId);
+  renderGoalFunds();
+}
 // fund: יתרה פנימית לכל משפחה + היסטוריית תנועות
 // famBalances: {famId: number} — כמה כל משפחה הפקידה פחות מה שיצא
 // transactions: [{id,type:'deposit'|'payout',famId,toFamId?,amount,desc,date}]
@@ -735,6 +744,7 @@ function evCard(ev){
       +icon+'</span><span><b style="color:var(--text)">'+esc(s.from)+'</b> העביר ל<b style="color:var(--text)">'+esc(s.to)+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
   }).join('')+'</div>' : '';
   const settleBar=cost>0?`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (${shareLabel(ev)})</div>${transfers.length?settleLines:'<div style="font-size:12px;color:var(--green);padding:4px 0">✅ כולם מסודרים!</div>'}${doneHtml}</div>`:'';
+  const collapsed=collapsedEvents.has(ev.id);
   return`<div class="ecard" id="ecard-${ev.id}">
     <div class="ecard-head">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
@@ -743,18 +753,20 @@ function evCard(ev){
       </div>
       <div class="ecard-meta">${esc(ev.date)}</div>
     </div>
-    <div class="members-list" id="mlist-${ev.id}">${mems}</div>
-    ${exclLine}
     <div class="total-cost-bar" id="totalbar-${ev.id}">
       <span>סה"כ עלות האירוע</span>
       <span style="color:var(--green-mid);font-size:16px">₪${cost.toLocaleString()}</span>
     </div>
+    <button class="exp-btn" onclick="toggleEvCollapse(${ev.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
+    ${collapsed?'':`
+    <div class="members-list" id="mlist-${ev.id}">${mems}</div>
+    ${exclLine}
     <div id="settlebar-${ev.id}">${settleBar}</div>
     <div class="card-actions">
       <button class="action-btn" onclick="editEv(${ev.id})">✏️ ערוך</button>
       ${balanced&&cost>0?`<button class="action-btn green" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
       <button class="action-btn red" onclick="delEv(${ev.id})">🗑 מחק</button>
-    </div>
+    </div>`}
   </div>`;
 }
 function liveUpdateCard(evId,inputEl,changedFid){
@@ -1208,6 +1220,7 @@ function renderGoalFunds(){
       ?`<div class="pbar"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
         <div class="plabel">נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}</div>`
       :`<div class="plabel">נאסף ₪${total.toLocaleString()}</div>`;
+    const collapsed=collapsedGoals.has(g.id);
     return`<div class="fund-settle-card" style="margin-bottom:14px;${g.closed?'opacity:.6':''}">
       <div style="padding:13px 14px 10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
@@ -1215,12 +1228,14 @@ function renderGoalFunds(){
           ${reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
         </div>
         ${progressHtml}
+        <button class="exp-btn" onclick="toggleGoalCollapse(${g.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
       </div>
+      ${collapsed?'':`
       <div>${rows}</div>
       <div class="card-actions">
         <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
         <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
-      </div>
+      </div>`}
     </div>`;
   }).join('');
 }
