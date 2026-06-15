@@ -325,6 +325,24 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       </div>
     </div>
 
+    <!-- Goal funds -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;margin-top:18px">
+      <div class="fund-section-title" style="margin-bottom:0">🎯 קופות למטרה</div>
+      <button class="fund-dep-btn" onclick="openGoalForm()">+ קופה חדשה</button>
+    </div>
+    <div id="goalFormSheet" style="display:none;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px">קופה חדשה למטרה</div>
+      <input type="text" id="goalName" placeholder="שם הקופה (לדוגמה: מתנה לסבא)"
+        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
+      <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
+        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="addGoalFund()">✓ צור קופה</button>
+        <button onclick="closeGoalForm()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+      </div>
+    </div>
+    <div id="goalFundsList" style="margin-bottom:14px"></div>
+
     <div style="margin-top:14px">
       <div class="fund-section-title">📋 היסטוריית תנועות</div>
       <div id="fundTxList"></div>
@@ -369,6 +387,10 @@ let nxtTx=1;
 // סך הקופה = סכום כל היתרות החיוביות
 const fundTotal=()=>Object.values(fund.famBalances).filter(v=>v>0).reduce((s,v)=>s+v,0);
 const famFundBal=fid=>(fund.famBalances[String(fid)]||0);
+// קופות למטרה: {id, name, target, contributions:{famId:amount}, closed}
+let goalFunds=[];
+let nxtGoal=1;
+const goalTotal=g=>Object.values(g.contributions||{}).reduce((s,v)=>s+v,0);
 const col=id=>COLORS[(id-1)%COLORS.length];
 const ini=n=>n.replace('משפחת','').trim().slice(0,2);
 const getFam=id=>families.find(f=>f.id===id);
@@ -428,6 +450,7 @@ function saveLocal(){
     localStorage.setItem('ff',JSON.stringify(families));
     localStorage.setItem('fund',JSON.stringify(fund));
     localStorage.setItem('nxtTx',String(nxtTx));
+    localStorage.setItem('goalFunds',JSON.stringify(goalFunds));
   }catch(e){}
 }
 
@@ -438,7 +461,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds});
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
     console.warn('save failed:',e);
@@ -458,9 +481,11 @@ async function load(){
     events=d.events||[];
     fund=d.fund||{famBalances:{},transactions:[]};
     if(!fund.famBalances)fund.famBalances={};
+    goalFunds=d.goalFunds||[];
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
+    nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
     showSyncStatus('✓ מסונכרן',2000);
   }catch(e){
     console.warn('load failed:',e);
@@ -469,8 +494,10 @@ async function load(){
       const fa=localStorage.getItem('ff');if(fa)families=JSON.parse(fa);
       const fd=localStorage.getItem('fund');if(fd){const p=JSON.parse(fd);fund=p.famBalances?p:{famBalances:{},transactions:p.transactions||[]};}
       const tx=localStorage.getItem('nxtTx');if(tx)nxtTx=parseInt(tx);
+      const gf=localStorage.getItem('goalFunds');if(gf)goalFunds=JSON.parse(gf);
       nxtId=events.reduce((a,e)=>Math.max(a,e.id),0)+1;
       nxtFam=families.reduce((a,f)=>Math.max(a,f.id),0)+1;
+      nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
       if(!fund.famBalances)fund.famBalances={};
     }catch(e2){}
     showSyncStatus('⚠ מקומי בלבד',3000);
@@ -494,7 +521,7 @@ function showSyncStatus(msg,hideAfter){
 }
 
 function render(){
-  renderHome();renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();
+  renderHome();renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();renderGoalFunds();
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
   document.getElementById('topSub').textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופה: ₪'+fundTotal().toLocaleString();
@@ -1040,6 +1067,86 @@ function renderFund(){
       <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
     </div>`;
   }).join('')}</div>`;
+}
+
+function openGoalForm(){
+  document.getElementById('goalFormSheet').style.display='block';
+  document.getElementById('goalFormSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function closeGoalForm(){
+  document.getElementById('goalFormSheet').style.display='none';
+  document.getElementById('goalName').value='';
+  document.getElementById('goalTarget').value='';
+}
+function addGoalFund(){
+  const name=document.getElementById('goalName').value.trim();
+  if(!name){ alert('נא להזין שם לקופה'); return; }
+  const target=Math.max(0,parseFloat(document.getElementById('goalTarget').value)||0);
+  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false});
+  closeGoalForm();
+  save();render();
+}
+function addGoalContribution(goalId,famId){
+  const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
+  const inp=document.getElementById('goalinp-'+goalId+'-'+famId);
+  const amt=parseFloat(inp.value)||0;
+  if(amt<=0)return;
+  g.contributions[famId]=(g.contributions[famId]||0)+amt;
+  inp.value='';
+  save();render();
+}
+function toggleGoalClosed(goalId){
+  const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
+  g.closed=!g.closed;
+  save();render();
+}
+function delGoalFund(goalId){
+  if(!confirm('למחוק את הקופה? כל ההפקדות יימחקו'))return;
+  goalFunds=goalFunds.filter(g=>g.id!==goalId);
+  save();render();
+}
+function renderGoalFunds(){
+  const el=document.getElementById('goalFundsList');
+  if(!el)return;
+  if(!goalFunds.length){
+    el.innerHTML=`<div class="empty" style="padding:30px 20px"><span class="empty-ico">🎯</span>אין קופות למטרה<br><span style="font-size:12px">לדוגמה: קופה למתנה לסבא</span></div>`;
+    return;
+  }
+  el.innerHTML=goalFunds.map(g=>{
+    const total=goalTotal(g);
+    const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
+    const reached=g.target>0&&total>=g.target;
+    const rows=families.map(f=>{
+      const cl=col(f.id);
+      const c=g.contributions[f.id]||0;
+      return`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
+        <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px">${ini(f.name)}</div>
+        <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
+        <span style="font-size:12px;color:var(--text2)">₪${c.toLocaleString()}</span>
+        <input type="number" min="0" inputmode="numeric" id="goalinp-${g.id}-${f.id}" placeholder="₪0"
+          style="width:64px;border:1.5px solid var(--border);border-radius:var(--r2);padding:5px 6px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+        <button onclick="addGoalContribution(${g.id},${f.id})" style="padding:6px 10px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">הפקד</button>
+      </div>`;
+    }).join('');
+    const progressHtml=g.target>0
+      ?`<div class="pbar"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
+        <div class="plabel">נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}</div>`
+      :`<div class="plabel">נאסף ₪${total.toLocaleString()}</div>`;
+    return`<div class="fund-settle-card" style="margin-bottom:14px;${g.closed?'opacity:.6':''}">
+      <div style="padding:13px 14px 10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+          <div style="font-size:15px;font-weight:700">🎯 ${esc(g.name)}</div>
+          ${reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
+        </div>
+        ${progressHtml}
+      </div>
+      <div>${rows}</div>
+      <div class="card-actions">
+        <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
+        <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 let _depositFamId=null;
