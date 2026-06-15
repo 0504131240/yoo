@@ -104,12 +104,10 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .exp-input-row { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
 .exp-inp { width: 90px; border: 1.5px solid var(--border); border-radius: var(--r2); padding: 6px 9px; font-size: 14px; font-family: var(--font); background: var(--bg); color: var(--text); text-align: left; direction: ltr; }
 .exp-inp:focus { outline: none; border-color: var(--green-mid); }
-.exp-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+.exp-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; border: none; cursor: pointer; font-family: var(--font); flex-shrink: 0; white-space: nowrap; }
 .exp-tag-pos { background: var(--red-bg); color: var(--red); }
 .exp-tag-neg { background: var(--green-bg); color: var(--green); }
 .exp-tag-zero { background: var(--surface2); color: var(--text2); }
-.paid-full-btn { font-size: 11px; font-weight: 700; padding: 6px 8px; border-radius: var(--r2); border: 1.5px solid var(--green-mid); background: transparent; color: var(--green-mid); cursor: pointer; font-family: var(--font); flex-shrink: 0; white-space: nowrap; }
-.paid-full-btn:active { background: var(--green-bg); }
 .settle-bar { background: var(--blue-bg); border-top: 1px solid var(--border); padding: 10px 14px; }
 .settle-title { font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 6px; }
 .settle-row { font-size: 12px; color: var(--text); margin-bottom: 3px; }
@@ -545,10 +543,9 @@ function evCard(ev){
     return`<div class="exp-input-row">
       <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
       <span class="mname">${esc(f.name.replace('משפחת','').trim())}</span>
-      <button class="paid-full-btn" onclick="markSettled(${ev.id},${fid})">✓ סודר</button>
       <input class="exp-inp" id="expinp-${ev.id}-${fid}" type="number" min="0" inputmode="numeric" placeholder="₪0"
         value="${spent||''}" oninput="liveUpdateCard(${ev.id},this,${fid})" onchange="updateExpense(${ev.id},${fid},this.value)">
-      <span class="exp-tag ${tagClass}" id="tag-${ev.id}-${fid}">${tagText}</span>
+      <button class="exp-tag ${tagClass}" id="tag-${ev.id}-${fid}" onclick="markSettled(${ev.id},${fid})">${tagText}</button>
     </div>`;
   }).join('');
   const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
