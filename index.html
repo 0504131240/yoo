@@ -202,7 +202,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   <div class="view active" id="view-events">
     <!-- New event form (hidden by default) -->
     <div class="new-form" id="newForm" style="display:none">
-      <h2>➕ אירוע חדש</h2>
+      <h2 id="formTitle">➕ אירוע חדש</h2>
       <div class="field">
         <label>שם האירוע *</label>
         <input type="text" id="f-name" placeholder="מנגל, צימר, ארוחה...">
@@ -242,7 +242,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
         <div class="err-txt" id="e-cost">נא להזין סכום</div>
       </div>
       <div class="form-btns">
-        <button class="save-btn" onclick="doCreate()">✓ צור אירוע</button>
+        <button class="save-btn" id="formSaveBtn" onclick="doCreate()">✓ צור אירוע</button>
         <button onclick="hideForm()">ביטול</button>
       </div>
     </div>
@@ -585,6 +585,7 @@ function evCard(ev){
     </div>
     <div id="settlebar-${ev.id}">${settleBar}</div>
     <div class="card-actions">
+      <button class="action-btn" onclick="editEv(${ev.id})">✏️ ערוך</button>
       ${balanced&&cost>0?`<button class="action-btn green" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
       <button class="action-btn red" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>
@@ -667,6 +668,7 @@ function renderArchive(){
       </div>
       ${isExp?`<div class="acard-body">${mems}${exclLine}
         <div class="card-actions">
+          <button class="action-btn" onclick="editEv(${ev.id})">✏️ ערוך</button>
           <button class="action-btn" onclick="reopenEv(${ev.id})">🔓 פתח מחדש</button>
           <button class="action-btn red" onclick="delEv(${ev.id})">🗑 מחק</button>
         </div></div>`:''}
@@ -712,6 +714,7 @@ function renderFamilies(){
 
 // Form
 let expMode='total';
+let editingId=null;
 function setExpMode(mode){
   expMode=mode;
   const isTotal=mode==='total';
@@ -742,6 +745,9 @@ function updateTotalPreview(){
     +'</div>';
 }
 function showForm(){
+  editingId=null;
+  document.getElementById('formTitle').textContent='➕ אירוע חדש';
+  document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
   document.getElementById('f-name').value='';
   document.getElementById('f-date').value='';
   ['e-name','e-cost','e-fams'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('show'); });
@@ -757,7 +763,38 @@ function showForm(){
   document.getElementById('newForm').scrollIntoView({behavior:'smooth',block:'start'});
   goTab('events',document.getElementById('nb-events'));
 }
-function hideForm(){ document.getElementById('newForm').style.display='none'; }
+function editEv(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  editingId=evId;
+  document.getElementById('formTitle').textContent='✏️ עריכת אירוע';
+  document.getElementById('formSaveBtn').textContent='✓ שמור שינויים';
+  document.getElementById('f-name').value=ev.name;
+  document.getElementById('f-date').value=ev.date==='לא צוין'?'':ev.date;
+  ['e-name','e-cost','e-fams'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('show'); });
+  document.getElementById('famChips').innerHTML=families.map(f=>
+    `<button class="chip ${ev.participants.includes(f.id)?'on':''}" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
+  ).join('');
+  if(ev.totalCost!=null){
+    expMode='total';
+    setExpMode('total');
+    document.getElementById('f-total').value=ev.totalCost;
+    updateTotalPreview();
+  } else {
+    expMode='custom';
+    setExpMode('custom');
+    ev.participants.forEach(fid=>{ const inp=document.getElementById('fexp-'+fid); if(inp) inp.value=ev.expenses[fid]||''; });
+    updateFormTotal();
+  }
+  document.getElementById('newForm').style.display='block';
+  document.getElementById('newForm').scrollIntoView({behavior:'smooth',block:'start'});
+  goTab('events',document.getElementById('nb-events'));
+}
+function hideForm(){
+  document.getElementById('newForm').style.display='none';
+  editingId=null;
+  document.getElementById('formTitle').textContent='➕ אירוע חדש';
+  document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
+}
 function toggleChip(fid){
   const el=document.getElementById('chip-'+fid);
   if(el){ el.classList.toggle('on'); if(expMode==='total') updateTotalPreview(); else updateExpenseInputs(); }
@@ -814,7 +851,12 @@ function doCreate(){
   }
   if(!ok)return;
   const totalCost=expMode==='total'?(parseFloat(document.getElementById('f-total')?.value)||0):null;
-  events.unshift({id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost});
+  if(editingId!=null){
+    const ev=events.find(e=>e.id===editingId);
+    if(ev){ ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded; ev.expenses=expenses; ev.totalCost=totalCost; }
+  } else {
+    events.unshift({id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost});
+  }
   hideForm();save();render();
 }
 
