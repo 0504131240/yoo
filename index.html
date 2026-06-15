@@ -238,7 +238,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   <!-- EVENTS -->
   <div class="view" id="view-events">
     <!-- New event form (hidden by default) -->
-    <div class="new-form" id="newForm" style="display:none">
+    <div id="newFormOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)hideForm()">
+    <div class="new-form" id="newForm" style="width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-sizing:border-box">
       <h2 id="formTitle">➕ אירוע חדש</h2>
       <div class="field">
         <label>שם האירוע *</label>
@@ -251,7 +252,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       </div>
       <div class="field">
         <label>משפחות משתתפות</label>
-        <div class="chips" id="famChips"></div>
+        <button type="button" class="action-btn" style="width:100%;box-sizing:border-box" onclick="openFamPicker()">👥 <span id="famPickSummary">מי משתתף</span></button>
         <div class="err-txt" id="e-fams">נא לבחור לפחות משפחה אחת</div>
       </div>
       <div class="field">
@@ -293,6 +294,18 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       <div class="form-btns">
         <button class="save-btn" id="formSaveBtn" onclick="doCreate()">✓ צור אירוע</button>
         <button onclick="hideForm()">ביטול</button>
+      </div>
+    </div>
+    </div>
+
+    <!-- Family picker modal (hidden by default) -->
+    <div id="famPickOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1100;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamPicker()">
+      <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">מי משתתף באירוע</div>
+        <div class="chips" id="famChips"></div>
+        <div class="form-btns">
+          <button class="save-btn" onclick="closeFamPicker()">✓ אישור</button>
+        </div>
       </div>
     </div>
 
@@ -1054,14 +1067,14 @@ function showForm(){
   document.getElementById('famChips').innerHTML=families.map(f=>
     `<button class="chip on" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
   ).join('');
+  updateFamPickSummary();
   setSplitMethod('equal');
   expMode='total';
   setExpMode('total');
   if(document.getElementById('f-total')) document.getElementById('f-total').value='';
   document.getElementById('expensesSection').style.display='none';
   updateExpenseInputs();
-  document.getElementById('newForm').style.display='block';
-  document.getElementById('newForm').scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('newFormOverlay').style.display='flex';
   goTab('events',document.getElementById('nb-events'));
 }
 function editEv(evId){
@@ -1075,6 +1088,7 @@ function editEv(evId){
   document.getElementById('famChips').innerHTML=families.map(f=>
     `<button class="chip ${ev.participants.includes(f.id)?'on':''}" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
   ).join('');
+  updateFamPickSummary();
   setSplitMethod(ev.splitMethod||'equal');
   if(ev.totalCost!=null){
     expMode='total';
@@ -1087,19 +1101,30 @@ function editEv(evId){
     ev.participants.forEach(fid=>{ const inp=document.getElementById('fexp-'+fid); if(inp) inp.value=ev.expenses[fid]||''; });
     updateFormTotal();
   }
-  document.getElementById('newForm').style.display='block';
-  document.getElementById('newForm').scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('newFormOverlay').style.display='flex';
   goTab('events',document.getElementById('nb-events'));
 }
 function hideForm(){
-  document.getElementById('newForm').style.display='none';
+  document.getElementById('newFormOverlay').style.display='none';
+  closeFamPicker();
   editingId=null;
   document.getElementById('formTitle').textContent='➕ אירוע חדש';
   document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
 }
 function toggleChip(fid){
   const el=document.getElementById('chip-'+fid);
-  if(el){ el.classList.toggle('on'); updateChildOverrideInputs(); if(expMode==='total') updateTotalPreview(); else updateExpenseInputs(); }
+  if(el){ el.classList.toggle('on'); updateFamPickSummary(); updateChildOverrideInputs(); if(expMode==='total') updateTotalPreview(); else updateExpenseInputs(); }
+}
+function openFamPicker(){
+  document.getElementById('famPickOverlay').style.display='flex';
+}
+function closeFamPicker(){
+  document.getElementById('famPickOverlay').style.display='none';
+}
+function updateFamPickSummary(){
+  const el=document.getElementById('famPickSummary');if(!el)return;
+  const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
+  el.textContent=selected.length?selected.length+' מתוך '+families.length+' משפחות נבחרו':'מי משתתף';
 }
 function updateExpenseInputs(){
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
