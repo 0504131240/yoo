@@ -301,6 +301,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   <div class="view" id="view-archive">
     <div class="year-row" id="yearRow"></div>
     <div id="archList"></div>
+    <div id="archGoalList"></div>
   </div>
 
   <!-- DEBTS -->
@@ -406,7 +407,7 @@ const COLORS=[
 let families=[];
 let events=[];
 let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
-let collapsedEvents=new Set(),collapsedGoals=new Set();
+let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId))collapsedEvents.delete(evId);else collapsedEvents.add(evId);
   renderOpenList();
@@ -611,7 +612,7 @@ function renderHome(){
     </div>`;
   }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
 
-  const openGoals=goalFunds.filter(g=>!g.closed);
+  const openGoals=goalFunds.filter(g=>!g.closed&&!g.archived);
   const goalSection=document.getElementById('homeGoalSection');
   goalSection.style.display=openGoals.length?'block':'none';
   document.getElementById('homeGoalList').innerHTML=openGoals.map(g=>{
@@ -812,7 +813,44 @@ function markSettled(evId,fid){
   if(inp){ inp.value=amount; liveUpdateCard(evId,inp,fid); }
   updateExpense(evId,fid,amount);
 }
+function renderArchiveGoals(){
+  const el=document.getElementById('archGoalList');
+  if(!el)return;
+  const archived=goalFunds.filter(g=>g.archived);
+  if(!archived.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="sec-ttl" style="margin-top:18px">קופות מטרה בארכיון</div>`+archived.map(g=>{
+    const total=goalTotal(g);
+    const isExp=expandedArchGoals.has(g.id);
+    const rows=families.map(f=>{
+      const cl=col(f.id);
+      const c=g.contributions[f.id]||0;
+      return`<div class="amrow">
+        <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px">${ini(f.name)}</div>
+        <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
+        <span style="font-size:12px;color:var(--text2)">הפקיד ₪${c.toLocaleString()}</span>
+      </div>`;
+    }).join('');
+    return`<div class="acard">
+      <div class="acard-head">
+        <div style="flex:1">
+          <div class="acard-title">🔒 🎯 ${esc(g.name)}</div>
+          <div class="acard-meta">${g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <span class="total-chip">₪${total.toLocaleString()}</span>
+          <button class="exp-btn" onclick="toggleArchGoalExp(${g.id})">${isExp?'▲ סגור':'▼ פרטים'}</button>
+        </div>
+      </div>
+      ${isExp?`<div class="acard-body">${rows}
+        <div class="card-actions">
+          <button class="action-btn" onclick="reopenGoalFund(${g.id})">🔓 פתח מחדש</button>
+          <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
+        </div></div>`:''}
+    </div>`;
+  }).join('');
+}
 function renderArchive(){
+  renderArchiveGoals();
   const closed=events.filter(e=>!e.open);
   const years=[...new Set(closed.map(e=>e.date.split(' ').pop()))].sort((a,b)=>b-a);
   document.getElementById('yearRow').innerHTML=['all',...years].map(y=>
@@ -1148,7 +1186,7 @@ function addGoalFund(){
   const name=document.getElementById('goalName').value.trim();
   if(!name){ alert('נא להזין שם לקופה'); return; }
   const target=Math.max(0,parseFloat(document.getElementById('goalTarget').value)||0);
-  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false});
+  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false});
   closeGoalForm();
   save();render();
 }
@@ -1195,14 +1233,31 @@ function delGoalFund(goalId){
   goalFunds=goalFunds.filter(g=>g.id!==goalId);
   save();render();
 }
+function archiveGoalFund(goalId){
+  const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
+  g.archived=true;collapsedGoals.delete(goalId);
+  save();render();
+  goTab('archive',document.getElementById('nb-archive'));
+}
+function reopenGoalFund(goalId){
+  const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
+  g.archived=false;expandedArchGoals.delete(goalId);
+  save();render();
+  goTab('fund',document.getElementById('nb-fund'));
+}
+function toggleArchGoalExp(goalId){
+  if(expandedArchGoals.has(goalId))expandedArchGoals.delete(goalId);else expandedArchGoals.add(goalId);
+  renderArchive();
+}
 function renderGoalFunds(){
   const el=document.getElementById('goalFundsList');
   if(!el)return;
-  if(!goalFunds.length){
+  const activeGoals=goalFunds.filter(g=>!g.archived);
+  if(!activeGoals.length){
     el.innerHTML=`<div class="empty" style="padding:30px 20px"><span class="empty-ico">🎯</span>אין קופות למטרה<br><span style="font-size:12px">לדוגמה: קופה למתנה לסבא</span></div>`;
     return;
   }
-  el.innerHTML=goalFunds.map(g=>{
+  el.innerHTML=activeGoals.map(g=>{
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
@@ -1234,6 +1289,7 @@ function renderGoalFunds(){
       <div>${rows}</div>
       <div class="card-actions">
         <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
+        <button class="action-btn green" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
         <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
       </div>`}
     </div>`;
