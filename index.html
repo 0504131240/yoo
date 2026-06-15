@@ -204,8 +204,21 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 
 <div class="main">
 
+  <!-- HOME -->
+  <div class="view active" id="view-home">
+    <div class="sec-ttl">אירועים פעילים</div>
+    <div id="homeEventList"></div>
+    <div class="fund-balance" style="margin-top:6px;cursor:pointer" onclick="goTab('fund',document.getElementById('nb-fund'))">
+      <div>
+        <div class="fund-bal-lbl">💰 יתרת קופה משותפת</div>
+        <div class="fund-bal-amt" id="homeFundAmt">₪0</div>
+      </div>
+      <span style="font-size:20px">›</span>
+    </div>
+  </div>
+
   <!-- EVENTS -->
-  <div class="view active" id="view-events">
+  <div class="view" id="view-events">
     <!-- New event form (hidden by default) -->
     <div class="new-form" id="newForm" style="display:none">
       <h2 id="formTitle">➕ אירוע חדש</h2>
@@ -321,7 +334,10 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 </div>
 
 <nav class="bottom-nav">
-  <button class="nav-btn active" id="nb-events" onclick="goTab('events',this)">
+  <button class="nav-btn active" id="nb-home" onclick="goTab('home',this)">
+    <span class="nav-icon">🏠</span>בית
+  </button>
+  <button class="nav-btn" id="nb-events" onclick="goTab('events',this)">
     <span class="nav-icon">📅</span>אירועים
   </button>
   <button class="nav-btn" id="nb-archive" onclick="goTab('archive',this)">
@@ -478,7 +494,7 @@ function showSyncStatus(msg,hideAfter){
 }
 
 function render(){
-  renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();
+  renderHome();renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
   document.getElementById('topSub').textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופה: ₪'+fundTotal().toLocaleString();
@@ -502,6 +518,32 @@ function renderMetrics(){
 function renderOpenList(){
   const open=events.filter(e=>e.open);
   document.getElementById('openList').innerHTML=open.length?open.map(evCard).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
+}
+function renderHome(){
+  document.getElementById('homeFundAmt').textContent='₪'+fundTotal().toLocaleString();
+  const open=events.filter(e=>e.open);
+  document.getElementById('homeEventList').innerHTML=open.length?open.map(ev=>{
+    const cost=evCost(ev);
+    const remaining=calcTransfers(ev).reduce((s,t)=>s+t.amt,0);
+    return`<div class="dcard">
+      <div class="drow" style="cursor:pointer" onclick="goToEvent(${ev.id})">
+        <div>
+          <div class="dname">${esc(ev.name)}</div>
+          <div class="devents">${esc(ev.date)} · עלות: ₪${cost.toLocaleString()}</div>
+        </div>
+        ${remaining>0
+          ?`<div><div class="damt">₪${remaining.toLocaleString()}</div><div class="devents" style="text-align:left">נותר לסידור</div></div>`
+          :`<span class="badge badge-green">✅ מאוזן</span>`}
+      </div>
+    </div>`;
+  }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
+}
+function goToEvent(evId){
+  goTab('events',document.getElementById('nb-events'));
+  setTimeout(()=>{
+    const el=document.getElementById('ecard-'+evId);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  },50);
 }
 function calcTransfers(ev, includeSettled){
   const bal=evBalance(ev);
