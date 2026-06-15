@@ -51,6 +51,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .field input:focus { outline: none; border-color: var(--green-mid); }
 .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 .chip { padding: 10px 10px; border: 1.5px solid var(--border); border-radius: var(--r2); background: var(--surface); color: var(--text); font-size: 13px; font-family: var(--font); cursor: pointer; text-align: center; font-weight: 500; }
+.split-btn { flex: 1; min-width: 100px; padding: 9px 6px; border-radius: var(--r2); border: 1.5px solid var(--border); background: transparent; color: var(--text2); font-size: 12px; font-weight: 700; font-family: var(--font); cursor: pointer; }
+.split-btn.active { background: var(--green-mid); color: #fff; border-color: var(--green-mid); }
 .chip.on { border-color: var(--green-mid); background: var(--green-bg); color: var(--green); }
 .err-txt { font-size: 12px; color: var(--red-mid); margin-top: 4px; display: none; }
 .err-txt.show { display: block; }
@@ -145,8 +147,11 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .fam-add { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 12px 14px; margin-bottom: 12px; display: flex; gap: 8px; }
 .fam-add input { flex: 1; border: 1.5px solid var(--border); border-radius: var(--r2); padding: 9px 12px; font-size: 14px; font-family: var(--font); background: var(--bg); color: var(--text); direction: rtl; }
 .fcard { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
-.fname { font-size: 14px; font-weight: 700; flex: 1; }
+.fname { font-size: 14px; font-weight: 700; }
 .fevents { font-size: 12px; color: var(--text2); }
+.children-field { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+.children-field label { font-size: 10px; color: var(--text2); }
+.children-inp { width: 44px; border: 1.5px solid var(--border); border-radius: var(--r2); padding: 5px; font-size: 13px; font-family: var(--font); background: var(--bg); color: var(--text); text-align: center; }
 
 /* Empty */
 .empty { text-align: center; padding: 48px 20px; color: var(--text2); }
@@ -216,6 +221,14 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
         <label>משפחות משתתפות</label>
         <div class="chips" id="famChips"></div>
         <div class="err-txt" id="e-fams">נא לבחור לפחות משפחה אחת</div>
+      </div>
+      <div class="field">
+        <label>חלוקת ההוצאה</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="split-btn" id="splitEqual" onclick="setSplitMethod('equal')">שווה לכל משפחה</button>
+          <button type="button" class="split-btn" id="splitPercapita" onclick="setSplitMethod('percapita')">לפי נפשות</button>
+          <button type="button" class="split-btn" id="splitWeighted" onclick="setSplitMethod('weighted')">ילד = 50%</button>
+        </div>
       </div>
       <div class="field" id="expensesSection" style="display:none">
         <!-- Mode toggle -->
@@ -344,8 +357,31 @@ const ini=n=>n.replace('משפחת','').trim().slice(0,2);
 const getFam=id=>families.find(f=>f.id===id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const evCost=ev=>ev.totalCost!=null?ev.totalCost:ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0);
-const evShare=ev=>{ if(ev.totalCost!=null) return Math.round(ev.totalCost/ev.participants.length); const n=ev.participants.length; return n?Math.round(evCost(ev)/n):0; };
-const evBalance=ev=>{ const share=evShare(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-share; }); return res; };
+const evShare=ev=>{ const n=ev.participants.length; return n?Math.round(evCost(ev)/n):0; };
+const FAM_ADULTS=2;
+const SPLIT_LABELS={equal:'שווה לכל משפחה',percapita:'לפי נפשות',weighted:'ילד = 50% ממבוגר'};
+const famWeight=(f,method)=>{
+  if(!f) return 1;
+  const ch=f.children||0;
+  if(method==='percapita') return FAM_ADULTS+ch;
+  if(method==='weighted') return FAM_ADULTS+ch*0.5;
+  return 1;
+};
+const evShares=ev=>{
+  const method=ev.splitMethod||'equal';
+  const cost=evCost(ev);
+  let totalW=0; const w={};
+  ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method); totalW+=w[fid]; });
+  const shares={};
+  ev.participants.forEach(fid=>{ shares[fid]=totalW?Math.round(cost*w[fid]/totalW):0; });
+  return shares;
+};
+const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
+const shareLabel=ev=>{
+  const method=ev.splitMethod||'equal';
+  if(method==='equal') return 'חלק שווה: ₪'+evShare(ev).toLocaleString()+'/משפחה';
+  return 'חלוקה: '+SPLIT_LABELS[method]+' · סה"כ ₪'+evCost(ev).toLocaleString();
+};
 
 const firebaseConfig = {
   apiKey: "AIzaSyA0MZMuGBBIXckhdiOZRZXRC_NPEte7pMA",
@@ -520,7 +556,6 @@ function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
 }
 function evCard(ev){
   const cost=evCost(ev);
-  const share=evShare(ev);
   const bal=evBalance(ev);
   const excl=families.filter(f=>ev.excluded.includes(f.id));
   const transfers=calcTransfers(ev);
@@ -568,7 +603,7 @@ function evCard(ev){
     return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">'
       +icon+'</span><span><b style="color:var(--text)">'+esc(s.from)+'</b> העביר ל<b style="color:var(--text)">'+esc(s.to)+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
   }).join('')+'</div>' : '';
-  const settleBar=cost>0?`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (חלק שווה: ₪${share.toLocaleString()}/משפחה)</div>${transfers.length?settleLines:'<div style="font-size:12px;color:var(--green);padding:4px 0">✅ כולם מסודרים!</div>'}${doneHtml}</div>`:'';
+  const settleBar=cost>0?`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (${shareLabel(ev)})</div>${transfers.length?settleLines:'<div style="font-size:12px;color:var(--green);padding:4px 0">✅ כולם מסודרים!</div>'}${doneHtml}</div>`:'';
   return`<div class="ecard" id="ecard-${ev.id}">
     <div class="ecard-head">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
@@ -598,7 +633,6 @@ function liveUpdateCard(evId,inputEl,changedFid){
   tmpExp[changedFid]=parseFloat(inputEl.value)||0;
   const tmpEv={...ev,expenses:tmpExp};
   const cost=evCost(tmpEv);
-  const share=evShare(tmpEv);
   const bal=evBalance(tmpEv);
   ev.participants.forEach(fid=>{
     const spent=fid===changedFid?tmpExp[fid]:(ev.expenses[fid]||0);
@@ -615,7 +649,7 @@ function liveUpdateCard(evId,inputEl,changedFid){
     const lines=transfers.map(t=>`<div class="settle-row" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 0">
       <span style="font-size:12px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
     </div>`).join('');
-    sb.innerHTML=`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (חלק שווה: ₪${share.toLocaleString()}/משפחה)</div>${transfers.length?lines:`<div style="font-size:12px;color:var(--green)">✅ כולם מסודרים!</div>`}</div>`;
+    sb.innerHTML=`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (${shareLabel(tmpEv)})</div>${transfers.length?lines:`<div style="font-size:12px;color:var(--green)">✅ כולם מסודרים!</div>`}</div>`;
   } else if(sb) sb.innerHTML='';
 }
 function updateExpense(evId,famId,val){
@@ -630,7 +664,7 @@ function updateExpense(evId,famId,val){
 }
 function markSettled(evId,fid){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const amount=evShare(ev);
+  const amount=evShares(ev)[fid]||0;
   const inp=document.getElementById('expinp-'+evId+'-'+fid);
   if(inp){ inp.value=amount; liveUpdateCard(evId,inp,fid); }
   updateExpense(evId,fid,amount);
@@ -647,7 +681,7 @@ function renderArchive(){
   const filtered=actYear==='all'?closed:closed.filter(e=>e.date.includes(actYear));
   if(!filtered.length){document.getElementById('archList').innerHTML=`<div class="empty"><span class="empty-ico">🗂️</span>${closed.length?'אין אירועים לשנה זו':'הארכיון ריק'}</div>`;return;}
   document.getElementById('archList').innerHTML=filtered.map(ev=>{
-    const cost=evCost(ev);const share=evShare(ev);const isExp=expanded.has(ev.id);
+    const cost=evCost(ev);const isExp=expanded.has(ev.id);
     const excl=families.filter(f=>ev.excluded.includes(f.id));
     const mems=ev.participants.map(fid=>{
       const f=getFam(fid);if(!f)return'';const cl=col(fid);
@@ -665,7 +699,7 @@ function renderArchive(){
       <div class="acard-head">
         <div style="flex:1">
           <div class="acard-title">🔒 ${esc(ev.name)}</div>
-          <div class="acard-meta">${esc(ev.date)} · ${ev.participants.length} משפחות · ₪${share.toLocaleString()}/משפחה</div>
+          <div class="acard-meta">${esc(ev.date)} · ${ev.participants.length} משפחות · ${shareLabel(ev)}</div>
           ${ev.closedOn?`<div class="acard-closed">נסגר: ${ev.closedOn}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -713,15 +747,32 @@ function renderFamilies(){
     const cl=col(f.id);const cnt=events.filter(e=>e.participants.includes(f.id)).length;
     return`<div class="fcard">
       <div class="ava" style="background:${cl.bg};color:${cl.c};width:38px;height:38px">${ini(f.name)}</div>
-      <div><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים</div></div>
+      <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים</div></div>
+      <div class="children-field">
+        <label>ילדים</label>
+        <input class="children-inp" type="number" min="0" inputmode="numeric" value="${f.children||0}" onchange="setFamChildren(${f.id},this.value)">
+      </div>
       <button class="action-btn red" onclick="delFam(${f.id})">הסר</button>
     </div>`;
   }).join('');
+}
+function setFamChildren(fid,val){
+  const f=families.find(x=>x.id===fid);if(!f)return;
+  f.children=Math.max(0,parseInt(val)||0);
+  save();render();
 }
 
 // Form
 let expMode='total';
 let editingId=null;
+let splitMethod='equal';
+function setSplitMethod(method){
+  splitMethod=method;
+  ['splitEqual','splitPercapita','splitWeighted'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  const ids={equal:'splitEqual',percapita:'splitPercapita',weighted:'splitWeighted'};
+  document.getElementById(ids[method]).classList.add('active');
+  if(expMode==='total') updateTotalPreview();
+}
 function setExpMode(mode){
   expMode=mode;
   const isTotal=mode==='total';
@@ -740,11 +791,12 @@ function updateTotalPreview(){
   const total=parseFloat(document.getElementById('f-total')?.value)||0;
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   if(!selected.length||!total){ document.getElementById('totalPreview').innerHTML=''; return; }
-  const share=Math.round(total/selected.length);
+  let totalW=0; const w={};
+  selected.forEach(f=>{ w[f.id]=famWeight(f,splitMethod); totalW+=w[f.id]; });
   document.getElementById('totalPreview').innerHTML=
     '<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px">'
-    +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">חלוקה שווה: ₪'+share.toLocaleString()+' לכל משפחה</div>'
-    +selected.map(f=>{ const cl=col(f.id); return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">'+SPLIT_LABELS[splitMethod]+'</div>'
+    +selected.map(f=>{ const cl=col(f.id); const share=totalW?Math.round(total*w[f.id]/totalW):0; return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
       +'<div class="ava" style="background:'+cl.bg+';color:'+cl.c+';width:26px;height:26px;font-size:10px;flex-shrink:0">'+ini(f.name)+'</div>'
       +'<span style="font-size:13px;flex:1">'+esc(f.name.replace('משפחת','').trim())+'</span>'
       +'<span style="font-size:13px;font-weight:700;color:var(--green-mid)">₪'+share.toLocaleString()+'</span>'
@@ -761,6 +813,7 @@ function showForm(){
   document.getElementById('famChips').innerHTML=families.map(f=>
     `<button class="chip on" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
   ).join('');
+  setSplitMethod('equal');
   expMode='total';
   setExpMode('total');
   if(document.getElementById('f-total')) document.getElementById('f-total').value='';
@@ -781,6 +834,7 @@ function editEv(evId){
   document.getElementById('famChips').innerHTML=families.map(f=>
     `<button class="chip ${ev.participants.includes(f.id)?'on':''}" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
   ).join('');
+  setSplitMethod(ev.splitMethod||'equal');
   if(ev.totalCost!=null){
     expMode='total';
     setExpMode('total');
@@ -860,9 +914,9 @@ function doCreate(){
   const totalCost=expMode==='total'?(parseFloat(document.getElementById('f-total')?.value)||0):null;
   if(editingId!=null){
     const ev=events.find(e=>e.id===editingId);
-    if(ev){ ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded; ev.expenses=expenses; ev.totalCost=totalCost; }
+    if(ev){ ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded; ev.expenses=expenses; ev.totalCost=totalCost; ev.splitMethod=splitMethod; }
   } else {
-    events.unshift({id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost});
+    events.unshift({id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost,splitMethod});
   }
   hideForm();save();render();
 }
@@ -891,7 +945,7 @@ function addFam(){
   const inp=document.getElementById('famInput');
   let name=inp.value.trim();if(!name)return;
   if(!name.startsWith('משפחת'))name='משפחת '+name;
-  families.push({id:nxtFam++,name});inp.value='';save();render();
+  families.push({id:nxtFam++,name,children:0});inp.value='';save();render();
 }
 function delFam(fid){
   if(events.some(e=>e.participants.includes(fid))){alert('לא ניתן למחוק משפחה שמשתתפת באירועים');return;}
