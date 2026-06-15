@@ -108,6 +108,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .exp-tag-pos { background: var(--red-bg); color: var(--red); }
 .exp-tag-neg { background: var(--green-bg); color: var(--green); }
 .exp-tag-zero { background: var(--surface2); color: var(--text2); }
+.paid-full-btn { font-size: 11px; font-weight: 700; padding: 6px 8px; border-radius: var(--r2); border: 1.5px solid var(--green-mid); background: transparent; color: var(--green-mid); cursor: pointer; font-family: var(--font); flex-shrink: 0; white-space: nowrap; }
+.paid-full-btn:active { background: var(--green-bg); }
 .settle-bar { background: var(--blue-bg); border-top: 1px solid var(--border); padding: 10px 14px; }
 .settle-title { font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 6px; }
 .settle-row { font-size: 12px; color: var(--text); margin-bottom: 3px; }
@@ -543,7 +545,8 @@ function evCard(ev){
     return`<div class="exp-input-row">
       <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
       <span class="mname">${esc(f.name.replace('משפחת','').trim())}</span>
-      <input class="exp-inp" type="number" min="0" inputmode="numeric" placeholder="₪0"
+      <button class="paid-full-btn" onclick="markFullyPaid(${ev.id},${fid})">✓ שולם הכל</button>
+      <input class="exp-inp" id="expinp-${ev.id}-${fid}" type="number" min="0" inputmode="numeric" placeholder="₪0"
         value="${spent||''}" oninput="liveUpdateCard(${ev.id},this,${fid})" onchange="updateExpense(${ev.id},${fid},this.value)">
       <span class="exp-tag ${tagClass}" id="tag-${ev.id}-${fid}">${tagText}</span>
     </div>`;
@@ -627,6 +630,13 @@ function updateExpense(evId,famId,val){
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
   document.getElementById('topSub').textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופה: ₪'+fundTotal().toLocaleString();
+}
+function markFullyPaid(evId,fid){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const amount=ev.totalCost!=null?ev.totalCost:evCost(ev);
+  const inp=document.getElementById('expinp-'+evId+'-'+fid);
+  if(inp){ inp.value=amount; liveUpdateCard(evId,inp,fid); }
+  updateExpense(evId,fid,amount);
 }
 function renderArchive(){
   const closed=events.filter(e=>!e.open);
