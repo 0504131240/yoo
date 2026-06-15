@@ -34,7 +34,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 /* Bottom nav */
 .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 50; }
 .nav-btn { flex: 1; border: none; background: none; color: var(--text2); font-size: 10px; font-family: var(--font); padding: 10px 4px 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.nav-btn.active { color: var(--green-mid); }
+.nav-btn.active { color: var(--blue-mid); }
 .nav-icon { font-size: 20px; line-height: 1; }
 
 /* Main */
@@ -52,8 +52,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 .chip { padding: 10px 10px; border: 1.5px solid var(--border); border-radius: var(--r2); background: var(--surface); color: var(--text); font-size: 13px; font-family: var(--font); cursor: pointer; text-align: center; font-weight: 500; }
 .split-btn { flex: 1; min-width: 100px; padding: 9px 6px; border-radius: var(--r2); border: 1.5px solid var(--border); background: transparent; color: var(--text2); font-size: 12px; font-weight: 700; font-family: var(--font); cursor: pointer; }
-.split-btn.active { background: var(--green-mid); color: #fff; border-color: var(--green-mid); }
-.chip.on { border-color: var(--green-mid); background: var(--green-bg); color: var(--green); }
+.split-btn.active { background: var(--blue-mid); color: #fff; border-color: var(--blue-mid); }
+.chip.on { border-color: var(--blue-mid); background: var(--blue-bg); color: var(--blue); }
 .err-txt { font-size: 12px; color: var(--red-mid); margin-top: 4px; display: none; }
 .err-txt.show { display: block; }
 .form-btns { display: flex; gap: 8px; margin-top: 14px; }
@@ -114,13 +114,13 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .mname { font-size: 13px; font-weight: 600; flex: 1; }
 .mamt { font-size: 13px; color: var(--text2); margin-left: 6px; }
 .pay-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); background: transparent; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: var(--font); transition: all 0.1s; }
-.pay-btn.paid { background: var(--green-mid); border-color: var(--green-mid); color: white; }
+.pay-btn.paid { background: var(--blue-mid); border-color: var(--blue-mid); color: white; }
 .pay-btn.unpaid { color: transparent; }
 .excl { font-size: 12px; color: var(--text2); padding: 8px 14px; }
 .hint-bar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--green); padding: 9px 14px; background: var(--green-bg); border-top: 1px solid var(--border); }
 .card-actions { display: flex; gap: 8px; padding: 10px 14px; background: var(--surface2); border-top: 1px solid var(--border); flex-wrap: wrap; }
 .action-btn { padding: 7px 14px; border-radius: var(--r2); border: 1px solid var(--border); background: transparent; font-size: 12px; font-weight: 600; font-family: var(--font); cursor: pointer; color: var(--text); }
-.action-btn.green { background: var(--green-bg); color: var(--green); border-color: transparent; }
+.action-btn.blue { background: var(--blue-bg); color: var(--blue); border-color: transparent; }
 .action-btn.red { background: var(--red-bg); color: var(--red); border-color: transparent; }
 
 /* Expense input row inside card */
@@ -185,7 +185,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .fund-dep-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .fund-dep-inp { flex: 1; border: 1.5px solid var(--border); border-radius: var(--r2); padding: 8px 10px; font-size: 14px; font-family: var(--font); background: var(--bg); color: var(--text); direction: ltr; text-align: left; }
 .fund-dep-inp:focus { outline: none; border-color: var(--green-mid); }
-.fund-dep-btn { padding: 9px 16px; border-radius: var(--r2); border: none; background: var(--green-mid); color: #fff; font-size: 13px; font-weight: 700; font-family: var(--font); cursor: pointer; white-space: nowrap; }
+.fund-dep-btn { padding: 9px 16px; border-radius: var(--r2); border: none; background: var(--blue-mid); color: #fff; font-size: 13px; font-weight: 700; font-family: var(--font); cursor: pointer; white-space: nowrap; }
 .fund-section-title { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
 .fund-settle-card { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); overflow: hidden; margin-bottom: 14px; }
 .fund-settle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); gap: 10px; }
@@ -204,7 +204,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .fund-tx-desc { flex: 1; color: var(--text); }
 .fund-tx-amt { font-weight: 700; color: var(--green-mid); }
 .fund-tx-amt.neg { color: var(--red-mid); }
-.fund-done-btn { padding: 6px 12px; border-radius: var(--r2); border: none; background: var(--green-mid); color: #fff; font-size: 12px; font-weight: 700; font-family: var(--font); cursor: pointer; white-space: nowrap; }
+.fund-done-btn { padding: 6px 12px; border-radius: var(--r2); border: none; background: var(--blue-mid); color: #fff; font-size: 12px; font-weight: 700; font-family: var(--font); cursor: pointer; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -270,7 +270,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       <div class="field" id="expensesSection" style="display:none">
         <!-- Mode toggle -->
         <div style="display:flex;gap:6px;margin-bottom:12px">
-          <button id="modeTotal" onclick="setExpMode('total')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--green-mid);background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סכום כולל ÷ שווה</button>
+          <button id="modeTotal" onclick="setExpMode('total')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סכום כולל ÷ שווה</button>
           <button id="modeCustom" onclick="setExpMode('custom')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">כל משפחה בנפרד</button>
         </div>
         <!-- Total mode -->
@@ -332,7 +332,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
     <div class="sec-ttl">ניהול משפחות</div>
     <div class="fam-add">
       <input type="text" id="famInput" placeholder="שם משפחה חדשה...">
-      <button class="action-btn green" onclick="addFam()">הוסף</button>
+      <button class="action-btn blue" onclick="addFam()">הוסף</button>
     </div>
     <div id="famList"></div>
     <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">
@@ -399,7 +399,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
       <div id="goalDepositFields"></div>
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="fund-dep-btn" style="flex:1;padding:12px;background:var(--blue-mid)" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
+        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
         <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
       </div>
     </div>
@@ -764,7 +764,7 @@ function evCard(ev){
       <span style="font-size:12px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
         ${canFund?`<button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferFromFund(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
-        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferDirect(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם ישירות</button>
+        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferDirect(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם ישירות</button>
       </div>
     </div>`;
   }).join('');
@@ -798,7 +798,7 @@ function evCard(ev){
     <div id="settlebar-${ev.id}">${settleBar}</div>
     <div class="card-actions">
       <button class="action-btn" onclick="editEv(${ev.id})">✏️ ערוך</button>
-      ${balanced&&cost>0?`<button class="action-btn green" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
+      ${balanced&&cost>0?`<button class="action-btn blue" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
       <button class="action-btn red" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>`}
   </div>`;
@@ -1032,12 +1032,12 @@ function setExpMode(mode){
   const isTotal=mode==='total';
   document.getElementById('totalModeDiv').style.display=isTotal?'block':'none';
   document.getElementById('customModeDiv').style.display=isTotal?'none':'block';
-  document.getElementById('modeTotal').style.background=isTotal?'var(--green-mid)':'transparent';
+  document.getElementById('modeTotal').style.background=isTotal?'var(--blue-mid)':'transparent';
   document.getElementById('modeTotal').style.color=isTotal?'#fff':'var(--text2)';
-  document.getElementById('modeTotal').style.borderColor=isTotal?'var(--green-mid)':'var(--border)';
-  document.getElementById('modeCustom').style.background=isTotal?'transparent':'var(--green-mid)';
+  document.getElementById('modeTotal').style.borderColor=isTotal?'var(--blue-mid)':'var(--border)';
+  document.getElementById('modeCustom').style.background=isTotal?'transparent':'var(--blue-mid)';
   document.getElementById('modeCustom').style.color=isTotal?'var(--text2)':'#fff';
-  document.getElementById('modeCustom').style.borderColor=isTotal?'var(--border)':'var(--green-mid)';
+  document.getElementById('modeCustom').style.borderColor=isTotal?'var(--border)':'var(--blue-mid)';
   if(!isTotal) updateExpenseInputs();
   else updateTotalPreview();
 }
@@ -1376,7 +1376,7 @@ function renderGoalFunds(){
       <div>${rows}</div>
       <div class="card-actions">
         <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
-        <button class="action-btn green" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
+        <button class="action-btn blue" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
         <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
       </div>`}
     </div>`;
