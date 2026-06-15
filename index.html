@@ -72,29 +72,25 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .sec-ttl { font-size: 14px; font-weight: 700; margin-bottom: 10px; margin-top: 4px; }
 
 /* Home */
-.home-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 18px; }
-.home-stat { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 12px 8px; text-align: center; }
-.home-stat-val { font-size: 18px; font-weight: 800; }
-.home-stat-val.r { color: var(--red-mid); }
-.home-stat-val.g { color: var(--green-mid); }
-.home-stat-lbl { font-size: 10.5px; color: var(--text2); margin-top: 4px; }
-.home-card { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 12px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: transform .08s, box-shadow .08s; }
-.home-card:active { transform: scale(0.985); }
-.home-card-col { flex-direction: column; align-items: stretch; }
-.home-card-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; }
-.home-card-body { flex: 1; min-width: 0; }
-.home-card-title { font-size: 14px; font-weight: 700; }
-.home-card-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
-.home-card-right { text-align: left; flex-shrink: 0; }
-.home-card-amt { font-size: 15px; font-weight: 800; }
-.home-card-amt-lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
-.home-card-arrow { font-size: 18px; color: var(--text3); flex-shrink: 0; }
-.home-fund-card { background: linear-gradient(135deg, #2A2A26, var(--text)); color: #fff; border: none; }
-.home-fund-card .home-card-title { color: #fff; }
-.home-fund-card .home-card-sub { color: rgba(255,255,255,0.55); }
-.home-fund-card .home-card-amt { color: #fff; font-size: 18px; }
-.home-fund-card .home-card-icon { background: rgba(255,255,255,0.12); }
-.home-goal-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+.home-hero { background: linear-gradient(135deg, #2E6F58, #16493A); color: #fff; border-radius: 18px; padding: 18px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 14px; cursor: pointer; box-shadow: 0 6px 18px rgba(22,73,58,0.25); }
+.home-hero-icon { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.home-hero-body { flex: 1; min-width: 0; }
+.home-hero-lbl { font-size: 12px; opacity: 0.75; }
+.home-hero-amt { font-size: 26px; font-weight: 800; margin-top: 2px; letter-spacing: -0.5px; }
+.home-hero-arrow { font-size: 20px; opacity: 0.45; flex-shrink: 0; }
+.home-list { background: var(--surface); border-radius: 18px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(26,26,24,0.05); }
+.home-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+.home-row:last-child { border-bottom: none; }
+.home-row:active { background: var(--surface2); }
+.home-row-col { flex-direction: column; align-items: stretch; }
+.home-row-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.home-row-body { flex: 1; min-width: 0; }
+.home-row-title { font-size: 14px; font-weight: 700; }
+.home-row-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.home-row-right { text-align: left; flex-shrink: 0; }
+.home-row-amt { font-size: 14px; font-weight: 800; }
+.home-row-amt-lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
+.home-goal-top { display: flex; align-items: center; gap: 12px; width: 100%; }
 
 /* Event card */
 .ecard { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); margin-bottom: 12px; overflow: hidden; }
@@ -228,17 +224,14 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 
   <!-- HOME -->
   <div class="view active" id="view-home">
-    <div class="home-stats" id="homeStats"></div>
-
-    <div class="sec-ttl">📅 אירועים פעילים</div>
-    <div id="homeEventList"></div>
-
-    <div class="sec-ttl" style="margin-top:18px">💰 קופה משותפת</div>
     <div id="homeFundCard"></div>
 
+    <div class="sec-ttl">📅 אירועים פעילים</div>
+    <div class="home-list" id="homeEventList"></div>
+
     <div id="homeGoalSection" style="display:none">
-      <div class="sec-ttl" style="margin-top:18px">🎯 קופות למטרה</div>
-      <div id="homeGoalList"></div>
+      <div class="sec-ttl">🎯 קופות למטרה</div>
+      <div class="home-list" id="homeGoalList"></div>
     </div>
   </div>
 
@@ -573,37 +566,31 @@ function renderOpenList(){
 function renderHome(){
   const open=events.filter(e=>e.open);
 
-  document.getElementById('homeStats').innerHTML=`
-    <div class="home-stat"><div class="home-stat-val">${open.length}</div><div class="home-stat-lbl">אירועים פעילים</div></div>
-    <div class="home-stat"><div class="home-stat-val r">₪${calcDebt().toLocaleString()}</div><div class="home-stat-lbl">חוב פתוח</div></div>
-    <div class="home-stat"><div class="home-stat-val g">₪${fundTotal().toLocaleString()}</div><div class="home-stat-lbl">בקופה</div></div>`;
+  document.getElementById('homeFundCard').innerHTML=`
+    <div class="home-hero" onclick="goTab('fund',document.getElementById('nb-fund'))">
+      <div class="home-hero-icon">💰</div>
+      <div class="home-hero-body">
+        <div class="home-hero-lbl">יתרת קופה משותפת</div>
+        <div class="home-hero-amt">₪${fundTotal().toLocaleString()}</div>
+      </div>
+      <span class="home-hero-arrow">‹</span>
+    </div>`;
 
   document.getElementById('homeEventList').innerHTML=open.length?open.map(ev=>{
     const cl=col(ev.id);
     const cost=evCost(ev);
     const remaining=calcTransfers(ev).reduce((s,t)=>s+t.amt,0);
-    return`<div class="home-card" onclick="goToEvent(${ev.id})">
-      <div class="home-card-icon" style="background:${cl.bg};color:${cl.c}">📅</div>
-      <div class="home-card-body">
-        <div class="home-card-title">${esc(ev.name)}</div>
-        <div class="home-card-sub">${esc(ev.date)} · עלות ₪${cost.toLocaleString()}</div>
+    return`<div class="home-row" onclick="goToEvent(${ev.id})">
+      <div class="home-row-icon" style="background:${cl.bg};color:${cl.c}">📅</div>
+      <div class="home-row-body">
+        <div class="home-row-title">${esc(ev.name)}</div>
+        <div class="home-row-sub">${esc(ev.date)} · עלות ₪${cost.toLocaleString()}</div>
       </div>
       ${remaining>0
-        ?`<div class="home-card-right"><div class="home-card-amt" style="color:var(--red-mid)">₪${remaining.toLocaleString()}</div><div class="home-card-amt-lbl">נותר לסידור</div></div>`
+        ?`<div class="home-row-right"><div class="home-row-amt" style="color:var(--red-mid)">₪${remaining.toLocaleString()}</div><div class="home-row-amt-lbl">נותר לסידור</div></div>`
         :`<span class="badge badge-green">✅ מאוזן</span>`}
     </div>`;
   }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
-
-  document.getElementById('homeFundCard').innerHTML=`
-    <div class="home-card home-fund-card" onclick="goTab('fund',document.getElementById('nb-fund'))">
-      <div class="home-card-icon">💰</div>
-      <div class="home-card-body">
-        <div class="home-card-title">יתרת קופה משותפת</div>
-        <div class="home-card-sub">לצפייה בפירוט והפקדות</div>
-      </div>
-      <div class="home-card-right"><div class="home-card-amt">₪${fundTotal().toLocaleString()}</div></div>
-      <span class="home-card-arrow" style="color:rgba(255,255,255,0.5)">‹</span>
-    </div>`;
 
   const openGoals=goalFunds.filter(g=>!g.closed);
   const goalSection=document.getElementById('homeGoalSection');
@@ -613,12 +600,12 @@ function renderHome(){
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
     const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`;
-    return`<div class="home-card home-card-col" onclick="goTab('fund',document.getElementById('nb-fund'))">
-      <div class="home-goal-row">
-        <div class="home-card-icon" style="background:var(--amber-bg);color:var(--amber)">🎯</div>
-        <div class="home-card-body">
-          <div class="home-card-title">${esc(g.name)}</div>
-          <div class="home-card-sub">${subText}</div>
+    return`<div class="home-row home-row-col" onclick="goTab('fund',document.getElementById('nb-fund'))">
+      <div class="home-goal-top">
+        <div class="home-row-icon" style="background:var(--amber-bg);color:var(--amber)">🎯</div>
+        <div class="home-row-body">
+          <div class="home-row-title">${esc(g.name)}</div>
+          <div class="home-row-sub">${subText}</div>
         </div>
         ${reached?'<span class="badge badge-green">✅ הושלם</span>':''}
       </div>
