@@ -545,7 +545,7 @@ function evCard(ev){
     return`<div class="exp-input-row">
       <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
       <span class="mname">${esc(f.name.replace('משפחת','').trim())}</span>
-      <button class="paid-full-btn" onclick="markFullyPaid(${ev.id},${fid})">✓ שולם הכל</button>
+      <button class="paid-full-btn" onclick="markSettled(${ev.id},${fid})">✓ סודר</button>
       <input class="exp-inp" id="expinp-${ev.id}-${fid}" type="number" min="0" inputmode="numeric" placeholder="₪0"
         value="${spent||''}" oninput="liveUpdateCard(${ev.id},this,${fid})" onchange="updateExpense(${ev.id},${fid},this.value)">
       <span class="exp-tag ${tagClass}" id="tag-${ev.id}-${fid}">${tagText}</span>
@@ -631,9 +631,9 @@ function updateExpense(evId,famId,val){
   const open=events.filter(e=>e.open).length;
   document.getElementById('topSub').textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופה: ₪'+fundTotal().toLocaleString();
 }
-function markFullyPaid(evId,fid){
+function markSettled(evId,fid){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const amount=ev.totalCost!=null?ev.totalCost:evCost(ev);
+  const amount=evShare(ev);
   const inp=document.getElementById('expinp-'+evId+'-'+fid);
   if(inp){ inp.value=amount; liveUpdateCard(evId,inp,fid); }
   updateExpense(evId,fid,amount);
