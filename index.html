@@ -318,19 +318,21 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       <button class="action-btn green" onclick="addFam()">הוסף</button>
     </div>
     <div id="famList"></div>
-    <div id="famEditSheet" style="display:none;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-top:10px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px">עריכת משפחה</div>
-      <input type="text" id="famEditName" placeholder="שם המשפחה"
-        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
-      <div class="children-field">
-        <label>ילדים</label>
-        <input class="children-inp" type="number" min="0" inputmode="numeric" id="famEditChildren">
+    <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">
+      <div id="famEditSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">עריכת משפחה</div>
+        <input type="text" id="famEditName" placeholder="שם המשפחה"
+          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
+        <div class="children-field">
+          <label>ילדים</label>
+          <input class="children-inp" type="number" min="0" inputmode="numeric" id="famEditChildren">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="saveFamEdit()">✓ שמור</button>
+          <button onclick="closeFamEditSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+        </div>
+        <button class="action-btn red" style="width:100%;margin-top:10px;box-sizing:border-box" onclick="delFamFromEdit()">🗑 הסר משפחה</button>
       </div>
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="saveFamEdit()">✓ שמור</button>
-        <button onclick="closeFamEditSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
-      </div>
-      <button class="action-btn red" style="width:100%;margin-top:10px;box-sizing:border-box" onclick="delFamFromEdit()">🗑 הסר משפחה</button>
     </div>
   </div>
 
@@ -949,11 +951,10 @@ function openFamEditSheet(fid){
   _famEditId=fid;
   document.getElementById('famEditName').value=f.name.replace('משפחת','').trim();
   document.getElementById('famEditChildren').value=f.children||0;
-  document.getElementById('famEditSheet').style.display='block';
-  document.getElementById('famEditSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('famEditOverlay').style.display='flex';
 }
 function closeFamEditSheet(){
-  document.getElementById('famEditSheet').style.display='none';
+  document.getElementById('famEditOverlay').style.display='none';
   _famEditId=null;
 }
 function saveFamEdit(){
