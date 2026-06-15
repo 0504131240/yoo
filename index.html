@@ -215,6 +215,10 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       </div>
       <span style="font-size:20px">›</span>
     </div>
+    <div id="homeGoalSection" style="display:none">
+      <div class="sec-ttl" style="margin-top:18px">קופות למטרה</div>
+      <div id="homeGoalList"></div>
+    </div>
   </div>
 
   <!-- EVENTS -->
@@ -564,6 +568,28 @@ function renderHome(){
       </div>
     </div>`;
   }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
+
+  const openGoals=goalFunds.filter(g=>!g.closed);
+  const goalSection=document.getElementById('homeGoalSection');
+  goalSection.style.display=openGoals.length?'block':'none';
+  document.getElementById('homeGoalList').innerHTML=openGoals.map(g=>{
+    const total=goalTotal(g);
+    const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
+    const reached=g.target>0&&total>=g.target;
+    const progressHtml=g.target>0
+      ?`<div class="pbar"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
+        <div class="plabel">נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}</div>`
+      :`<div class="plabel">נאסף ₪${total.toLocaleString()}</div>`;
+    return`<div class="dcard">
+      <div class="drow" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:6px" onclick="goTab('fund',document.getElementById('nb-fund'))">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="dname">🎯 ${esc(g.name)}</div>
+          ${reached?'<span class="badge badge-green">✅ הושלם</span>':''}
+        </div>
+        ${progressHtml}
+      </div>
+    </div>`;
+  }).join('');
 }
 function goToEvent(evId){
   goTab('events',document.getElementById('nb-events'));
