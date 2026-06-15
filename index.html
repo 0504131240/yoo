@@ -285,7 +285,6 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 
   <!-- ARCHIVE -->
   <div class="view" id="view-archive">
-    <div class="metrics" id="archMetrics"></div>
     <div class="year-row" id="yearRow"></div>
     <div id="archList"></div>
   </div>
@@ -770,11 +769,7 @@ function markSettled(evId,fid){
 }
 function renderArchive(){
   const closed=events.filter(e=>!e.open);
-  const total=closed.reduce((a,ev)=>a+evCost(ev),0);
   const years=[...new Set(closed.map(e=>e.date.split(' ').pop()))].sort((a,b)=>b-a);
-  document.getElementById('archMetrics').innerHTML=`
-    <div class="metric"><div class="metric-lbl">בארכיון</div><div class="metric-val g">${closed.length}</div></div>
-    <div class="metric"><div class="metric-lbl">הוצאות</div><div class="metric-val">₪${total.toLocaleString()}</div></div>`;
   document.getElementById('yearRow').innerHTML=['all',...years].map(y=>
     `<button class="ypill ${actYear===y?'active':''}" onclick="setYear('${esc(y)}')">${y==='all'?'הכל':esc(y)}</button>`).join('');
   const filtered=actYear==='all'?closed:closed.filter(e=>e.date.includes(actYear));
