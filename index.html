@@ -262,6 +262,10 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
           <button type="button" class="split-btn" id="splitWeighted" onclick="setSplitMethod('weighted')">ילד = 50%</button>
         </div>
       </div>
+      <div class="field" id="childOverrideSection" style="display:none">
+        <label>כמה ילדים הגיעו לאירוע (לחישוב החלוקה)</label>
+        <div id="childOverrideInputs"></div>
+      </div>
       <div class="field" id="expensesSection" style="display:none">
         <!-- Mode toggle -->
         <div style="display:flex;gap:6px;margin-bottom:12px">
@@ -452,9 +456,9 @@ const evCost=ev=>ev.totalCost!=null?ev.totalCost:ev.participants.reduce((s,fid)=
 const evShare=ev=>{ const n=ev.participants.length; return n?Math.round(evCost(ev)/n):0; };
 const FAM_ADULTS=2;
 const SPLIT_LABELS={equal:'שווה לכל משפחה',percapita:'לפי נפשות',weighted:'ילד = 50% ממבוגר'};
-const famWeight=(f,method)=>{
+const famWeight=(f,method,childOverride)=>{
   if(!f) return 1;
-  const ch=f.children||0;
+  const ch=childOverride!=null?childOverride:(f.children||0);
   if(method==='percapita') return FAM_ADULTS+ch;
   if(method==='weighted') return FAM_ADULTS+ch*0.5;
   return 1;
@@ -463,7 +467,7 @@ const evShares=ev=>{
   const method=ev.splitMethod||'equal';
   const cost=evCost(ev);
   let totalW=0; const w={};
-  ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method); totalW+=w[fid]; });
+  ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method,ev.childOverrides?.[fid]); totalW+=w[fid]; });
   const shares={};
   ev.participants.forEach(fid=>{ shares[fid]=totalW?Math.round(cost*w[fid]/totalW):0; });
   return shares;
@@ -986,7 +990,29 @@ function setSplitMethod(method){
   ['splitEqual','splitPercapita','splitWeighted'].forEach(id=>document.getElementById(id).classList.remove('active'));
   const ids={equal:'splitEqual',percapita:'splitPercapita',weighted:'splitWeighted'};
   document.getElementById(ids[method]).classList.add('active');
+  updateChildOverrideInputs();
   if(expMode==='total') updateTotalPreview();
+}
+function formChildOverride(fid){
+  const inp=document.getElementById('fchild-'+fid);
+  if(inp&&inp.value!=='') return Math.max(0,parseInt(inp.value)||0);
+  return undefined;
+}
+function updateChildOverrideInputs(){
+  const sec=document.getElementById('childOverrideSection');
+  const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
+  if(splitMethod==='equal'||!selected.length){ sec.style.display='none'; return; }
+  sec.style.display='block';
+  const ev=editingId!=null?events.find(e=>e.id===editingId):null;
+  document.getElementById('childOverrideInputs').innerHTML=selected.map(f=>{
+    const cl=col(f.id);
+    const val=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:(f.children||0);
+    return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
+      <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
+      <input class="children-inp" type="number" min="0" inputmode="numeric" id="fchild-${f.id}" value="${val}" oninput="if(expMode==='total')updateTotalPreview()">
+    </div>`;
+  }).join('');
 }
 function setExpMode(mode){
   expMode=mode;
@@ -1007,7 +1033,7 @@ function updateTotalPreview(){
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   if(!selected.length||!total){ document.getElementById('totalPreview').innerHTML=''; return; }
   let totalW=0; const w={};
-  selected.forEach(f=>{ w[f.id]=famWeight(f,splitMethod); totalW+=w[f.id]; });
+  selected.forEach(f=>{ w[f.id]=famWeight(f,splitMethod,formChildOverride(f.id)); totalW+=w[f.id]; });
   document.getElementById('totalPreview').innerHTML=
     '<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px">'
     +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">'+SPLIT_LABELS[splitMethod]+'</div>'
@@ -1073,7 +1099,7 @@ function hideForm(){
 }
 function toggleChip(fid){
   const el=document.getElementById('chip-'+fid);
-  if(el){ el.classList.toggle('on'); if(expMode==='total') updateTotalPreview(); else updateExpenseInputs(); }
+  if(el){ el.classList.toggle('on'); updateChildOverrideInputs(); if(expMode==='total') updateTotalPreview(); else updateExpenseInputs(); }
 }
 function updateExpenseInputs(){
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
@@ -1127,11 +1153,13 @@ function doCreate(){
   }
   if(!ok)return;
   const totalCost=expMode==='total'?(parseFloat(document.getElementById('f-total')?.value)||0):null;
+  const childOverrides={};
+  if(splitMethod!=='equal') participants.forEach(fid=>{ childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0); });
   if(editingId!=null){
     const ev=events.find(e=>e.id===editingId);
-    if(ev){ ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded; ev.expenses=expenses; ev.totalCost=totalCost; ev.splitMethod=splitMethod; }
+    if(ev){ ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded; ev.expenses=expenses; ev.totalCost=totalCost; ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; }
   } else {
-    events.unshift({id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost,splitMethod});
+    events.unshift({id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost,splitMethod,childOverrides});
   }
   hideForm();save();render();
 }
