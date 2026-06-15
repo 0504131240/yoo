@@ -71,6 +71,31 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 /* Section title */
 .sec-ttl { font-size: 14px; font-weight: 700; margin-bottom: 10px; margin-top: 4px; }
 
+/* Home */
+.home-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.home-stat { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 12px 8px; text-align: center; }
+.home-stat-val { font-size: 18px; font-weight: 800; }
+.home-stat-val.r { color: var(--red-mid); }
+.home-stat-val.g { color: var(--green-mid); }
+.home-stat-lbl { font-size: 10.5px; color: var(--text2); margin-top: 4px; }
+.home-card { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 12px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: transform .08s, box-shadow .08s; }
+.home-card:active { transform: scale(0.985); }
+.home-card-col { flex-direction: column; align-items: stretch; }
+.home-card-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; }
+.home-card-body { flex: 1; min-width: 0; }
+.home-card-title { font-size: 14px; font-weight: 700; }
+.home-card-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.home-card-right { text-align: left; flex-shrink: 0; }
+.home-card-amt { font-size: 15px; font-weight: 800; }
+.home-card-amt-lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
+.home-card-arrow { font-size: 18px; color: var(--text3); flex-shrink: 0; }
+.home-fund-card { background: linear-gradient(135deg, #2A2A26, var(--text)); color: #fff; border: none; }
+.home-fund-card .home-card-title { color: #fff; }
+.home-fund-card .home-card-sub { color: rgba(255,255,255,0.55); }
+.home-fund-card .home-card-amt { color: #fff; font-size: 18px; }
+.home-fund-card .home-card-icon { background: rgba(255,255,255,0.12); }
+.home-goal-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+
 /* Event card */
 .ecard { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); margin-bottom: 12px; overflow: hidden; }
 .ecard-head { padding: 13px 14px 10px; }
@@ -159,9 +184,6 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .empty-ico { font-size: 38px; display: block; margin-bottom: 10px; }
 
 /* Fund */
-.fund-balance { background: var(--text); color: #fff; border-radius: var(--r); padding: 20px 16px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-.fund-bal-lbl { font-size: 12px; opacity: 0.7; margin-bottom: 4px; }
-.fund-bal-amt { font-size: 28px; font-weight: 700; }
 .fund-deposit-box { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 14px; margin-bottom: 14px; }
 .fund-deposit-box h3 { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--text2); }
 .fund-dep-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -206,17 +228,16 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 
   <!-- HOME -->
   <div class="view active" id="view-home">
-    <div class="sec-ttl">אירועים פעילים</div>
+    <div class="home-stats" id="homeStats"></div>
+
+    <div class="sec-ttl">📅 אירועים פעילים</div>
     <div id="homeEventList"></div>
-    <div class="fund-balance" style="margin-top:6px;cursor:pointer" onclick="goTab('fund',document.getElementById('nb-fund'))">
-      <div>
-        <div class="fund-bal-lbl">💰 יתרת קופה משותפת</div>
-        <div class="fund-bal-amt" id="homeFundAmt">₪0</div>
-      </div>
-      <span style="font-size:20px">›</span>
-    </div>
+
+    <div class="sec-ttl" style="margin-top:18px">💰 קופה משותפת</div>
+    <div id="homeFundCard"></div>
+
     <div id="homeGoalSection" style="display:none">
-      <div class="sec-ttl" style="margin-top:18px">קופות למטרה</div>
+      <div class="sec-ttl" style="margin-top:18px">🎯 קופות למטרה</div>
       <div id="homeGoalList"></div>
     </div>
   </div>
@@ -550,23 +571,39 @@ function renderOpenList(){
   document.getElementById('openList').innerHTML=open.length?open.map(evCard).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
 }
 function renderHome(){
-  document.getElementById('homeFundAmt').textContent='₪'+fundTotal().toLocaleString();
   const open=events.filter(e=>e.open);
+
+  document.getElementById('homeStats').innerHTML=`
+    <div class="home-stat"><div class="home-stat-val">${open.length}</div><div class="home-stat-lbl">אירועים פעילים</div></div>
+    <div class="home-stat"><div class="home-stat-val r">₪${calcDebt().toLocaleString()}</div><div class="home-stat-lbl">חוב פתוח</div></div>
+    <div class="home-stat"><div class="home-stat-val g">₪${fundTotal().toLocaleString()}</div><div class="home-stat-lbl">בקופה</div></div>`;
+
   document.getElementById('homeEventList').innerHTML=open.length?open.map(ev=>{
+    const cl=col(ev.id);
     const cost=evCost(ev);
     const remaining=calcTransfers(ev).reduce((s,t)=>s+t.amt,0);
-    return`<div class="dcard">
-      <div class="drow" style="cursor:pointer" onclick="goToEvent(${ev.id})">
-        <div>
-          <div class="dname">${esc(ev.name)}</div>
-          <div class="devents">${esc(ev.date)} · עלות: ₪${cost.toLocaleString()}</div>
-        </div>
-        ${remaining>0
-          ?`<div><div class="damt">₪${remaining.toLocaleString()}</div><div class="devents" style="text-align:left">נותר לסידור</div></div>`
-          :`<span class="badge badge-green">✅ מאוזן</span>`}
+    return`<div class="home-card" onclick="goToEvent(${ev.id})">
+      <div class="home-card-icon" style="background:${cl.bg};color:${cl.c}">📅</div>
+      <div class="home-card-body">
+        <div class="home-card-title">${esc(ev.name)}</div>
+        <div class="home-card-sub">${esc(ev.date)} · עלות ₪${cost.toLocaleString()}</div>
       </div>
+      ${remaining>0
+        ?`<div class="home-card-right"><div class="home-card-amt" style="color:var(--red-mid)">₪${remaining.toLocaleString()}</div><div class="home-card-amt-lbl">נותר לסידור</div></div>`
+        :`<span class="badge badge-green">✅ מאוזן</span>`}
     </div>`;
   }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
+
+  document.getElementById('homeFundCard').innerHTML=`
+    <div class="home-card home-fund-card" onclick="goTab('fund',document.getElementById('nb-fund'))">
+      <div class="home-card-icon">💰</div>
+      <div class="home-card-body">
+        <div class="home-card-title">יתרת קופה משותפת</div>
+        <div class="home-card-sub">לצפייה בפירוט והפקדות</div>
+      </div>
+      <div class="home-card-right"><div class="home-card-amt">₪${fundTotal().toLocaleString()}</div></div>
+      <span class="home-card-arrow" style="color:rgba(255,255,255,0.5)">‹</span>
+    </div>`;
 
   const openGoals=goalFunds.filter(g=>!g.closed);
   const goalSection=document.getElementById('homeGoalSection');
@@ -575,18 +612,17 @@ function renderHome(){
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
-    const progressHtml=g.target>0
-      ?`<div class="pbar"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
-        <div class="plabel">נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}</div>`
-      :`<div class="plabel">נאסף ₪${total.toLocaleString()}</div>`;
-    return`<div class="dcard">
-      <div class="drow" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:6px" onclick="goTab('fund',document.getElementById('nb-fund'))">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="dname">🎯 ${esc(g.name)}</div>
-          ${reached?'<span class="badge badge-green">✅ הושלם</span>':''}
+    const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`;
+    return`<div class="home-card home-card-col" onclick="goTab('fund',document.getElementById('nb-fund'))">
+      <div class="home-goal-row">
+        <div class="home-card-icon" style="background:var(--amber-bg);color:var(--amber)">🎯</div>
+        <div class="home-card-body">
+          <div class="home-card-title">${esc(g.name)}</div>
+          <div class="home-card-sub">${subText}</div>
         </div>
-        ${progressHtml}
+        ${reached?'<span class="badge badge-green">✅ הושלם</span>':''}
       </div>
+      ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
     </div>`;
   }).join('');
 }
