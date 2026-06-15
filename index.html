@@ -18,7 +18,7 @@
   --green: #0F6E56; --green-bg: #E1F5EE; --green-mid: #1D9E75;
   --amber: #854F0B; --amber-bg: #FAEEDA; --amber-mid: #EF9F27;
   --red: #791F1F; --red-bg: #FCEBEB; --red-mid: #A32D2D;
-  --blue: #0C447C; --blue-bg: #E6F1FB;
+  --blue: #0C447C; --blue-bg: #E6F1FB; --blue-mid: #1E88D8;
   --r: 12px; --r2: 8px;
   --font: -apple-system, 'Segoe UI', Arial, sans-serif;
 }
@@ -72,7 +72,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .sec-ttl { font-size: 14px; font-weight: 700; margin-bottom: 10px; margin-top: 4px; }
 
 /* Home */
-.home-hero { background: linear-gradient(135deg, #2E6F58, #16493A); color: #fff; border-radius: 18px; padding: 18px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 14px; cursor: pointer; box-shadow: 0 6px 18px rgba(22,73,58,0.25); }
+.home-hero { background: linear-gradient(135deg, #1E6FA8, #0D3A5C); color: #fff; border-radius: 18px; padding: 18px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 14px; cursor: pointer; box-shadow: 0 6px 18px rgba(13,58,92,0.25); }
 .home-hero-icon { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
 .home-hero-body { flex: 1; min-width: 0; }
 .home-hero-lbl { font-size: 12px; opacity: 0.75; }
@@ -365,7 +365,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
       <div id="goalDepositFields"></div>
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
+        <button class="fund-dep-btn" style="flex:1;padding:12px;background:var(--blue-mid)" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
         <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
       </div>
     </div>
@@ -1151,10 +1151,10 @@ function openGoalDepositSheet(goalId,famId){
   const c=g.contributions[famId]||0;
   document.getElementById('goalDepositFields').innerHTML=`
     <div style="font-size:13px;color:var(--text2);margin-bottom:10px">
-      הפקדה ל"${esc(g.name)}" עבור: <b>${esc(name)}</b> · הופקד עד כה: <b style="color:var(--green-mid)">₪${c.toLocaleString()}</b>
+      הפקדה ל"${esc(g.name)}" עבור: <b>${esc(name)}</b> · הופקד עד כה: <b style="color:var(--blue-mid)">₪${c.toLocaleString()}</b>
     </div>
     <input type="number" min="0" inputmode="numeric" id="goalDepositAmt" placeholder="סכום להפקדה (₪)"
-      style="width:100%;border:1.5px solid var(--green-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+      style="width:100%;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
   `;
   document.getElementById('goalDepositSheet').style.display='block';
   document.getElementById('goalDepositSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -1200,8 +1200,8 @@ function renderGoalFunds(){
       return`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
         <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px">${ini(f.name)}</div>
         <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
-        <span style="font-size:17px;font-weight:800;color:var(--green-mid)">₪${c.toLocaleString()}</span>
-        <button onclick="openGoalDepositSheet(${g.id},${f.id})" style="padding:7px 12px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">הפקד</button>
+        <span style="font-size:17px;font-weight:800;color:var(--blue-mid)">₪${c.toLocaleString()}</span>
+        <button onclick="openGoalDepositSheet(${g.id},${f.id})" style="padding:7px 12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">הפקד</button>
       </div>`;
     }).join('');
     const progressHtml=g.target>0
