@@ -360,6 +360,16 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
     </div>
     <div id="goalFundsList" style="margin-bottom:14px"></div>
 
+    <!-- Goal deposit sheet (hidden) -->
+    <div id="goalDepositSheet" style="display:none;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
+      <div id="goalDepositFields"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
+        <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+      </div>
+    </div>
+
     <div style="margin-top:14px">
       <div class="fund-section-title">📋 היסטוריית תנועות</div>
       <div id="fundTxList"></div>
@@ -1130,13 +1140,37 @@ function addGoalFund(){
   closeGoalForm();
   save();render();
 }
-function addGoalContribution(goalId,famId){
+let _goalDepositGoalId=null;
+let _goalDepositFamId=null;
+function openGoalDepositSheet(goalId,famId){
+  _goalDepositGoalId=goalId;
+  _goalDepositFamId=famId;
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
-  const inp=document.getElementById('goalinp-'+goalId+'-'+famId);
-  const amt=parseFloat(inp.value)||0;
-  if(amt<=0)return;
-  g.contributions[famId]=(g.contributions[famId]||0)+amt;
-  inp.value='';
+  const f=getFam(famId);
+  const name=f.name.replace('משפחת','').trim();
+  const c=g.contributions[famId]||0;
+  document.getElementById('goalDepositFields').innerHTML=`
+    <div style="font-size:13px;color:var(--text2);margin-bottom:10px">
+      הפקדה ל"${esc(g.name)}" עבור: <b>${esc(name)}</b> · הופקד עד כה: <b style="color:var(--green-mid)">₪${c.toLocaleString()}</b>
+    </div>
+    <input type="number" min="0" inputmode="numeric" id="goalDepositAmt" placeholder="סכום להפקדה (₪)"
+      style="width:100%;border:1.5px solid var(--green-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+  `;
+  document.getElementById('goalDepositSheet').style.display='block';
+  document.getElementById('goalDepositSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
+  setTimeout(()=>{ const el=document.getElementById('goalDepositAmt'); if(el)el.focus(); },100);
+}
+function closeGoalDepositSheet(){
+  document.getElementById('goalDepositSheet').style.display='none';
+  _goalDepositGoalId=null;_goalDepositFamId=null;
+}
+function confirmGoalDeposit(){
+  if(_goalDepositGoalId==null||_goalDepositFamId==null)return;
+  const amt=parseFloat(document.getElementById('goalDepositAmt')?.value)||0;
+  if(amt<=0){ alert('נא להזין סכום'); return; }
+  const g=goalFunds.find(x=>x.id===_goalDepositGoalId);if(!g)return;
+  g.contributions[_goalDepositFamId]=(g.contributions[_goalDepositFamId]||0)+amt;
+  closeGoalDepositSheet();
   save();render();
 }
 function toggleGoalClosed(goalId){
@@ -1163,13 +1197,11 @@ function renderGoalFunds(){
     const rows=families.map(f=>{
       const cl=col(f.id);
       const c=g.contributions[f.id]||0;
-      return`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
-        <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px">${ini(f.name)}</div>
+      return`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+        <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px">${ini(f.name)}</div>
         <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
-        <span style="font-size:12px;color:var(--text2)">₪${c.toLocaleString()}</span>
-        <input type="number" min="0" inputmode="numeric" id="goalinp-${g.id}-${f.id}" placeholder="₪0"
-          style="width:64px;border:1.5px solid var(--border);border-radius:var(--r2);padding:5px 6px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
-        <button onclick="addGoalContribution(${g.id},${f.id})" style="padding:6px 10px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">הפקד</button>
+        <span style="font-size:17px;font-weight:800;color:var(--green-mid)">₪${c.toLocaleString()}</span>
+        <button onclick="openGoalDepositSheet(${g.id},${f.id})" style="padding:7px 12px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">הפקד</button>
       </div>`;
     }).join('');
     const progressHtml=g.target>0
