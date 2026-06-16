@@ -840,10 +840,15 @@ function evCard(ev){
       +icon+'</span><span><b style="color:var(--text)">'+esc(s.from)+'</b> העביר ל<b style="color:var(--text)">'+esc(s.to)+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
   }).join('')+'</div>' : '';
   const creditorFids=ev.participants.filter(fid=>(adjBal[fid]||0)>0.5);
+  const potTransfers=calcPotTransfers(ev);
   const potHtml=hasPot?`<div style="margin:8px 0 0;background:var(--amber-bg);border-radius:var(--r2);padding:8px 10px">
     <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:4px">💰 קופת האירוע · ₪${potTotal.toLocaleString()}</div>
-    ${potPayments.map(p=>{const pf=getFam(p.famId);return`<div style="font-size:11px;color:var(--text2)">✓ ${esc(pf.name.replace('משפחת','').trim())} · ₪${p.amt.toLocaleString()}</div>`;}).join('')}
-    <button onclick="releasePot(${ev.id})" style="margin-top:6px;padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">${creditorFids.length?'↗ העבר לזוכים':'✓ סמן כהועבר'}</button>
+    ${potPayments.map(p=>{const pf=getFam(p.famId);return`<div style="font-size:11px;color:var(--text2)">✓ ${esc(pf.name.replace('משפחת','').trim())} שילם ₪${p.amt.toLocaleString()}</div>`;}).join('')}
+    ${potTransfers.length?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(180,130,0,0.2)">
+      <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:3px">יש להעביר:</div>
+      ${potTransfers.map(t=>`<div style="font-size:11px;color:var(--text);margin-bottom:1px">👈 <b>${esc(t.from)}</b> → <b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</div>`).join('')}
+    </div>`:''}
+    <button onclick="releasePot(${ev.id})" style="margin-top:6px;padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">${creditorFids.length?'↗ אשר העברה לזוכים':'✓ סמן כהועבר'}</button>
   </div>`:'';
   const settleBar=cost>0?`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (${shareLabel(ev)})</div>${transfers.length?settleLines:hasPot?'':'<div style="font-size:12px;color:var(--green);padding:4px 0">✅ כולם מסודרים!</div>'}${potHtml}${doneHtml}</div>`:'';
   const collapsed=collapsedEvents.has(ev.id);
@@ -921,6 +926,23 @@ function payToPot(evId,famId){
   ev.potPayments.push({famId,amt:owed});
   save();render();
 }
+function calcPotTransfers(ev){
+  const pots=ev.potPayments||[];if(!pots.length)return[];
+  const baseBal=evAdjBalance({...ev,potPayments:[]});
+  const creds=ev.participants.filter(fid=>(baseBal[fid]||0)>0.5)
+    .map(fid=>({name:getFam(fid).name.replace('משפחת','').trim(),fid,amt:baseBal[fid]}));
+  if(!creds.length)return[];
+  const out=[],pCopy=creds.map(x=>({...x})),nCopy=pots.map(p=>({name:getFam(p.famId).name.replace('משפחת','').trim(),fid:p.famId,amt:p.amt}));
+  let pi=0,ni=0;
+  while(pi<pCopy.length&&ni<nCopy.length){
+    const give=Math.min(pCopy[pi].amt,nCopy[ni].amt);
+    if(give>0.5) out.push({from:nCopy[ni].name,fromFid:nCopy[ni].fid,to:pCopy[pi].name,toFid:pCopy[pi].fid,amt:Math.round(give)});
+    pCopy[pi].amt-=give; nCopy[ni].amt-=give;
+    if(pCopy[pi].amt<=0.5)pi++;
+    if(nCopy[ni].amt<=0.5)ni++;
+  }
+  return out;
+}
 function releasePot(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   const pots=ev.potPayments||[];if(!pots.length)return;
@@ -931,16 +953,9 @@ function releasePot(evId){
     pots.forEach(p=>{ ev.expenses[p.famId]=(ev.expenses[p.famId]||0)+p.amt; });
   } else {
     if(!ev.settled)ev.settled=[];
-    const pCopy=creditors.map(x=>({...x}));
-    const nCopy=pots.map(p=>({name:getFam(p.famId).name.replace('משפחת','').trim(),fid:p.famId,amt:p.amt}));
-    let pi=0,ni=0;
-    while(pi<pCopy.length&&ni<nCopy.length){
-      const give=Math.min(pCopy[pi].amt,nCopy[ni].amt);
-      if(give>0.5) ev.settled.push({from:nCopy[ni].name,fromFid:nCopy[ni].fid,to:pCopy[pi].name,toFid:pCopy[pi].fid,amt:Math.round(give),method:'pot'});
-      pCopy[pi].amt-=give; nCopy[ni].amt-=give;
-      if(pCopy[pi].amt<=0.5)pi++;
-      if(nCopy[ni].amt<=0.5)ni++;
-    }
+    calcPotTransfers(ev).forEach(t=>{
+      ev.settled.push({from:t.from,fromFid:t.fromFid,to:t.to,toFid:t.toFid,amt:t.amt,method:'pot'});
+    });
   }
   ev.potPayments=[];
   save();render();
