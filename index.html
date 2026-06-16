@@ -769,11 +769,13 @@ function evCard(ev){
     if(fromFid2!==undefined) adjBal[fromFid2]=(adjBal[fromFid2]||0)+s.amt;
     if(toFid2!==undefined) adjBal[toFid2]=(adjBal[toFid2]||0)-s.amt;
   });
+  const shares=evShares(ev);
   const mems=ev.participants.map(fid=>{
     const f=getFam(fid);if(!f)return'';
     const cl=col(fid);
     const spent=ev.expenses[fid]||0;
     const b=adjBal[fid];
+    const share=shares[fid]||0;
     const tagClass=b>0.5?'exp-tag-neg':b<-0.5?'exp-tag-pos':'exp-tag-zero';
     const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
     const tagTag=ev.totalCost!=null?'button':'span';
@@ -781,7 +783,10 @@ function evCard(ev){
     const tagCls='exp-tag '+tagClass+(ev.totalCost!=null?' exp-tag-clickable':'');
     return`<div class="exp-input-row">
       <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
-      <span class="mname">${esc(f.name.replace('משפחת','').trim())}</span>
+      <div style="flex:1;min-width:0">
+        <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
+        ${cost>0?`<div style="font-size:10px;color:var(--text2)">חלק: ₪${share.toLocaleString()}</div>`:''}
+      </div>
       <input class="exp-inp" id="expinp-${ev.id}-${fid}" type="number" min="0" inputmode="numeric" placeholder="₪0"
         value="${spent||''}" oninput="liveUpdateCard(${ev.id},this,${fid})" onchange="updateExpense(${ev.id},${fid},this.value)">
       <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
