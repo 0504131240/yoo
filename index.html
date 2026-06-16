@@ -787,8 +787,7 @@ function evCard(ev){
         <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
         ${cost>0?`<div style="font-size:10px;color:var(--text2)">חלק: ₪${share.toLocaleString()}</div>`:''}
       </div>
-      <input class="exp-inp" id="expinp-${ev.id}-${fid}" type="number" min="0" inputmode="numeric" placeholder="₪0"
-        value="${spent||''}" oninput="liveUpdateCard(${ev.id},this,${fid})" onchange="updateExpense(${ev.id},${fid},this.value)">
+      ${spent>0?`<span style="font-size:13px;font-weight:600;color:var(--text2);flex-shrink:0">שילם ₪${spent.toLocaleString()}</span>`:''}
       <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
     </div>`;
   }).join('');
