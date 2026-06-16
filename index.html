@@ -431,8 +431,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 
     <!-- Goal deposit modal -->
     <div id="goalDepositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalDepositSheet()">
-      <div id="goalDepositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
-        <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
+      <div id="goalDepositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+        <div id="goalDepositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
         <div id="goalDepositFields"></div>
         <div style="display:flex;gap:8px;margin-top:14px">
           <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
@@ -1371,29 +1371,49 @@ function addGoalFund(){
 }
 let _goalDepositGoalId=null;
 let _goalDepositFamId=null;
-function openGoalDepositSheet(goalId,famId){
+function openGoalDepositSheet(goalId){
   _goalDepositGoalId=goalId;
-  _goalDepositFamId=famId;
+  _goalDepositFamId=null;
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
-  const f=getFam(famId);
-  const name=f.name.replace('משפחת','').trim();
-  const c=g.contributions[famId]||0;
+  const titleEl=document.getElementById('goalDepositTitle');
+  if(titleEl) titleEl.textContent='הפקדה ל"'+g.name+'"';
   document.getElementById('goalDepositFields').innerHTML=`
-    <div style="font-size:13px;color:var(--text2);margin-bottom:10px">
-      הפקדה ל"${esc(g.name)}" עבור: <b>${esc(name)}</b> · הופקד עד כה: <b style="color:var(--blue-mid)">₪${c.toLocaleString()}</b>
-    </div>
     <input type="number" min="0" inputmode="numeric" id="goalDepositAmt" placeholder="סכום להפקדה (₪)"
-      style="width:100%;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+      style="width:100%;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;margin-bottom:14px;box-sizing:border-box">
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">מי מפקיד?</div>
+    ${families.map(f=>{
+      const cl=col(f.id);
+      const c=g.contributions[f.id]||0;
+      return`<div id="gdepfam-${f.id}" onclick="selectGoalDepFam(${f.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;box-sizing:border-box">
+        <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div>
+          <div style="font-size:11px;color:var(--blue-mid);margin-top:1px">הפקיד עד כה: ₪${c.toLocaleString()}</div>
+        </div>
+      </div>`;
+    }).join('')}
   `;
   document.getElementById('goalDepositOverlay').style.display='flex';
   setTimeout(()=>{ const el=document.getElementById('goalDepositAmt'); if(el)el.focus(); },100);
+}
+function selectGoalDepFam(famId){
+  _goalDepositFamId=famId;
+  families.forEach(f=>{
+    const el=document.getElementById('gdepfam-'+f.id);
+    if(el){
+      const sel=f.id===famId;
+      el.style.borderColor=sel?'var(--blue-mid)':'var(--border)';
+      el.style.background=sel?'var(--blue-bg)':'transparent';
+    }
+  });
 }
 function closeGoalDepositSheet(){
   document.getElementById('goalDepositOverlay').style.display='none';
   _goalDepositGoalId=null;_goalDepositFamId=null;
 }
 function confirmGoalDeposit(){
-  if(_goalDepositGoalId==null||_goalDepositFamId==null)return;
+  if(_goalDepositGoalId==null){ return; }
+  if(_goalDepositFamId==null){ alert('נא לבחור משפחה'); return; }
   const amt=parseFloat(document.getElementById('goalDepositAmt')?.value)||0;
   if(amt<=0){ alert('נא להזין סכום'); return; }
   const g=goalFunds.find(x=>x.id===_goalDepositGoalId);if(!g)return;
@@ -1439,37 +1459,40 @@ function renderGoalFunds(){
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
-    const rows=families.map(f=>{
-      const cl=col(f.id);
-      const c=g.contributions[f.id]||0;
-      return`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
-        <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px">${ini(f.name)}</div>
-        <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
-        <span style="font-size:17px;font-weight:800;color:var(--blue-mid)">₪${c.toLocaleString()}</span>
-        <button onclick="openGoalDepositSheet(${g.id},${f.id})" style="padding:7px 12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">הפקד</button>
-      </div>`;
-    }).join('');
-    const progressHtml=g.target>0
-      ?`<div class="pbar"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
-        <div class="plabel">נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}</div>`
-      :`<div class="plabel">נאסף ₪${total.toLocaleString()}</div>`;
-    const collapsed=collapsedGoals.has(g.id);
+    const contributors=families.filter(f=>(g.contributions[f.id]||0)>0);
+    const contribHtml=contributors.length?`
+      <div style="border-top:1px solid rgba(255,255,255,0.15);padding-top:9px;margin-top:10px">
+        ${contributors.map(f=>{
+          const cl=col(f.id);
+          const c=g.contributions[f.id]||0;
+          return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+            <div class="ava" style="background:${cl.bg};color:${cl.c};width:24px;height:24px;font-size:9px;flex-shrink:0">${ini(f.name)}</div>
+            <div style="flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,0.8)">${esc(f.name.replace('משפחת','').trim())}</div>
+            <div style="font-size:12px;font-weight:700;color:#6ee7b7">₪${c.toLocaleString()}</div>
+          </div>`;
+        }).join('')}
+      </div>`:'';
     return`<div class="fund-settle-card" id="gfund-${g.id}" style="margin-bottom:14px;${g.closed?'opacity:.6':''}">
-      <div style="padding:13px 14px 10px">
+      <div style="background:var(--text);border-radius:var(--r) var(--r) 0 0;padding:16px 16px 13px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
-          <div style="font-size:15px;font-weight:700">🎯 ${esc(g.name)}</div>
-          ${reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
+          <div style="font-size:15px;font-weight:800;color:#fff">🎯 ${esc(g.name)}</div>
+          ${reached?'<span class="badge badge-green" style="margin-top:2px">✅ הושלם</span>':g.closed?'<span class="badge badge-gray" style="margin-top:2px">סגור</span>':''}
         </div>
-        ${progressHtml}
-        <button class="exp-btn" onclick="toggleGoalCollapse(${g.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
+        <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:3px">נאסף עד כה</div>
+        <div style="font-size:30px;font-weight:800;color:#fff;letter-spacing:-0.5px">${total>0?'₪'+total.toLocaleString():'₪0'}</div>
+        ${g.target>0?`
+          <div class="pbar" style="margin:8px 0 3px;background:rgba(255,255,255,0.2)"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.55)">מתוך ₪${g.target.toLocaleString()} · ${pct}%</div>`:''}
+        ${contribHtml}
       </div>
-      ${collapsed?'':`
-      <div>${rows}</div>
-      <div class="card-actions">
-        <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
-        <button class="action-btn blue" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
-        <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
-      </div>`}
+      <div style="padding:10px 12px">
+        ${!g.closed?`<button onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:''}
+        <div class="card-actions" style="margin:0">
+          <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
+          <button class="action-btn blue" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
+          <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
+        </div>
+      </div>
     </div>`;
   }).join('');
 }
