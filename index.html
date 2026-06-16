@@ -264,8 +264,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
         </div>
       </div>
       <div class="field" id="childOverrideSection" style="display:none">
-        <label>כמה ילדים הגיעו לאירוע (לחישוב החלוקה)</label>
-        <div id="childOverrideInputs"></div>
+        <label>מספר ילדים באירוע</label>
+        <button type="button" class="action-btn" style="width:100%;box-sizing:border-box" onclick="openChildOverridePicker()">👶 <span id="childPickSummary">הגדר ילדים לפי משפחה</span></button>
       </div>
       <div class="field" id="expensesSection" style="display:none">
         <!-- Mode toggle -->
@@ -282,12 +282,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
         </div>
         <!-- Custom mode -->
         <div id="customModeDiv" style="display:none">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">כמה כל משפחה שילמה בפועל:</div>
-          <div id="expenseInputs"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:8px 0;border-top:1px solid var(--border)">
-            <span style="font-size:12px;font-weight:700;color:var(--text2)">סה"כ</span>
-            <span style="font-size:16px;font-weight:700;color:var(--green-mid)" id="formTotalCost">₪0</span>
-          </div>
+          <button type="button" class="action-btn" style="width:100%;box-sizing:border-box" onclick="openExpensePicker()">💰 <span id="expensePickSummary">כמה כל משפחה שילמה</span></button>
         </div>
         <div class="err-txt" id="e-cost">נא להזין סכום</div>
       </div>
@@ -298,13 +293,39 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
     </div>
     </div>
 
-    <!-- Family picker modal (hidden by default) -->
+    <!-- Family picker modal -->
     <div id="famPickOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1100;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamPicker()">
       <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px">מי משתתף באירוע</div>
         <div class="chips" id="famChips"></div>
         <div class="form-btns">
           <button class="save-btn" onclick="closeFamPicker()">✓ אישור</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Child override picker modal -->
+    <div id="childOverrideOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeChildOverridePicker()">
+      <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">כמה ילדים הגיעו לאירוע</div>
+        <div id="childOverrideInputs"></div>
+        <div class="form-btns">
+          <button class="save-btn" onclick="closeChildOverridePicker()">✓ אישור</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expense picker modal -->
+    <div id="expenseOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeExpensePicker()">
+      <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">כמה כל משפחה שילמה</div>
+        <div id="expenseInputs"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:8px 0;border-top:1px solid var(--border)">
+          <span style="font-size:12px;font-weight:700;color:var(--text2)">סה"כ</span>
+          <span style="font-size:16px;font-weight:700;color:var(--blue-mid)" id="formTotalCost">₪0</span>
+        </div>
+        <div class="form-btns">
+          <button class="save-btn" onclick="closeExpensePicker()">✓ אישור</button>
         </div>
       </div>
     </div>
@@ -1023,9 +1044,37 @@ function updateChildOverrideInputs(){
     return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
       <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
-      <input class="children-inp" type="number" min="0" inputmode="numeric" id="fchild-${f.id}" value="${val}" oninput="if(expMode==='total')updateTotalPreview()">
+      <input class="children-inp" type="number" min="0" inputmode="numeric" id="fchild-${f.id}" value="${val}" oninput="if(expMode==='total')updateTotalPreview();updateChildPickSummary()">
     </div>`;
   }).join('');
+  updateChildPickSummary();
+}
+function openChildOverridePicker(){
+  document.getElementById('childOverrideOverlay').style.display='flex';
+}
+function closeChildOverridePicker(){
+  document.getElementById('childOverrideOverlay').style.display='none';
+  updateChildPickSummary();
+  if(expMode==='total')updateTotalPreview();
+}
+function updateChildPickSummary(){
+  const el=document.getElementById('childPickSummary');if(!el)return;
+  const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
+  const total=selected.reduce((s,f)=>{ const v=formChildOverride(f.id); return s+(v!=null?v:(f.children||0)); },0);
+  el.textContent=total>0?`${selected.length} משפחות · ${total} ילדים בסה"כ`:'הגדר ילדים לפי משפחה';
+}
+function openExpensePicker(){
+  document.getElementById('expenseOverlay').style.display='flex';
+}
+function closeExpensePicker(){
+  document.getElementById('expenseOverlay').style.display='none';
+  updateExpensePickSummary();
+}
+function updateExpensePickSummary(){
+  const el=document.getElementById('expensePickSummary');if(!el)return;
+  let total=0;
+  families.forEach(f=>{ const inp=document.getElementById('fexp-'+f.id); if(inp) total+=parseFloat(inp.value)||0; });
+  el.textContent=total>0?`הוזן ₪${total.toLocaleString()}`:'כמה כל משפחה שילמה';
 }
 function setExpMode(mode){
   expMode=mode;
@@ -1073,7 +1122,7 @@ function showForm(){
   setExpMode('total');
   if(document.getElementById('f-total')) document.getElementById('f-total').value='';
   document.getElementById('expensesSection').style.display='none';
-  updateExpenseInputs();
+  updateExpenseInputs();updateExpensePickSummary();
   document.getElementById('newFormOverlay').style.display='flex';
   goTab('events',document.getElementById('nb-events'));
 }
@@ -1106,7 +1155,7 @@ function editEv(evId){
 }
 function hideForm(){
   document.getElementById('newFormOverlay').style.display='none';
-  closeFamPicker();
+  closeFamPicker();closeChildOverridePicker();closeExpensePicker();
   editingId=null;
   document.getElementById('formTitle').textContent='➕ אירוע חדש';
   document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
@@ -1144,6 +1193,7 @@ function updateFormTotal(){
   let total=0;
   families.forEach(f=>{ const inp=document.getElementById('fexp-'+f.id); if(inp) total+=parseFloat(inp.value)||0; });
   document.getElementById('formTotalCost').textContent='₪'+total.toLocaleString();
+  updateExpensePickSummary();
 }
 function doCreate(){
   const name=document.getElementById('f-name').value.trim();
