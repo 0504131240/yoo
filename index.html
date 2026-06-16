@@ -381,20 +381,23 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   <!-- FUND -->
   <div class="view" id="view-fund">
 
-    <!-- Big balance card -->
-    <div style="background:var(--text);border-radius:var(--r);padding:28px 20px 24px;margin-bottom:16px;text-align:center">
-      <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:8px;letter-spacing:.5px">💰 יתרת קופה משותפת</div>
-      <div id="fundBalAmt" style="font-size:44px;font-weight:800;color:#fff;letter-spacing:-1px">₪0</div>
+    <!-- Big balance card with family balances inside -->
+    <div style="background:var(--text);border-radius:var(--r);padding:24px 20px 18px;margin-bottom:14px">
+      <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:8px;text-align:center;letter-spacing:.5px">💰 יתרת קופה משותפת</div>
+      <div id="fundBalAmt" style="font-size:44px;font-weight:800;color:#fff;letter-spacing:-1px;text-align:center">₪0</div>
+      <div id="fundFamSummary" style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px"></div>
     </div>
 
-    <!-- Per-family rows -->
-    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;letter-spacing:.5px">יתרות לפי משפחה</div>
-    <div id="fundDepRows"></div>
+    <!-- Action buttons -->
+    <div style="display:flex;gap:10px;margin-bottom:18px">
+      <button onclick="openDepositSheet('withdraw')" style="flex:1;padding:14px;border-radius:var(--r2);border:none;background:var(--red-bg);color:var(--red);font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer">↑ משיכה</button>
+      <button onclick="openDepositSheet('deposit')" style="flex:1;padding:14px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer">↓ הפקדה</button>
+    </div>
 
-    <!-- Deposit modal -->
+    <!-- Deposit/Withdraw modal -->
     <div id="depositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeDepositSheet()">
-      <div id="depositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
-        <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופה</div>
+      <div id="depositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+        <div id="depositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופה</div>
         <div id="depositFields"></div>
         <div style="display:flex;gap:8px;margin-top:14px">
           <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmDeposit()">✓ אשר הפקדה</button>
@@ -1316,23 +1319,23 @@ function renderFund(){
   const total=fundTotal();
   document.getElementById('fundBalAmt').textContent='₪'+total.toLocaleString();
 
-  document.getElementById('fundDepRows').innerHTML=families.map(f=>{
-    const cl=col(f.id);
-    const bal=famFundBal(f.id);
-    const balColor=bal>0?'var(--green-mid)':bal===0?'var(--text3)':'var(--red-mid)';
-    const balText=bal>0?'₪'+bal.toLocaleString():bal===0?'₪0':'חוב ₪'+Math.abs(bal).toLocaleString();
-    return`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
-      <div class="ava" style="background:${cl.bg};color:${cl.c};width:36px;height:36px;flex-shrink:0">${ini(f.name)}</div>
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div>
-        <div style="font-size:13px;font-weight:600;color:${balColor};margin-top:2px">${balText}</div>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button onclick="openDepositSheet(${f.id},'withdraw')" style="padding:8px 12px;border-radius:var(--r2);border:1px solid var(--border);background:var(--red-bg);color:var(--red);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">משיכה</button>
-        <button onclick="openDepositSheet(${f.id},'deposit')" style="padding:8px 12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">הפקד</button>
-      </div>
-    </div>`;
-  }).join('');
+  const famSumEl=document.getElementById('fundFamSummary');
+  if(famSumEl){
+    const withBal=families.filter(f=>famFundBal(f.id)>0);
+    if(!withBal.length){
+      famSumEl.innerHTML='';
+    } else {
+      famSumEl.innerHTML=withBal.map(f=>{
+        const cl=col(f.id);
+        const bal=famFundBal(f.id);
+        return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div class="ava" style="background:${cl.bg};color:${cl.c};width:28px;height:28px;font-size:10px;flex-shrink:0">${ini(f.name)}</div>
+          <div style="flex:1;font-size:13px;font-weight:600;color:rgba(255,255,255,0.85)">${esc(f.name.replace('משפחת','').trim())}</div>
+          <div style="font-size:13px;font-weight:700;color:#6ee7b7">₪${bal.toLocaleString()}</div>
+        </div>`;
+      }).join('');
+    }
+  }
 
   // היסטוריית תנועות
   const txEl=document.getElementById('fundTxList');
@@ -1473,36 +1476,59 @@ function renderGoalFunds(){
 
 let _depositFamId=null;
 let _depositMode='deposit';
-function openDepositSheet(famId, mode){
-  _depositFamId=famId;
+function openDepositSheet(mode){
+  _depositFamId=null;
   _depositMode=mode||'deposit';
-  const f=getFam(famId);
-  const name=f.name.replace('משפחת','').trim();
-  const bal=famFundBal(famId);
   const isDeposit=_depositMode==='deposit';
-  const balColor=bal>0?'var(--green-mid)':bal===0?'var(--text3)':'var(--red-mid)';
+  const acc=isDeposit?'var(--blue-mid)':'var(--red-mid)';
+  const titleEl=document.getElementById('depositTitle');
+  if(titleEl) titleEl.textContent=isDeposit?'הפקדה לקופה':'משיכה מהקופה';
   document.getElementById('depositFields').innerHTML=`
-    <div style="font-size:13px;color:var(--text2);margin-bottom:10px">
-      ${isDeposit?'הפקדה':'משיכה'} עבור: <b>${esc(name)}</b> · יתרה נוכחית: <b style="color:${balColor}">₪${bal.toLocaleString()}</b>
-    </div>
     <input type="number" min="0" inputmode="numeric" id="depositAmt" placeholder="${isDeposit?'סכום להפקדה':'סכום למשיכה'} (₪)"
-      style="width:100%;border:1.5px solid ${isDeposit?'var(--blue-mid)':'var(--red-mid)'};border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+      style="width:100%;border:1.5px solid ${acc};border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;margin-bottom:14px;box-sizing:border-box">
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">${isDeposit?'מי מפקיד?':'מי מושך?'}</div>
+    ${families.map(f=>{
+      const cl=col(f.id);
+      const bal=famFundBal(f.id);
+      const balColor=bal>0?'var(--green-mid)':bal===0?'var(--text3)':'var(--red-mid)';
+      const balText=bal>0?'₪'+bal.toLocaleString():bal===0?'₪0':'חוב ₪'+Math.abs(bal).toLocaleString();
+      return`<div id="depfam-${f.id}" onclick="selectDepFam(${f.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;box-sizing:border-box">
+        <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div>
+          <div style="font-size:11px;color:${balColor};margin-top:1px">יתרה: ${balText}</div>
+        </div>
+      </div>`;
+    }).join('')}
   `;
-  // update confirm button color and text
   const btn=document.querySelector('#depositSheet .fund-dep-btn');
   if(btn){
     btn.textContent=isDeposit?'✓ אשר הפקדה':'✓ אשר משיכה';
-    btn.style.background=isDeposit?'var(--blue-mid)':'var(--red-mid)';
+    btn.style.background=acc;
   }
   document.getElementById('depositOverlay').style.display='flex';
   setTimeout(()=>{ const el=document.getElementById('depositAmt'); if(el)el.focus(); },100);
+}
+function selectDepFam(famId){
+  _depositFamId=famId;
+  const isDeposit=_depositMode==='deposit';
+  const acc=isDeposit?'var(--blue-mid)':'var(--red-mid)';
+  const accBg=isDeposit?'var(--blue-bg)':'var(--red-bg)';
+  families.forEach(f=>{
+    const el=document.getElementById('depfam-'+f.id);
+    if(el){
+      const sel=f.id===famId;
+      el.style.borderColor=sel?acc:'var(--border)';
+      el.style.background=sel?accBg:'transparent';
+    }
+  });
 }
 function closeDepositSheet(){
   document.getElementById('depositOverlay').style.display='none';
   _depositFamId=null;
 }
 function confirmDeposit(){
-  if(!_depositFamId) return;
+  if(!_depositFamId){ alert('נא לבחור משפחה'); return; }
   const amt=parseFloat(document.getElementById('depositAmt')?.value)||0;
   if(amt<=0){ alert('נא להזין סכום'); return; }
   const f=getFam(_depositFamId);
