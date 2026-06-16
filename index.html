@@ -361,9 +361,13 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
         <div style="font-size:14px;font-weight:700;margin-bottom:12px">עריכת משפחה</div>
         <input type="text" id="famEditName" placeholder="שם המשפחה"
           style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
-        <div class="children-field">
-          <label>ילדים</label>
-          <input class="children-inp" type="number" min="0" inputmode="numeric" id="famEditChildren">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:13px;font-weight:600;color:var(--text2)">ילדים</span>
+          <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+            <button type="button" onclick="stepFamChildren(-1)" style="width:36px;height:36px;border:none;background:var(--bg);color:var(--text);font-size:20px;font-weight:300;cursor:pointer;font-family:var(--font)">−</button>
+            <input class="children-inp" type="number" min="0" inputmode="numeric" id="famEditChildren" style="border:none;border-right:1.5px solid var(--border);border-left:1.5px solid var(--border);border-radius:0;width:44px;height:36px;padding:0">
+            <button type="button" onclick="stepFamChildren(1)" style="width:36px;height:36px;border:none;background:var(--bg);color:var(--text);font-size:20px;font-weight:300;cursor:pointer;font-family:var(--font)">+</button>
+          </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:14px">
           <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="saveFamEdit()">✓ שמור</button>
@@ -710,6 +714,17 @@ function goToGoalFund(goalId){
     const el=document.getElementById('gfund-'+goalId);
     if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
   },100);
+}
+function stepFamChildren(delta){
+  const inp=document.getElementById('famEditChildren');
+  inp.value=Math.max(0,(parseInt(inp.value)||0)+delta);
+}
+function stepChild(id,delta){
+  const inp=document.getElementById(id);
+  if(!inp)return;
+  inp.value=Math.max(0,(parseInt(inp.value)||0)+delta);
+  if(expMode==='total')updateTotalPreview();
+  updateChildPickSummary();
 }
 function calcTransfers(ev, includeSettled){
   const bal=evBalance(ev);
@@ -1065,7 +1080,11 @@ function updateChildOverrideInputs(){
     return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
       <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
-      <input class="children-inp" type="number" min="0" inputmode="numeric" id="fchild-${f.id}" value="${val}" oninput="if(expMode==='total')updateTotalPreview();updateChildPickSummary()">
+      <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+        <button type="button" onclick="stepChild('fchild-${f.id}',-1)" style="width:30px;height:30px;border:none;background:var(--bg);color:var(--text);font-size:17px;font-weight:300;cursor:pointer;font-family:var(--font)">−</button>
+        <input class="children-inp" type="number" min="0" inputmode="numeric" id="fchild-${f.id}" value="${val}" oninput="if(expMode==='total')updateTotalPreview();updateChildPickSummary()" style="border:none;border-right:1.5px solid var(--border);border-left:1.5px solid var(--border);border-radius:0;width:36px;height:30px;padding:0">
+        <button type="button" onclick="stepChild('fchild-${f.id}',1)" style="width:30px;height:30px;border:none;background:var(--bg);color:var(--text);font-size:17px;font-weight:300;cursor:pointer;font-family:var(--font)">+</button>
+      </div>
     </div>`;
   }).join('');
   updateChildPickSummary();
