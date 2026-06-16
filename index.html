@@ -387,13 +387,15 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;letter-spacing:.5px">יתרות לפי משפחה</div>
     <div id="fundDepRows"></div>
 
-    <!-- Deposit sheet (hidden) -->
-    <div id="depositSheet" style="display:none;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-top:2px;margin-bottom:14px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופה</div>
-      <div id="depositFields"></div>
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmDeposit()">✓ אשר הפקדה</button>
-        <button onclick="closeDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+    <!-- Deposit modal -->
+    <div id="depositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeDepositSheet()">
+      <div id="depositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופה</div>
+        <div id="depositFields"></div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmDeposit()">✓ אשר הפקדה</button>
+          <button onclick="closeDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+        </div>
       </div>
     </div>
 
@@ -402,26 +404,33 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       <div class="fund-section-title" style="margin-bottom:0">🎯 קופות למטרה</div>
       <button class="fund-dep-btn" onclick="openGoalForm()">+ קופה חדשה</button>
     </div>
-    <div id="goalFormSheet" style="display:none;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:14px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px">קופה חדשה למטרה</div>
-      <input type="text" id="goalName" placeholder="שם הקופה (לדוגמה: מתנה לסבא)"
-        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
-      <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
-        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="addGoalFund()">✓ צור קופה</button>
-        <button onclick="closeGoalForm()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+
+    <!-- New goal fund modal -->
+    <div id="goalFormOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalForm()">
+      <div id="goalFormSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">קופה חדשה למטרה</div>
+        <input type="text" id="goalName" placeholder="שם הקופה (לדוגמה: מתנה לסבא)"
+          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
+        <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
+          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="addGoalFund()">✓ צור קופה</button>
+          <button onclick="closeGoalForm()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+        </div>
       </div>
     </div>
+
     <div id="goalFundsList" style="margin-bottom:14px"></div>
 
-    <!-- Goal deposit sheet (hidden) -->
-    <div id="goalDepositSheet" style="display:none;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:14px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
-      <div id="goalDepositFields"></div>
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
-        <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+    <!-- Goal deposit modal -->
+    <div id="goalDepositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalDepositSheet()">
+      <div id="goalDepositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
+        <div id="goalDepositFields"></div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
+          <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+        </div>
       </div>
     </div>
 
@@ -1311,11 +1320,10 @@ function renderFund(){
 }
 
 function openGoalForm(){
-  document.getElementById('goalFormSheet').style.display='block';
-  document.getElementById('goalFormSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('goalFormOverlay').style.display='flex';
 }
 function closeGoalForm(){
-  document.getElementById('goalFormSheet').style.display='none';
+  document.getElementById('goalFormOverlay').style.display='none';
   document.getElementById('goalName').value='';
   document.getElementById('goalTarget').value='';
 }
@@ -1343,12 +1351,11 @@ function openGoalDepositSheet(goalId,famId){
     <input type="number" min="0" inputmode="numeric" id="goalDepositAmt" placeholder="סכום להפקדה (₪)"
       style="width:100%;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
   `;
-  document.getElementById('goalDepositSheet').style.display='block';
-  document.getElementById('goalDepositSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('goalDepositOverlay').style.display='flex';
   setTimeout(()=>{ const el=document.getElementById('goalDepositAmt'); if(el)el.focus(); },100);
 }
 function closeGoalDepositSheet(){
-  document.getElementById('goalDepositSheet').style.display='none';
+  document.getElementById('goalDepositOverlay').style.display='none';
   _goalDepositGoalId=null;_goalDepositFamId=null;
 }
 function confirmGoalDeposit(){
@@ -1456,12 +1463,11 @@ function openDepositSheet(famId, mode){
     btn.textContent=isDeposit?'✓ אשר הפקדה':'✓ אשר משיכה';
     btn.style.background=isDeposit?'var(--blue-mid)':'var(--red-mid)';
   }
-  document.getElementById('depositSheet').style.display='block';
-  document.getElementById('depositSheet').scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('depositOverlay').style.display='flex';
   setTimeout(()=>{ const el=document.getElementById('depositAmt'); if(el)el.focus(); },100);
 }
 function closeDepositSheet(){
-  document.getElementById('depositSheet').style.display='none';
+  document.getElementById('depositOverlay').style.display='none';
   _depositFamId=null;
 }
 function confirmDeposit(){
