@@ -381,11 +381,21 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   <!-- FUND -->
   <div class="view" id="view-fund">
 
-    <!-- Big balance card with family balances inside -->
-    <div style="background:var(--text);border-radius:var(--r);padding:24px 20px 18px;margin-bottom:14px">
-      <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:8px;text-align:center;letter-spacing:.5px">💰 יתרת קופה משותפת</div>
-      <div id="fundBalAmt" style="font-size:44px;font-weight:800;color:#fff;letter-spacing:-1px;text-align:center">₪0</div>
-      <div id="fundFamSummary" style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px"></div>
+    <!-- Grand total summary card -->
+    <div id="grandTotalCard" style="background:var(--text);border-radius:var(--r);padding:20px 20px 16px;margin-bottom:14px">
+      <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:6px;text-align:center;letter-spacing:.5px">סך כל הקופות</div>
+      <div id="grandTotalAmt" style="font-size:38px;font-weight:800;color:#fff;letter-spacing:-1px;text-align:center;margin-bottom:12px">₪0</div>
+      <div id="grandTotalBreakdown" style="display:flex;justify-content:center;gap:16px;border-top:1px solid rgba(255,255,255,0.15);padding-top:10px"></div>
+    </div>
+
+    <!-- Main fund card with family balances inside -->
+    <div class="fund-section-title">💰 קופה ראשית</div>
+    <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px 16px 14px;margin-bottom:8px">
+      <div style="text-align:center;margin-bottom:4px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:2px">יתרה</div>
+        <div id="fundBalAmt" style="font-size:32px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪0</div>
+      </div>
+      <div id="fundFamSummary" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"></div>
     </div>
 
     <!-- Action buttons -->
@@ -393,6 +403,9 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       <button onclick="openDepositSheet('withdraw')" style="flex:1;padding:14px;border-radius:var(--r2);border:none;background:var(--red-bg);color:var(--red);font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer">↑ משיכה</button>
       <button onclick="openDepositSheet('deposit')" style="flex:1;padding:14px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer">↓ הפקדה</button>
     </div>
+
+    <!-- Event pots section -->
+    <div id="eventPotsSection" style="margin-bottom:18px"></div>
 
     <!-- Deposit/Withdraw modal -->
     <div id="depositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeDepositSheet()">
@@ -1374,8 +1387,24 @@ function goTab(tab,el){
 }
 
 function renderFund(){
-  const total=fundTotal();
-  document.getElementById('fundBalAmt').textContent='₪'+total.toLocaleString();
+  const mainTotal=fundTotal();
+  const goalTotal2=goalFunds.filter(g=>!g.archived&&!g.closed).reduce((s,g)=>s+goalTotal(g),0);
+  const evPotsTotal=events.filter(e=>e.open).reduce((s,ev)=>s+evPotTotal(ev),0);
+  const grandTotal=mainTotal+goalTotal2+evPotsTotal;
+
+  // Grand total card
+  document.getElementById('grandTotalAmt').textContent='₪'+grandTotal.toLocaleString();
+  document.getElementById('grandTotalBreakdown').innerHTML=[
+    {label:'ראשית',amt:mainTotal,color:'rgba(255,255,255,0.8)'},
+    {label:'מטרה',amt:goalTotal2,color:'#6ee7b7'},
+    {label:'אירועים',amt:evPotsTotal,color:'#fbbf24'},
+  ].map(({label,amt,color})=>`<div style="text-align:center">
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:2px">${label}</div>
+    <div style="font-size:15px;font-weight:700;color:${color}">₪${amt.toLocaleString()}</div>
+  </div>`).join('');
+
+  // Main fund balance
+  document.getElementById('fundBalAmt').textContent='₪'+mainTotal.toLocaleString();
 
   const famSumEl=document.getElementById('fundFamSummary');
   if(famSumEl){
@@ -1388,10 +1417,33 @@ function renderFund(){
         const bal=famFundBal(f.id);
         return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <div class="ava" style="background:${cl.bg};color:${cl.c};width:28px;height:28px;font-size:10px;flex-shrink:0">${ini(f.name)}</div>
-          <div style="flex:1;font-size:13px;font-weight:600;color:rgba(255,255,255,0.85)">${esc(f.name.replace('משפחת','').trim())}</div>
-          <div style="font-size:13px;font-weight:700;color:#6ee7b7">₪${bal.toLocaleString()}</div>
+          <div style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green-mid)">₪${bal.toLocaleString()}</div>
         </div>`;
       }).join('');
+    }
+  }
+
+  // Event pots section
+  const evPotsEl=document.getElementById('eventPotsSection');
+  if(evPotsEl){
+    const potsWithFunds=events.filter(e=>e.open&&evPotTotal(e)>0);
+    if(!potsWithFunds.length){
+      evPotsEl.innerHTML='';
+    } else {
+      evPotsEl.innerHTML=`<div class="fund-section-title">📅 קופות אירועים</div>`+
+        potsWithFunds.map(ev=>{
+          const pot=evPotTotal(ev);
+          const cl=col(ev.id);
+          return`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="goToEvent(${ev.id})">
+            <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">📅</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700">${esc(ev.name)}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:1px">${esc(ev.date)}</div>
+            </div>
+            <div style="font-size:15px;font-weight:800;color:var(--amber)">₪${pot.toLocaleString()}</div>
+          </div>`;
+        }).join('');
     }
   }
 
