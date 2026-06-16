@@ -679,7 +679,9 @@ function renderHome(){
   document.getElementById('homeEventList').innerHTML=open.length?open.map(ev=>{
     const cl=col(ev.id);
     const cost=evCost(ev);
-    const remaining=calcTransfers(ev).reduce((s,t)=>s+t.amt,0);
+    const remaining=ev.totalCost!=null
+      ?Math.max(0,ev.totalCost-ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0))
+      :calcTransfers(ev).reduce((s,t)=>s+t.amt,0);
     return`<div class="home-row" onclick="goToEvent(${ev.id})">
       <div class="home-row-icon" style="background:${cl.bg};color:${cl.c}">📅</div>
       <div class="home-row-body">
@@ -796,7 +798,8 @@ function evCard(ev){
   const bal=evBalance(ev);
   const excl=families.filter(f=>ev.excluded.includes(f.id));
   const transfers=calcTransfers(ev);
-  const balanced=transfers.length===0;
+  const totalPaid=ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0);
+  const balanced=ev.totalCost!=null?totalPaid>=ev.totalCost-0.5:transfers.length===0;
   // compute adjusted balance after settled transfers
   const adjBal={...bal};
   (ev.settled||[]).forEach(s=>{
@@ -911,10 +914,8 @@ function updateExpense(evId,famId,val){
 }
 function markSettled(evId,fid){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const amount=evShares(ev)[fid]||0;
-  const inp=document.getElementById('expinp-'+evId+'-'+fid);
-  if(inp){ inp.value=amount; liveUpdateCard(evId,inp,fid); }
-  updateExpense(evId,fid,amount);
+  ev.expenses[fid]=evShares(ev)[fid]||0;
+  save();render();
 }
 function renderArchiveGoals(){
   const el=document.getElementById('archGoalList');
