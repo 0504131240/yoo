@@ -683,7 +683,7 @@ function renderHome(){
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
     const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`;
-    return`<div class="home-row home-row-col" onclick="goTab('fund',document.getElementById('nb-fund'))">
+    return`<div class="home-row home-row-col" onclick="goToGoalFund(${g.id})">
       <div class="home-goal-top">
         <div class="home-row-icon" style="background:var(--amber-bg);color:var(--amber)">🎯</div>
         <div class="home-row-body">
@@ -702,6 +702,14 @@ function goToEvent(evId){
     const el=document.getElementById('ecard-'+evId);
     if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
   },50);
+}
+function goToGoalFund(goalId){
+  collapsedGoals.delete(goalId);
+  goTab('fund',document.getElementById('nb-fund'));
+  setTimeout(()=>{
+    const el=document.getElementById('gfund-'+goalId);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  },100);
 }
 function calcTransfers(ev, includeSettled){
   const bal=evBalance(ev);
@@ -1424,7 +1432,7 @@ function renderGoalFunds(){
         <div class="plabel">נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}</div>`
       :`<div class="plabel">נאסף ₪${total.toLocaleString()}</div>`;
     const collapsed=collapsedGoals.has(g.id);
-    return`<div class="fund-settle-card" style="margin-bottom:14px;${g.closed?'opacity:.6':''}">
+    return`<div class="fund-settle-card" id="gfund-${g.id}" style="margin-bottom:14px;${g.closed?'opacity:.6':''}">
       <div style="padding:13px 14px 10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
           <div style="font-size:15px;font-weight:700">🎯 ${esc(g.name)}</div>
