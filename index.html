@@ -523,6 +523,16 @@ const evShares=ev=>{
   return shares;
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
+function evAdjBalance(ev){
+  const adjBal=evBalance(ev);
+  (ev.settled||[]).forEach(s=>{
+    const fromFid=ev.participants.find(fid=>{ const f=getFam(fid); return f&&f.name.replace('משפחת','').trim()===s.from; });
+    const toFid=ev.participants.find(fid=>{ const f=getFam(fid); return f&&f.name.replace('משפחת','').trim()===s.to; });
+    if(fromFid!=null) adjBal[fromFid]=(adjBal[fromFid]||0)+s.amt;
+    if(toFid!=null) adjBal[toFid]=(adjBal[toFid]||0)-s.amt;
+  });
+  return adjBal;
+}
 const shareLabel=ev=>{
   const method=ev.splitMethod||'equal';
   if(method==='equal') return 'חלק שווה: ₪'+evShare(ev).toLocaleString()+'/משפחה';
@@ -636,8 +646,8 @@ function render(){
 function calcDebt(){
   let t=0;
   events.filter(e=>e.open).forEach(ev=>{
-    const bal=evBalance(ev);
-    ev.participants.forEach(fid=>{ if(bal[fid]<0) t+=Math.abs(bal[fid]); });
+    const bal=evAdjBalance(ev);
+    ev.participants.forEach(fid=>{ if(bal[fid]<-0.5) t+=Math.abs(bal[fid]); });
   });
   return t;
 }
@@ -990,8 +1000,8 @@ function renderDebts(){
   const debts={};
   families.forEach(f=>{debts[f.id]={total:0,evs:[]};});
   events.filter(e=>e.open).forEach(ev=>{
-    const bal=evBalance(ev);
-    ev.participants.forEach(fid=>{ if(bal[fid]<0){debts[fid].total+=Math.abs(bal[fid]);debts[fid].evs.push(esc(ev.name));} });
+    const bal=evAdjBalance(ev);
+    ev.participants.forEach(fid=>{ if(bal[fid]<-0.5){debts[fid].total+=Math.abs(bal[fid]);debts[fid].evs.push(esc(ev.name));} });
   });
   const has=families.filter(f=>debts[f.id]?.total>0);
   const none=families.filter(f=>debts[f.id]?.total===0);
