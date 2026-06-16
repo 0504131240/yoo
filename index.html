@@ -519,7 +519,11 @@ const evShares=ev=>{
   let totalW=0; const w={};
   ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method,ev.childOverrides?.[fid]); totalW+=w[fid]; });
   const shares={};
-  ev.participants.forEach(fid=>{ shares[fid]=totalW?Math.round(cost*w[fid]/totalW):0; });
+  let allocated=0;
+  ev.participants.forEach((fid,i)=>{
+    if(i===ev.participants.length-1){ shares[fid]=Math.round(cost-allocated); }
+    else{ const s=totalW?Math.round(cost*w[fid]/totalW):0; shares[fid]=s; allocated+=s; }
+  });
   return shares;
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
