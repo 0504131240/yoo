@@ -850,7 +850,7 @@ function evCard(ev){
     ${potPayments.map(p=>{const pf=getFam(p.famId);return`<div style="font-size:11px;color:var(--text2)">✓ ${esc(pf.name.replace('משפחת','').trim())} שילם ₪${p.amt.toLocaleString()}</div>`;}).join('')}
     ${potTransfers.length?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(180,130,0,0.2)">
       <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:3px">יש להעביר:</div>
-      ${potTransfers.map(t=>`<div style="font-size:11px;color:var(--text);margin-bottom:1px">👈 <b>${esc(t.from)}</b> → <b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</div>`).join('')}
+      ${Object.entries(potTransfers.reduce((acc,t)=>{acc[t.to]=(acc[t.to]||0)+t.amt;return acc;},{})).map(([to,amt])=>`<div style="font-size:11px;color:var(--text);margin-bottom:1px">👈 <b>${esc(to)}</b> יקבל ₪${amt.toLocaleString()}</div>`).join('')}
     </div>`:''}
     <button onclick="releasePot(${ev.id})" style="margin-top:6px;padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">${creditorFids.length?'↗ אשר העברה לזוכים':'✓ סמן כהועבר'}</button>
   </div>`:'';
