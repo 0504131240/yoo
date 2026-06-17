@@ -218,6 +218,7 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
   </div>
   <div style="display:flex;gap:8px;flex-shrink:0">
     <button class="btn-add" id="nb-families" onclick="goTab('families',this)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">👥</button>
+    <button class="btn-add" onclick="openLockModal()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:16px"><span id="lockIcon">🔒</span></button>
     <button class="btn-add edit-only" onclick="showForm()">+ אירוע חדש</button>
   </div>
 </div>
@@ -482,9 +483,6 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
   </button>
   <button class="nav-btn" id="nb-fund" onclick="goTab('fund',this)">
     <span class="nav-icon">🏦</span>קופה
-  </button>
-  <button class="nav-btn" id="nb-lock" onclick="openLockModal()">
-    <span class="nav-icon" id="lockIcon">🔒</span><span id="lockLabel">נעול</span>
   </button>
 </nav>
 
@@ -1993,9 +1991,7 @@ function doDepositToCumPot(){
 function applyEditMode(){
   document.body.classList.toggle('edit-mode',editMode);
   const icon=document.getElementById('lockIcon');
-  const label=document.getElementById('lockLabel');
   if(icon)icon.textContent=editMode?'🔓':'🔒';
-  if(label)label.textContent=editMode?'עריכה':'נעול';
 }
 function openLockModal(){
   renderLockModal(editMode?'lock':adminPass?'unlock':'set');
