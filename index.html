@@ -770,7 +770,11 @@ function stepChild(id,delta){
   updateChildPickSummary();
 }
 function calcTransfers(ev){
-  const adjBal=evAdjBalance(ev);
+  const adjBal={...evAdjBalance(ev)};
+  // Pre-apply pot releases to creditors so direct transfers only show the remaining gap
+  if((ev.potPayments||[]).length>0){
+    calcPotTransfers(ev).forEach(t=>{ adjBal[t.toFid]=(adjBal[t.toFid]||0)-t.amt; });
+  }
   const pos=[],neg=[];
   ev.participants.forEach(fid=>{
     const f=getFam(fid);if(!f)return;
