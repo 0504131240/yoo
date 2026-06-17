@@ -1286,35 +1286,71 @@ function famAva(f, size=34, extra=''){
 let _famEditId=null;
 let _famEditPhoto=undefined;
 let _reposImgSize=null,_reposOffset={x:0,y:0},_reposDragging=false,_reposStart=null;
+let _reposZoom=1,_reposBaseW=0,_reposBaseH=0,_pinchStartDist=null,_pinchStartZoom=1;
 function previewFamPhoto(inp){
   if(!inp.files||!inp.files[0])return;
   const reader=new FileReader();
   reader.onload=e=>openPhotoRepos(e.target.result);
   reader.readAsDataURL(inp.files[0]);
 }
+function getPinchDist(e){
+  const dx=e.touches[0].clientX-e.touches[1].clientX;
+  const dy=e.touches[0].clientY-e.touches[1].clientY;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+function updateReposZoom(z){
+  const imgEl=document.getElementById('photoReposImg');
+  if(!_reposBaseW)return;
+  const sz=200;
+  z=Math.min(4,Math.max(1,z));
+  _reposZoom=z;
+  const dw=_reposBaseW*z,dh=_reposBaseH*z;
+  _reposImgSize={w:dw,h:dh,sz};
+  imgEl.style.width=dw+'px';imgEl.style.height=dh+'px';
+  let nx=Math.min(0,Math.max(sz-dw,_reposOffset.x));
+  let ny=Math.min(0,Math.max(sz-dh,_reposOffset.y));
+  _reposOffset={x:nx,y:ny};
+  imgEl.style.transform=`translate(${nx}px,${ny}px)`;
+  const zoomLbl=document.getElementById('reposZoomLbl');
+  if(zoomLbl)zoomLbl.textContent=Math.round(z*100)+'%';
+}
 function openPhotoRepos(rawUrl){
   const modal=document.getElementById('photoReposModal');
   const imgEl=document.getElementById('photoReposImg');
   const circle=document.getElementById('photoReposCircle');
   const sz=200;
+  _reposZoom=1;_reposBaseW=0;_reposBaseH=0;_pinchStartDist=null;
   imgEl.onload=()=>{
     const nw=imgEl.naturalWidth,nh=imgEl.naturalHeight;
     const scale=Math.max(sz/nw,sz/nh);
-    const dw=nw*scale,dh=nh*scale;
+    _reposBaseW=nw*scale;_reposBaseH=nh*scale;
+    const dw=_reposBaseW,dh=_reposBaseH;
     imgEl.style.width=dw+'px';imgEl.style.height=dh+'px';
     _reposOffset={x:(sz-dw)/2,y:(sz-dh)/2};
     imgEl.style.transform=`translate(${_reposOffset.x}px,${_reposOffset.y}px)`;
     _reposImgSize={w:dw,h:dh,sz};
+    const zoomLbl=document.getElementById('reposZoomLbl');
+    if(zoomLbl)zoomLbl.textContent='100%';
   };
   imgEl.src=rawUrl;
   modal.style.display='flex';
   const onDown=e=>{
+    if(e.touches&&e.touches.length===2){
+      _pinchStartDist=getPinchDist(e);
+      _pinchStartZoom=_reposZoom;
+      e.preventDefault();return;
+    }
     _reposDragging=true;
     const p=e.touches?e.touches[0]:e;
     _reposStart={x:p.clientX-_reposOffset.x,y:p.clientY-_reposOffset.y};
     e.preventDefault();
   };
   const onMove=e=>{
+    if(e.touches&&e.touches.length===2&&_pinchStartDist){
+      const dist=getPinchDist(e);
+      updateReposZoom(_pinchStartZoom*(dist/_pinchStartDist));
+      e.preventDefault();return;
+    }
     if(!_reposDragging||!_reposImgSize)return;
     const p=e.touches?e.touches[0]:e;
     const s=_reposImgSize;
@@ -1325,10 +1361,17 @@ function openPhotoRepos(rawUrl){
     imgEl.style.transform=`translate(${nx}px,${ny}px)`;
     e.preventDefault();
   };
-  const onUp=()=>{ _reposDragging=false; };
+  const onUp=e=>{
+    if(e&&e.touches&&e.touches.length<2)_pinchStartDist=null;
+    _reposDragging=false;
+  };
   circle.onmousedown=circle.ontouchstart=onDown;
   document.onmousemove=document.ontouchmove=onMove;
   document.onmouseup=document.ontouchend=onUp;
+  circle.onwheel=e=>{
+    e.preventDefault();
+    updateReposZoom(_reposZoom*(e.deltaY<0?1.1:0.9));
+  };
 }
 function confirmPhotoRepos(){
   const imgEl=document.getElementById('photoReposImg');
@@ -1346,7 +1389,7 @@ function confirmPhotoRepos(){
 }
 function closePhotoRepos(){
   document.getElementById('photoReposModal').style.display='none';
-  _reposDragging=false;
+  _reposDragging=false;_pinchStartDist=null;
   document.onmousemove=document.ontouchmove=null;
   document.onmouseup=document.ontouchend=null;
 }
@@ -2333,10 +2376,15 @@ document.getElementById('manifestLink').href=URL.createObjectURL(mblob);
 <!-- Photo reposition modal -->
 <div id="photoReposModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">
   <div style="background:var(--surface);border-radius:var(--r);padding:22px 20px 18px;width:100%;max-width:300px;text-align:center;box-sizing:border-box">
-    <div style="font-size:14px;font-weight:700;margin-bottom:6px">מרכז את התמונה</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:16px">גרור לשינוי מיקום</div>
-    <div id="photoReposCircle" style="width:200px;height:200px;border-radius:50%;overflow:hidden;margin:0 auto 18px;cursor:grab;position:relative;border:3px solid var(--blue-mid);touch-action:none;background:var(--surface2)">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px">מרכז את התמונה</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">גרור לשינוי מיקום · גלגל עכבר / צביטה להגדלה</div>
+    <div id="photoReposCircle" style="width:200px;height:200px;border-radius:50%;overflow:hidden;margin:0 auto 14px;cursor:grab;position:relative;border:3px solid var(--blue-mid);touch-action:none;background:var(--surface2)">
       <img id="photoReposImg" style="position:absolute;top:0;left:0;user-select:none;-webkit-user-drag:none" draggable="false" alt="">
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px">
+      <button onclick="updateReposZoom(_reposZoom*0.85)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:20px;line-height:1;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center">−</button>
+      <span id="reposZoomLbl" style="font-size:12px;font-weight:700;color:var(--text2);min-width:38px;text-align:center">100%</span>
+      <button onclick="updateReposZoom(_reposZoom*1.18)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:20px;line-height:1;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center">+</button>
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="confirmPhotoRepos()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--text);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ אשר</button>
