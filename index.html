@@ -269,10 +269,13 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
       </div>
       <div class="field" id="expensesSection" style="display:none">
         <!-- Mode toggle -->
-        <div style="display:flex;gap:6px;margin-bottom:12px">
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
           <button id="modeTotal" onclick="setExpMode('total')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סכום כולל ÷ שווה</button>
           <button id="modeCustom" onclick="setExpMode('custom')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">כל משפחה בנפרד</button>
+          <button id="modeCumulative" onclick="setExpMode('cumulative')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">מצטבר</button>
         </div>
+        <!-- Cumulative mode notice -->
+        <div id="cumulativeModeDiv" style="display:none;text-align:center;font-size:13px;color:var(--text2);padding:10px 0;background:var(--blue-bg);border-radius:var(--r2)">הוצאות יוזנו ישירות באירוע לאחר יצירתו</div>
         <!-- Total mode -->
         <div id="totalModeDiv">
           <input type="number" min="0" inputmode="numeric" id="f-total" placeholder="סכום כולל (₪)"
@@ -491,6 +494,8 @@ let families=[];
 let events=[];
 let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
+let expandedCumFamilies=new Set();
+let addExpItemEvId=null,addExpItemFamId=null;
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId))collapsedEvents.delete(evId);else collapsedEvents.add(evId);
   renderOpenList();
@@ -834,6 +839,43 @@ function evCard(ev){
       <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
     </div>`;
   }).join('');
+  const cumRows=ev.participants.map(fid=>{
+    const f=getFam(fid);if(!f)return'';
+    const cl=col(fid);
+    const items=(ev.expenseItems||[]).filter(it=>it.famId===fid);
+    const spent=ev.expenses[fid]||0;
+    const b=adjBal[fid];
+    const share=shares[fid]||0;
+    const tagClass=b>0.5?'exp-tag-neg':b<-0.5?'exp-tag-pos':'exp-tag-zero';
+    const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
+    const isDebtor=b<-0.5;
+    const tagTag=isDebtor?'button':'span';
+    const tagClick=isDebtor?` onclick="payToPot(${ev.id},${fid})"` : '';
+    const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
+    const key=ev.id+'-'+fid;
+    const isExpanded=expandedCumFamilies.has(key);
+    const detailList=items.length&&isExpanded?`<div style="padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px">
+      ${items.map(it=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
+        <span style="flex:1;color:var(--text2)">${esc(it.name)}</span>
+        <span style="font-weight:600;color:var(--text)">₪${it.amt.toLocaleString()}</span>
+        <button onclick="deleteExpItem(${ev.id},${it.id})" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
+      </div>`).join('')}
+    </div>`:'';
+    return`<div class="exp-input-row"${isExpanded?' style="flex-direction:column;align-items:stretch"':''}>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
+          ${cost>0?`<div style="font-size:10px;color:var(--text2)">חלק: ₪${share.toLocaleString()}</div>`:''}
+        </div>
+        ${spent>0?`<span style="font-size:12px;font-weight:700;color:var(--text);flex-shrink:0">₪${spent.toLocaleString()}</span>`:''}
+        ${items.length?`<button onclick="toggleCumFamily(${ev.id},${fid})" style="padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer;flex-shrink:0">${isExpanded?'▲':'▼ '+items.length}</button>`:''}
+        <${tagTag} class="${tagCls}"${tagClick}>${tagText}</${tagTag}>
+      </div>
+      ${detailList}
+    </div>`;
+  }).join('');
+  const addExpBtn=`<div style="padding:8px 14px 10px"><button onclick="openAddExpItem(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">➕ הוסף הוצאה</button></div>`;
   const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
   const settleLines=transfers.map(t=>{
     const canFund = canPayFromFund(t.fromFid, t.amt);
@@ -890,7 +932,8 @@ function evCard(ev){
     </div>
     <button class="exp-btn" onclick="toggleEvCollapse(${ev.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
     ${collapsed?'':`
-    <div class="members-list" id="mlist-${ev.id}">${mems}</div>
+    <div class="members-list" id="mlist-${ev.id}">${ev.cumulative?cumRows:mems}</div>
+    ${ev.cumulative?addExpBtn:''}
     ${exclLine}
     <div id="settlebar-${ev.id}">${settleBar}</div>
     <div class="card-actions">
@@ -1227,16 +1270,18 @@ function updateExpensePickSummary(){
 function setExpMode(mode){
   expMode=mode;
   const isTotal=mode==='total';
+  const isCumulative=mode==='cumulative';
   document.getElementById('totalModeDiv').style.display=isTotal?'block':'none';
-  document.getElementById('customModeDiv').style.display=isTotal?'none':'block';
-  document.getElementById('modeTotal').style.background=isTotal?'var(--blue-mid)':'transparent';
-  document.getElementById('modeTotal').style.color=isTotal?'#fff':'var(--text2)';
-  document.getElementById('modeTotal').style.borderColor=isTotal?'var(--blue-mid)':'var(--border)';
-  document.getElementById('modeCustom').style.background=isTotal?'transparent':'var(--blue-mid)';
-  document.getElementById('modeCustom').style.color=isTotal?'var(--text2)':'#fff';
-  document.getElementById('modeCustom').style.borderColor=isTotal?'var(--border)':'var(--blue-mid)';
-  if(!isTotal) updateExpenseInputs();
-  else updateTotalPreview();
+  document.getElementById('customModeDiv').style.display=(!isTotal&&!isCumulative)?'block':'none';
+  document.getElementById('cumulativeModeDiv').style.display=isCumulative?'block':'none';
+  ['modeTotal','modeCustom','modeCumulative'].forEach(btnId=>{
+    const btn=document.getElementById(btnId);if(!btn)return;
+    const active=(btnId==='modeTotal'&&isTotal)||(btnId==='modeCustom'&&mode==='custom')||(btnId==='modeCumulative'&&isCumulative);
+    btn.style.background=active?'var(--blue-mid)':'transparent';
+    btn.style.color=active?'#fff':'var(--text2)';
+    btn.style.borderColor=active?'var(--blue-mid)':'var(--border)';
+  });
+  if(isTotal) updateTotalPreview();
 }
 function updateTotalPreview(){
   const total=parseFloat(document.getElementById('f-total')?.value)||0;
@@ -1287,7 +1332,10 @@ function editEv(evId){
   ).join('');
   updateFamPickSummary();
   setSplitMethod(ev.splitMethod||'equal');
-  if(ev.totalCost!=null){
+  if(ev.cumulative){
+    expMode='cumulative';
+    setExpMode('cumulative');
+  } else if(ev.totalCost!=null){
     expMode='total';
     setExpMode('total');
     document.getElementById('f-total').value=ev.totalCost;
@@ -1369,6 +1417,10 @@ function doCreate(){
       participants.forEach(fid=>{ expenses[fid]=0; });
       anyExpense=true;
     }
+  } else if(expMode==='cumulative'){
+    participants.forEach(fid=>{ expenses[fid]=0; });
+    document.getElementById('e-cost').classList.remove('show');
+    anyExpense=true;
   } else {
     participants.forEach(fid=>{ const inp=document.getElementById('fexp-'+fid); const v=parseFloat(inp&&inp.value)||0; expenses[fid]=v; if(v>0)anyExpense=true; });
     if(!anyExpense){document.getElementById('e-cost').classList.add('show');ok=false;}
@@ -1376,13 +1428,20 @@ function doCreate(){
   }
   if(!ok)return;
   const totalCost=expMode==='total'?(parseFloat(document.getElementById('f-total')?.value)||0):null;
+  const isCumulative=expMode==='cumulative';
   const childOverrides={};
   if(splitMethod!=='equal') participants.forEach(fid=>{ childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0); });
   if(editingId!=null){
     const ev=events.find(e=>e.id===editingId);
-    if(ev){ ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded; ev.expenses=expenses; ev.totalCost=totalCost; ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; }
+    if(ev){
+      ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded;
+      ev.splitMethod=splitMethod; ev.childOverrides=childOverrides;
+      if(!ev.cumulative){ ev.expenses=expenses; ev.totalCost=totalCost; }
+    }
   } else {
-    events.unshift({id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost,splitMethod,childOverrides});
+    const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides};
+    if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
+    events.unshift(newEv);
   }
   hideForm();save();render();
 }
@@ -1720,6 +1779,64 @@ function confirmDeposit(){
 
 
 
+function openAddExpItem(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  addExpItemEvId=evId; addExpItemFamId=null;
+  document.getElementById('expItemName').value='';
+  document.getElementById('expItemAmt').value='';
+  const errEl=document.getElementById('expItemErr');if(errEl)errEl.style.display='none';
+  const picker=document.getElementById('expItemFamPicker');
+  picker.innerHTML=ev.participants.map(fid=>{
+    const f=getFam(fid);if(!f)return'';
+    const cl=col(fid);
+    return`<button onclick="selectAddExpFam(${fid})" id="expfam-${fid}" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(f.name.replace('משפחת','').trim())}</button>`;
+  }).join('');
+  document.getElementById('addExpItemOverlay').style.display='flex';
+}
+function selectAddExpFam(famId){
+  addExpItemFamId=famId;
+  const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
+  ev.participants.forEach(fid=>{
+    const btn=document.getElementById('expfam-'+fid);if(!btn)return;
+    const cl=col(fid);
+    if(fid===famId){btn.style.background=cl.bg;btn.style.color=cl.c;btn.style.borderColor=cl.c;}
+    else{btn.style.background='transparent';btn.style.color='var(--text2)';btn.style.borderColor='var(--border)';}
+  });
+}
+function closeAddExpItem(){
+  document.getElementById('addExpItemOverlay').style.display='none';
+  addExpItemEvId=null; addExpItemFamId=null;
+}
+function doAddExpItem(){
+  const name=document.getElementById('expItemName').value.trim();
+  const amt=parseFloat(document.getElementById('expItemAmt').value)||0;
+  const errEl=document.getElementById('expItemErr');
+  if(!name||!addExpItemFamId||amt<=0){if(errEl)errEl.style.display='block';return;}
+  if(errEl)errEl.style.display='none';
+  const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
+  if(!ev.expenseItems)ev.expenseItems=[];
+  ev.expItemId=(ev.expItemId||0)+1;
+  ev.expenseItems.push({id:ev.expItemId,famId:addExpItemFamId,name,amt});
+  ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;
+  closeAddExpItem();
+  save();render();
+}
+function deleteExpItem(evId,itemId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const item=(ev.expenseItems||[]).find(it=>it.id===itemId);if(!item)return;
+  ev.expenses[item.famId]=Math.max(0,(ev.expenses[item.famId]||0)-item.amt);
+  ev.expenseItems=ev.expenseItems.filter(it=>it.id!==itemId);
+  save();render();
+}
+function toggleCumFamily(evId,famId){
+  const key=evId+'-'+famId;
+  if(expandedCumFamilies.has(key))expandedCumFamilies.delete(key);
+  else expandedCumFamilies.add(key);
+  const el=document.getElementById('ecard-'+evId);
+  const ev=events.find(e=>e.id===evId);
+  if(el&&ev)el.outerHTML=evCard(ev);
+}
+
 load();
 </script>
 
@@ -1737,5 +1854,29 @@ const manifest = {
 const mblob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 document.getElementById('manifestLink').href=URL.createObjectURL(mblob);
 </script>
+
+<!-- Add expense item modal (cumulative events) -->
+<div id="addExpItemOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeAddExpItem()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px">➕ הוסף הוצאה</div>
+    <div class="field">
+      <label class="field-lbl">שם ההוצאה</label>
+      <input type="text" id="expItemName" placeholder="לדוגמה: ארוחת ערב, כרטיסים..." style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label class="field-lbl">מי שילם</label>
+      <div id="expItemFamPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label class="field-lbl">סכום (₪)</label>
+      <input type="number" min="0" inputmode="numeric" id="expItemAmt" placeholder="0" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+    </div>
+    <div id="expItemErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center">נא למלא שם, לבחור משפחה וסכום</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="doAddExpItem()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הוסף</button>
+      <button onclick="closeAddExpItem()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
