@@ -713,7 +713,7 @@ function renderHome(){
       <div class="home-row-icon" style="background:${cl.bg};color:${cl.c}">📅</div>
       <div class="home-row-body">
         <div class="home-row-title">${esc(ev.name)}</div>
-        <div class="home-row-sub">${esc(ev.date)} · עלות ₪${cost.toLocaleString()}</div>
+        <div class="home-row-sub">${ev.date&&ev.date!=='לא צוין'?esc(ev.date)+' · ':''}עלות ₪${cost.toLocaleString()}</div>
       </div>
       ${remaining>0
         ?`<div class="home-row-right"><div class="home-row-amt" style="color:var(--red-mid)">₪${remaining.toLocaleString()}</div><div class="home-row-amt-lbl">נותר לסידור</div></div>`
@@ -927,7 +927,7 @@ function evCard(ev){
         <div class="ecard-title">${esc(ev.name)}</div>
         <span class="badge ${balanced&&cost>0?'badge-green':'badge-amber'}">${balanced&&cost>0?'מאוזן':'פעיל'}</span>
       </div>
-      <div class="ecard-meta">${esc(ev.date)}</div>
+      ${ev.date&&ev.date!=='לא צוין'?`<div class="ecard-meta">${esc(ev.date)}</div>`:''}
     </div>
     <div class="total-cost-bar" id="totalbar-${ev.id}">
       <span>סה"כ עלות האירוע</span>
@@ -1120,7 +1120,7 @@ function renderArchive(){
       <div class="acard-head">
         <div style="flex:1">
           <div class="acard-title">🔒 ${esc(ev.name)}</div>
-          <div class="acard-meta">${esc(ev.date)} · ${ev.participants.length} משפחות · ${shareLabel(ev)}</div>
+          <div class="acard-meta">${ev.date&&ev.date!=='לא צוין'?esc(ev.date)+' · ':''}${ev.participants.length} משפחות · ${shareLabel(ev)}</div>
           ${ev.closedOn?`<div class="acard-closed">נסגר: ${ev.closedOn}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1328,7 +1328,7 @@ function editEv(evId){
   document.getElementById('formTitle').textContent='✏️ עריכת אירוע';
   document.getElementById('formSaveBtn').textContent='✓ שמור שינויים';
   document.getElementById('f-name').value=ev.name;
-  document.getElementById('f-date').value=ev.date==='לא צוין'?'':ev.date;
+  document.getElementById('f-date').value=(ev.date==='לא צוין'?'':ev.date)||'';
   ['e-name','e-cost','e-fams'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('show'); });
   document.getElementById('famChips').innerHTML=families.map(f=>
     `<button class="chip ${ev.participants.includes(f.id)?'on':''}" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
@@ -1396,7 +1396,7 @@ function updateFormTotal(){
 }
 function doCreate(){
   const name=document.getElementById('f-name').value.trim();
-  const date=document.getElementById('f-date').value.trim()||'לא צוין';
+  const date=document.getElementById('f-date').value.trim()||'';
   let ok=true;
   if(!name){document.getElementById('e-name').classList.add('show');ok=false;}
   else document.getElementById('e-name').classList.remove('show');
@@ -1535,7 +1535,7 @@ function renderFund(){
             <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">📅</div>
             <div style="flex:1">
               <div style="font-size:14px;font-weight:700">${esc(ev.name)}</div>
-              <div style="font-size:11px;color:var(--text2);margin-top:1px">${esc(ev.date)}</div>
+              ${ev.date&&ev.date!=='לא צוין'?`<div style="font-size:11px;color:var(--text2);margin-top:1px">${esc(ev.date)}</div>`:''}
             </div>
             <div style="font-size:15px;font-weight:800;color:var(--amber)">₪${pot.toLocaleString()}</div>
           </div>`;
