@@ -39,6 +39,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 
 /* Main */
 .main { padding: 14px; max-width: 600px; margin: 0 auto; }
+body:not(.edit-mode) .edit-only { display: none !important; }
+body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default; }
 .view { display: none; }
 .view.active { display: block; }
 
@@ -216,7 +218,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   </div>
   <div style="display:flex;gap:8px;flex-shrink:0">
     <button class="btn-add" id="nb-families" onclick="goTab('families',this)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">👥</button>
-    <button class="btn-add" onclick="showForm()">+ אירוע חדש</button>
+    <button class="btn-add edit-only" onclick="showForm()">+ אירוע חדש</button>
   </div>
 </div>
 
@@ -354,7 +356,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   <!-- FAMILIES -->
   <div class="view" id="view-families">
     <div class="sec-ttl">ניהול משפחות</div>
-    <div class="fam-add">
+    <div class="fam-add edit-only">
       <input type="text" id="famInput" placeholder="שם משפחה חדשה...">
       <button class="action-btn blue" onclick="addFam()">הוסף</button>
     </div>
@@ -402,7 +404,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
     </div>
 
     <!-- Action buttons -->
-    <div style="display:flex;gap:10px;margin-bottom:18px">
+    <div style="display:flex;gap:10px;margin-bottom:18px" class="edit-only">
       <button onclick="openDepositSheet('withdraw')" style="flex:1;padding:14px;border-radius:var(--r2);border:none;background:var(--red-bg);color:var(--red);font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer">↑ משיכה</button>
       <button onclick="openDepositSheet('deposit')" style="flex:1;padding:14px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer">↓ הפקדה</button>
     </div>
@@ -425,7 +427,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
     <!-- Goal funds -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;margin-top:18px">
       <div class="fund-section-title" style="margin-bottom:0">🎯 קופות למטרה</div>
-      <button class="fund-dep-btn" onclick="openGoalForm()">+ קופה חדשה</button>
+      <button class="fund-dep-btn edit-only" onclick="openGoalForm()">+ קופה חדשה</button>
     </div>
 
     <!-- New goal fund modal -->
@@ -481,6 +483,9 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
   <button class="nav-btn" id="nb-fund" onclick="goTab('fund',this)">
     <span class="nav-icon">🏦</span>קופה
   </button>
+  <button class="nav-btn" id="nb-lock" onclick="openLockModal()">
+    <span class="nav-icon" id="lockIcon">🔒</span><span id="lockLabel">נעול</span>
+  </button>
 </nav>
 
 <script>
@@ -498,6 +503,8 @@ let expandedCumFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null;
 let cumPotEvId=null,cumPotFamId=null;
 let settleModalEvId=null,potModalEvId=null;
+let adminPass='';
+let editMode=sessionStorage.getItem('editMode')==='1';
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId))collapsedEvents.delete(evId);else collapsedEvents.add(evId);
   renderOpenList();
@@ -597,6 +604,7 @@ function saveLocal(){
     localStorage.setItem('fund',JSON.stringify(fund));
     localStorage.setItem('nxtTx',String(nxtTx));
     localStorage.setItem('goalFunds',JSON.stringify(goalFunds));
+    localStorage.setItem('adminPass',adminPass);
   }catch(e){}
 }
 
@@ -607,7 +615,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass});
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
     console.warn('save failed:',e);
@@ -628,6 +636,7 @@ async function load(){
     fund=d.fund||{famBalances:{},transactions:[]};
     if(!fund.famBalances)fund.famBalances={};
     goalFunds=d.goalFunds||[];
+    adminPass=d.adminPass||'';
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
@@ -641,6 +650,7 @@ async function load(){
       const fd=localStorage.getItem('fund');if(fd){const p=JSON.parse(fd);fund=p.famBalances?p:{famBalances:{},transactions:p.transactions||[]};}
       const tx=localStorage.getItem('nxtTx');if(tx)nxtTx=parseInt(tx);
       const gf=localStorage.getItem('goalFunds');if(gf)goalFunds=JSON.parse(gf);
+      const ap=localStorage.getItem('adminPass');if(ap)adminPass=ap;
       nxtId=events.reduce((a,e)=>Math.max(a,e.id),0)+1;
       nxtFam=families.reduce((a,f)=>Math.max(a,f.id),0)+1;
       nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
@@ -667,6 +677,7 @@ function showSyncStatus(msg,hideAfter){
 }
 
 function render(){
+  applyEditMode();
   renderHome();renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();renderGoalFunds();
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
@@ -867,7 +878,7 @@ function evCard(ev){
       ${items.map(it=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
         <span style="flex:1;color:var(--text2)">${esc(it.name)}</span>
         <span style="font-weight:600;color:var(--text)">₪${it.amt.toLocaleString()}</span>
-        <button onclick="deleteExpItem(${ev.id},${it.id})" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
+        <button onclick="deleteExpItem(${ev.id},${it.id})" class="edit-only" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
       </div>`).join('')}
     </div>`:'';
     return`<div class="exp-input-row"${isExpanded?' style="flex-direction:column;align-items:stretch"':''}>
@@ -884,7 +895,7 @@ function evCard(ev){
       ${detailList}
     </div>`;
   }).join('');
-  const addExpBtn=`<div style="padding:8px 14px 10px;display:flex;gap:8px">
+  const addExpBtn=`<div style="padding:8px 14px 10px;display:flex;gap:8px" class="edit-only">
     <button onclick="openAddExpItem(${ev.id})" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">➕ הוצאה</button>
     <button onclick="openCumPot(${ev.id})" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופה</button>
   </div>`;
@@ -948,11 +959,11 @@ function evCard(ev){
     ${ev.cumulative?addExpBtn:''}
     ${exclLine}
     <div class="card-actions">
-      <button class="action-btn" onclick="editEv(${ev.id})">✏️ ערוך</button>
+      <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
       ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
       ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${potTotal.toLocaleString()}</button>`:''}
-      ${balanced&&cost>0?`<button class="action-btn blue" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
-      <button class="action-btn red" onclick="delEv(${ev.id})">🗑 מחק</button>
+      ${balanced&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
+      <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>`}
   </div>`;
 }
@@ -1090,8 +1101,8 @@ function renderArchiveGoals(){
       </div>
       ${isExp?`<div class="acard-body">${rows}
         <div class="card-actions">
-          <button class="action-btn" onclick="reopenGoalFund(${g.id})">🔓 פתח מחדש</button>
-          <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
+          <button class="action-btn edit-only" onclick="reopenGoalFund(${g.id})">🔓 פתח מחדש</button>
+          <button class="action-btn red edit-only" onclick="delGoalFund(${g.id})">🗑 מחק</button>
         </div></div>`:''}
     </div>`;
   }).join('');
@@ -1133,9 +1144,9 @@ function renderArchive(){
       </div>
       ${isExp?`<div class="acard-body">${mems}${exclLine}
         <div class="card-actions">
-          <button class="action-btn" onclick="editEv(${ev.id})">✏️ ערוך</button>
-          <button class="action-btn" onclick="reopenEv(${ev.id})">🔓 פתח מחדש</button>
-          <button class="action-btn red" onclick="delEv(${ev.id})">🗑 מחק</button>
+          <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
+          <button class="action-btn edit-only" onclick="reopenEv(${ev.id})">🔓 פתח מחדש</button>
+          <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
         </div></div>`:''}
     </div>`;
   }).join('');
@@ -1172,7 +1183,7 @@ function renderFamilies(){
     return`<div class="fcard">
       <div class="ava" style="background:${cl.bg};color:${cl.c};width:38px;height:38px">${ini(f.name)}</div>
       <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}</div></div>
-      <button class="action-btn" onclick="openFamEditSheet(${f.id})">✏️ ערוך</button>
+      <button class="action-btn edit-only" onclick="openFamEditSheet(${f.id})">✏️ ערוך</button>
     </div>`;
   }).join('');
 }
@@ -1695,8 +1706,8 @@ function renderGoalFunds(){
         ${contribHtml}
       </div>
       <div style="padding:10px 12px">
-        ${!g.closed?`<button onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:''}
-        <div class="card-actions" style="margin:0">
+        ${!g.closed?`<button class="edit-only" onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:''}
+        <div class="card-actions edit-only" style="margin:0">
           <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
           <button class="action-btn blue" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
           <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
@@ -1862,8 +1873,8 @@ function renderSettleModal(ev){
     return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
       <span style="font-size:13px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${canFund?`<button style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferFromFundM(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
-        <button style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferDirectM(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם</button>
+        ${canFund?`<button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferFromFundM(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
+        <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferDirectM(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם</button>
       </div>
     </div>`;
   }).join('');
@@ -1913,8 +1924,8 @@ function renderPotModal(ev){
   potTransfers.forEach(t=>{if(!potByCreditor[t.toFid])potByCreditor[t.toFid]={name:t.to,fid:t.toFid,amt:0};potByCreditor[t.toFid].amt+=t.amt;});
   const credRows=Object.values(potByCreditor).map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
     <div style="font-size:13px;flex:1">👈 <b>${esc(c.name)}</b> יקבל ₪${c.amt.toLocaleString()}</div>
-    <button onclick="releasePotToOneM(${ev.id},${c.fid},false)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
-    <button onclick="releasePotToOneM(${ev.id},${c.fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
+    <button class="edit-only" onclick="releasePotToOneM(${ev.id},${c.fid},false)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
+    <button class="edit-only" onclick="releasePotToOneM(${ev.id},${c.fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
   </div>`).join('');
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
@@ -1926,7 +1937,7 @@ function renderPotModal(ev){
       ${potPayments.map(p=>{const pf=getFam(p.famId);return`<div style="font-size:13px;padding:3px 0;color:var(--text)">✓ ${esc(pf.name.replace('משפחת','').trim())} ₪${p.amt.toLocaleString()}</div>`;}).join('')}
     </div>
     ${potTransfers.length?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
-    ${!creditorFids.length&&potPayments.length?`<div style="padding:10px 16px"><button onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
+    ${!creditorFids.length&&potPayments.length?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
     <div style="padding:${potTransfers.length||!creditorFids.length?'4':'10'}px 16px 10px">
       <button onclick="closePotModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
@@ -1979,6 +1990,75 @@ function doDepositToCumPot(){
   save();render();
 }
 
+function applyEditMode(){
+  document.body.classList.toggle('edit-mode',editMode);
+  const icon=document.getElementById('lockIcon');
+  const label=document.getElementById('lockLabel');
+  if(icon)icon.textContent=editMode?'🔓':'🔒';
+  if(label)label.textContent=editMode?'עריכה':'נעול';
+}
+function openLockModal(){
+  renderLockModal(editMode?'lock':adminPass?'unlock':'set');
+  document.getElementById('lockModal').style.display='flex';
+  if(!editMode&&adminPass)setTimeout(()=>{const i=document.getElementById('unlockInp');if(i)i.focus();},50);
+}
+function closeLockModal(){document.getElementById('lockModal').style.display='none';}
+function renderLockModal(mode){
+  const el=document.getElementById('lockModalContent');if(!el)return;
+  if(mode==='lock'){
+    el.innerHTML=`<div style="font-size:15px;font-weight:700;margin-bottom:12px;text-align:center">🔓 מצב עריכה פעיל</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px;text-align:center">רוצה לנעול את האפליקציה?</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="lockApp()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--text);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">🔒 נעל</button>
+        <button onclick="closeLockModal()" style="flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+      </div>`;
+  } else if(mode==='set'){
+    el.innerHTML=`<div style="font-size:15px;font-weight:700;margin-bottom:8px;text-align:center">🔐 הגדר סיסמה</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:14px;text-align:center">רק מי שיש לו סיסמה יוכל לשנות נתונים. כולם יוכלו לראות הכל.</div>
+      <input id="newPassInp" type="password" placeholder="סיסמה חדשה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box;direction:ltr;text-align:center">
+      <input id="newPassConf" type="password" placeholder="אשר סיסמה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box;direction:ltr;text-align:center" onkeydown="if(event.key==='Enter')setAdminPass()">
+      <div id="passSetErr" style="font-size:12px;color:var(--red-mid);margin-bottom:8px;display:none;text-align:center"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="setAdminPass()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--text);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הגדר</button>
+        <button onclick="closeLockModal()" style="flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+      </div>`;
+    setTimeout(()=>{const i=document.getElementById('newPassInp');if(i)i.focus();},50);
+  } else {
+    el.innerHTML=`<div style="font-size:15px;font-weight:700;margin-bottom:14px;text-align:center">🔒 הזן סיסמה</div>
+      <input id="unlockInp" type="password" placeholder="סיסמה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box;direction:ltr;text-align:center" onkeydown="if(event.key==='Enter')submitUnlock()">
+      <div id="passErr" style="font-size:12px;color:var(--red-mid);margin-bottom:8px;display:none;text-align:center">סיסמה שגויה ❌</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="submitUnlock()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--text);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">כניסה</button>
+        <button onclick="closeLockModal()" style="flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+      </div>`;
+  }
+}
+function setAdminPass(){
+  const p1=(document.getElementById('newPassInp')||{}).value||'';
+  const p2=(document.getElementById('newPassConf')||{}).value||'';
+  const err=document.getElementById('passSetErr');
+  if(!p1){if(err){err.textContent='נא להזין סיסמה';err.style.display='block';}return;}
+  if(p1!==p2){if(err){err.textContent='הסיסמאות אינן תואמות';err.style.display='block';}return;}
+  adminPass=p1;editMode=true;
+  sessionStorage.setItem('editMode','1');
+  applyEditMode();save();closeLockModal();
+}
+function submitUnlock(){
+  const val=(document.getElementById('unlockInp')||{}).value||'';
+  if(val===adminPass){
+    editMode=true;sessionStorage.setItem('editMode','1');
+    applyEditMode();closeLockModal();
+  } else {
+    const err=document.getElementById('passErr');if(err)err.style.display='block';
+    const inp=document.getElementById('unlockInp');if(inp){inp.value='';inp.focus();}
+  }
+}
+function lockApp(){
+  editMode=false;sessionStorage.removeItem('editMode');
+  applyEditMode();closeLockModal();
+}
+
+applyEditMode();
 load();
 </script>
 
@@ -2038,6 +2118,13 @@ document.getElementById('manifestLink').href=URL.createObjectURL(mblob);
       <button onclick="doDepositToCumPot()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--amber-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הפקד</button>
       <button onclick="closeCumPot()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
+  </div>
+</div>
+
+<!-- Lock modal -->
+<div id="lockModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeLockModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
+    <div id="lockModalContent"></div>
   </div>
 </div>
 
