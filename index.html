@@ -462,8 +462,10 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
     </div>
 
     <div style="margin-top:14px">
-      <div class="fund-section-title">📋 היסטוריית תנועות</div>
-      <div id="fundTxList"></div>
+      <button onclick="toggleFundTx()" id="fundTxToggle" style="width:100%;padding:11px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;text-align:right;display:flex;align-items:center;justify-content:space-between">
+        <span>📋 היסטוריית תנועות</span><span id="fundTxArrow">▼</span>
+      </button>
+      <div id="fundTxList" style="display:none"></div>
     </div>
   </div>
 
@@ -501,6 +503,7 @@ let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set
 let expandedCumFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null;
 let cumPotEvId=null,cumPotFamId=null;
+let fundTxOpen=false;
 let settleModalEvId=null,potModalEvId=null;
 let adminPass='';
 let editMode=false;
@@ -1558,11 +1561,15 @@ function renderFund(){
 
   // היסטוריית תנועות
   const txEl=document.getElementById('fundTxList');
+  const arrow=document.getElementById('fundTxArrow');
+  if(txEl) txEl.style.display=fundTxOpen?'block':'none';
+  if(arrow) arrow.textContent=fundTxOpen?'▲':'▼';
+  if(!fundTxOpen||!txEl) return;
   if(!fund.transactions.length){
     txEl.innerHTML=`<div class="empty"><span class="empty-ico">📋</span>אין תנועות עדיין</div>`;
     return;
   }
-  txEl.innerHTML=`<div class="fund-tx-card">${[...fund.transactions].reverse().map(tx=>{
+  txEl.innerHTML=`<div class="fund-tx-card" style="margin-top:6px">${[...fund.transactions].reverse().map(tx=>{
     const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
     return`<div class="fund-tx-row">
       <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
@@ -1570,6 +1577,27 @@ function renderFund(){
       <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
     </div>`;
   }).join('')}</div>`;
+}
+function toggleFundTx(){
+  fundTxOpen=!fundTxOpen;
+  const txEl=document.getElementById('fundTxList');
+  const arrow=document.getElementById('fundTxArrow');
+  if(txEl) txEl.style.display=fundTxOpen?'block':'none';
+  if(arrow) arrow.textContent=fundTxOpen?'▲':'▼';
+  if(fundTxOpen){
+    if(!fund.transactions.length){
+      txEl.innerHTML=`<div class="empty"><span class="empty-ico">📋</span>אין תנועות עדיין</div>`;
+    } else {
+      txEl.innerHTML=`<div class="fund-tx-card" style="margin-top:6px">${[...fund.transactions].reverse().map(tx=>{
+        const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
+        return`<div class="fund-tx-row">
+          <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
+          <span class="fund-tx-desc">${esc(tx.desc)}</span>
+          <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
+        </div>`;
+      }).join('')}</div>`;
+    }
+  }
 }
 
 function openGoalForm(){
