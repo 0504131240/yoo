@@ -390,6 +390,17 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
     <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">
       <div id="famEditSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px">עריכת משפחה</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div id="famEditPhotoPreview" style="width:56px;height:56px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;border:2px solid var(--border)"></div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">תמונת משפחה</div>
+            <label style="display:inline-block;padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">
+              📷 העלה תמונה
+              <input type="file" accept="image/*" id="famEditPhoto" style="display:none" onchange="previewFamPhoto(this)">
+            </label>
+            <button onclick="clearFamPhoto()" id="famEditPhotoClear" style="display:none;margin-right:6px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--red-mid);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">✕ הסר</button>
+          </div>
+        </div>
         <input type="text" id="famEditName" placeholder="שם המשפחה"
           style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -761,7 +772,7 @@ function renderHome(){
     ev.participants.forEach(fid=>{ famNet[fid]=(famNet[fid]||0)+(bal[fid]||0); });
   });
   document.getElementById('homeFamStrip').innerHTML=families.length?`
-    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">👥 נפשות</div>
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">👥 משפחות</div>
     <div class="home-fam-strip">${families.map(f=>{
       const cl=col(f.id);
       const net=Math.round(famNet[f.id]||0);
@@ -769,7 +780,7 @@ function renderHome(){
       const amtColor=net>0?'var(--green-mid)':net<0?'var(--red-mid)':'var(--text3)';
       const amtText=net>0?'+₪'+net.toLocaleString():net<0?'-₪'+Math.abs(net).toLocaleString():'מסודר';
       return`<div class="home-fam-pill ${cls}">
-        <div class="ava" style="background:${cl.bg};color:${cl.c};width:36px;height:36px">${ini(f.name)}</div>
+        ${famAva(f, 36)}
         <div style="font-size:11px;font-weight:700;color:var(--text)">${esc(f.name.replace('משפחת','').trim())}</div>
         <div style="font-size:11px;font-weight:700;color:${amtColor}">${amtText}</div>
       </div>`;
@@ -929,7 +940,7 @@ function evCard(ev){
     const tagClick=isDebtor?` onclick="payToPot(${ev.id},${fid})"` : '';
     const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
     return`<div class="exp-input-row">
-      <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
+      ${famAva(f)}
       <div style="flex:1;min-width:0">
         <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
         ${cost>0?`<div style="font-size:10px;color:var(--text2)">חלק: ₪${share.toLocaleString()}</div>`:''}
@@ -962,7 +973,7 @@ function evCard(ev){
     </div>`:'';
     return`<div class="exp-input-row"${isExpanded?' style="flex-direction:column;align-items:stretch"':''}>
       <div style="display:flex;align-items:center;gap:8px">
-        <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
+        ${famAva(f)}
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
           ${cost>0?`<div style="font-size:10px;color:var(--text2)">חלק: ₪${share.toLocaleString()}</div>`:''}
@@ -1162,7 +1173,7 @@ function renderArchiveGoals(){
       const cl=col(f.id);
       const c=g.contributions[f.id]||0;
       return`<div class="amrow">
-        <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px">${ini(f.name)}</div>
+        ${famAva(f, 30)}
         <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
         <span style="font-size:12px;color:var(--text2)">הפקיד ₪${c.toLocaleString()}</span>
       </div>`;
@@ -1202,7 +1213,7 @@ function renderArchive(){
       const spent=ev.expenses[fid]||0;
       const b=evBalance(ev)[fid];
       return`<div class="amrow">
-        <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px">${ini(f.name)}</div>
+        ${famAva(f, 30)}
         <span style="font-size:13px;font-weight:600;flex:1">${esc(f.name.replace('משפחת','').trim())}</span>
         <span style="font-size:12px;color:var(--text2)">שילם ₪${spent.toLocaleString()}</span>
         <span class="badge ${b>=0?'badge-green':'badge-amber'}" style="font-size:10px">${b>=0?'קיבל ₪'+b:'החזיר ₪'+Math.abs(b)}</span>
@@ -1246,7 +1257,7 @@ function renderDebts(){
   html+=has.map(f=>{const cl=col(f.id);const d=debts[f.id];
     return`<div class="drow">
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="ava" style="background:${cl.bg};color:${cl.c}">${ini(f.name)}</div>
+        ${famAva(f)}
         <div><div class="dname">${esc(f.name)}</div><div class="devents">${d.evs.join(' · ')}</div></div>
       </div>
       <div><div class="damt">₪${d.total.toLocaleString()}</div><div class="dcnt">${d.evs.length} אירוע${d.evs.length>1?'ות':''}</div></div>
@@ -1260,17 +1271,70 @@ function renderFamilies(){
   document.getElementById('famList').innerHTML=families.map(f=>{
     const cl=col(f.id);const cnt=events.filter(e=>e.participants.includes(f.id)).length;
     return`<div class="fcard">
-      <div class="ava" style="background:${cl.bg};color:${cl.c};width:38px;height:38px">${ini(f.name)}</div>
+      ${famAva(f, 38)}
       <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}</div></div>
       <button class="action-btn edit-only" onclick="openFamEditSheet(${f.id})">✏️ ערוך</button>
     </div>`;
   }).join('');
 }
+function famAva(f, size=34, extra=''){
+  const cl=col(f.id);
+  const fs=size<=24?'9px':size<=28?'10px':size<=32?'11px':'12px';
+  if(f.photo) return `<img src="${f.photo}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;${extra}" alt="">`;
+  return `<div class="ava" style="background:${cl.bg};color:${cl.c};width:${size}px;height:${size}px;font-size:${fs};${extra}">${ini(f.name)}</div>`;
+}
 let _famEditId=null;
+let _famEditPhoto=undefined;
+function previewFamPhoto(inp){
+  if(!inp.files||!inp.files[0])return;
+  const file=inp.files[0];
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const sz=160;
+      canvas.width=sz;canvas.height=sz;
+      const ctx=canvas.getContext('2d');
+      const s=Math.min(img.width,img.height);
+      const ox=(img.width-s)/2,oy=(img.height-s)/2;
+      ctx.drawImage(img,ox,oy,s,s,0,0,sz,sz);
+      _famEditPhoto=canvas.toDataURL('image/jpeg',0.7);
+      const preview=document.getElementById('famEditPhotoPreview');
+      const clearBtn=document.getElementById('famEditPhotoClear');
+      if(preview) preview.innerHTML=`<img src="${_famEditPhoto}" style="width:100%;height:100%;object-fit:cover">`;
+      if(clearBtn) clearBtn.style.display='inline-block';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function clearFamPhoto(){
+  _famEditPhoto=null;
+  const f=families.find(x=>x.id===_famEditId);
+  const cl=f?col(f.id):{bg:'var(--surface2)',c:'var(--text2)'};
+  const preview=document.getElementById('famEditPhotoPreview');
+  const clearBtn=document.getElementById('famEditPhotoClear');
+  const inp=document.getElementById('famEditPhoto');
+  if(inp) inp.value='';
+  if(preview) preview.innerHTML=f?`<span style="background:${cl.bg};color:${cl.c};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">${ini(f.name)}</span>`:'';
+  if(clearBtn) clearBtn.style.display='none';
+}
 function openFamEditSheet(fid){
   const f=families.find(x=>x.id===fid);if(!f)return;
   _famEditId=fid;
   document.getElementById('famEditName').value=f.name.replace('משפחת','').trim();
+  const cl=col(f.id);
+  const preview=document.getElementById('famEditPhotoPreview');
+  const clearBtn=document.getElementById('famEditPhotoClear');
+  const inp=document.getElementById('famEditPhoto');
+  if(inp)inp.value='';
+  _famEditPhoto=undefined;
+  if(preview){
+    if(f.photo){ preview.innerHTML=`<img src="${f.photo}" style="width:100%;height:100%;object-fit:cover">`; }
+    else { preview.innerHTML=`<span style="background:${cl.bg};color:${cl.c};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">${ini(f.name)}</span>`; }
+  }
+  if(clearBtn) clearBtn.style.display=f.photo?'inline-block':'none';
   document.getElementById('famEditChildren').value=f.children||0;
   document.getElementById('famEditOverlay').style.display='flex';
 }
@@ -1286,6 +1350,8 @@ function saveFamEdit(){
   if(!name.startsWith('משפחת'))name='משפחת '+name;
   f.name=name;
   f.children=Math.max(0,parseInt(document.getElementById('famEditChildren').value)||0);
+  if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
+  _famEditPhoto=undefined;
   closeFamEditSheet();
   save();render();
 }
@@ -1325,7 +1391,7 @@ function updateChildOverrideInputs(){
     const cl=col(f.id);
     const val=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:(f.children||0);
     return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
+      ${famAva(f, 30, 'flex-shrink:0')}
       <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
       <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
         <button type="button" onclick="stepChild('fchild-${f.id}',-1)" style="width:30px;height:30px;border:none;background:var(--bg);color:var(--text);font-size:17px;font-weight:300;cursor:pointer;font-family:var(--font)">−</button>
@@ -1389,7 +1455,7 @@ function updateTotalPreview(){
     '<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px">'
     +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">'+SPLIT_LABELS[splitMethod]+'</div>'
     +selected.map(f=>{ const cl=col(f.id); const share=totalW?Math.round(total*w[f.id]/totalW):0; return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
-      +'<div class="ava" style="background:'+cl.bg+';color:'+cl.c+';width:26px;height:26px;font-size:10px;flex-shrink:0">'+ini(f.name)+'</div>'
+      +famAva(f, 26, 'flex-shrink:0')
       +'<span style="font-size:13px;flex:1">'+esc(f.name.replace('משפחת','').trim())+'</span>'
       +'<span style="font-size:13px;font-weight:700;color:var(--green-mid)">₪'+share.toLocaleString()+'</span>'
       +'</div>'; }).join('')
@@ -1474,7 +1540,7 @@ function updateExpenseInputs(){
   document.getElementById('expenseInputs').innerHTML=selected.map(f=>{
     const cl=col(f.id);
     return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <div class="ava" style="background:${cl.bg};color:${cl.c};width:30px;height:30px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
+      ${famAva(f, 30, 'flex-shrink:0')}
       <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
       <input class="exp-inp" type="number" min="0" inputmode="numeric" placeholder="₪0" id="fexp-${f.id}" oninput="updateFormTotal()">
     </div>`;
@@ -1605,7 +1671,7 @@ function renderFund(){
         const cl=col(f.id);
         const bal=famFundBal(f.id);
         return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-          <div class="ava" style="background:${cl.bg};color:${cl.c};width:28px;height:28px;font-size:10px;flex-shrink:0">${ini(f.name)}</div>
+          ${famAva(f, 28, 'flex-shrink:0')}
           <div style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</div>
           <div style="font-size:13px;font-weight:700;color:var(--green-mid)">₪${bal.toLocaleString()}</div>
         </div>`;
@@ -1709,7 +1775,7 @@ function openGoalDepositSheet(goalId){
       const cl=col(f.id);
       const c=g.contributions[f.id]||0;
       return`<div id="gdepfam-${f.id}" onclick="selectGoalDepFam(${f.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;box-sizing:border-box">
-        <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
+        ${famAva(f, 32, 'flex-shrink:0')}
         <div style="flex:1">
           <div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div>
           <div style="font-size:11px;color:var(--blue-mid);margin-top:1px">הפקיד עד כה: ₪${c.toLocaleString()}</div>
@@ -1790,7 +1856,7 @@ function renderGoalFunds(){
           const cl=col(f.id);
           const c=g.contributions[f.id]||0;
           return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-            <div class="ava" style="background:${cl.bg};color:${cl.c};width:24px;height:24px;font-size:9px;flex-shrink:0">${ini(f.name)}</div>
+            ${famAva(f, 24, 'flex-shrink:0')}
             <div style="flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,0.8)">${esc(f.name.replace('משפחת','').trim())}</div>
             <div style="font-size:12px;font-weight:700;color:#6ee7b7">₪${c.toLocaleString()}</div>
           </div>`;
@@ -1840,7 +1906,7 @@ function openDepositSheet(mode){
       const balColor=bal>0?'var(--green-mid)':bal===0?'var(--text3)':'var(--red-mid)';
       const balText=bal>0?'₪'+bal.toLocaleString():bal===0?'₪0':'חוב ₪'+Math.abs(bal).toLocaleString();
       return`<div id="depfam-${f.id}" onclick="selectDepFam(${f.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;box-sizing:border-box">
-        <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">${ini(f.name)}</div>
+        ${famAva(f, 32, 'flex-shrink:0')}
         <div style="flex:1">
           <div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div>
           <div style="font-size:11px;color:${balColor};margin-top:1px">יתרה: ${balText}</div>
