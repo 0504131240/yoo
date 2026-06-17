@@ -536,12 +536,15 @@ const evShares=ev=>{
   const cost=evCost(ev);
   let totalW=0; const w={};
   ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method,ev.childOverrides?.[fid]); totalW+=w[fid]; });
-  const shares={};
-  let allocated=0;
-  ev.participants.forEach((fid,i)=>{
-    if(i===ev.participants.length-1){ shares[fid]=Math.round(cost-allocated); }
-    else{ const s=totalW?Math.round(cost*w[fid]/totalW):0; shares[fid]=s; allocated+=s; }
-  });
+  if(!totalW) return Object.fromEntries(ev.participants.map(fid=>[fid,0]));
+  // Largest remainder method: floor each share, then distribute extra shekels
+  // to families with largest fractional parts — no family differs by more than ₪1
+  const exact={}, floors={};
+  ev.participants.forEach(fid=>{ exact[fid]=cost*w[fid]/totalW; floors[fid]=Math.floor(exact[fid]); });
+  let remainder=Math.round(cost-ev.participants.reduce((s,fid)=>s+floors[fid],0));
+  const sorted=[...ev.participants].sort((a,b)=>(exact[b]-floors[b])-(exact[a]-floors[a]));
+  const shares={...floors};
+  for(let i=0;i<remainder;i++) shares[sorted[i]]++;
   return shares;
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
