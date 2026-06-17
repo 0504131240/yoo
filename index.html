@@ -496,6 +496,7 @@ let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null;
+let cumPotEvId=null,cumPotFamId=null;
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId))collapsedEvents.delete(evId);else collapsedEvents.add(evId);
   renderOpenList();
@@ -878,7 +879,10 @@ function evCard(ev){
       ${detailList}
     </div>`;
   }).join('');
-  const addExpBtn=`<div style="padding:8px 14px 10px"><button onclick="openAddExpItem(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">➕ הוסף הוצאה</button></div>`;
+  const addExpBtn=`<div style="padding:8px 14px 10px;display:flex;gap:8px">
+    <button onclick="openAddExpItem(${ev.id})" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">➕ הוצאה</button>
+    <button onclick="openCumPot(${ev.id})" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופה</button>
+  </div>`;
   const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
   const settleLines=transfers.map(t=>{
     const canFund = canPayFromFund(t.fromFid, t.amt);
@@ -1839,6 +1843,43 @@ function toggleCumFamily(evId,famId){
   const ev=events.find(e=>e.id===evId);
   if(el&&ev)el.outerHTML=evCard(ev);
 }
+function openCumPot(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  cumPotEvId=evId; cumPotFamId=null;
+  document.getElementById('cumPotAmt').value='';
+  const errEl=document.getElementById('cumPotErr');if(errEl)errEl.style.display='none';
+  const picker=document.getElementById('cumPotFamPicker');
+  picker.innerHTML=ev.participants.map(fid=>{
+    const f=getFam(fid);if(!f)return'';
+    return`<button onclick="selectCumPotFam(${fid})" id="cumpotfam-${fid}" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(f.name.replace('משפחת','').trim())}</button>`;
+  }).join('');
+  document.getElementById('cumPotOverlay').style.display='flex';
+}
+function selectCumPotFam(famId){
+  cumPotFamId=famId;
+  const ev=events.find(e=>e.id===cumPotEvId);if(!ev)return;
+  ev.participants.forEach(fid=>{
+    const btn=document.getElementById('cumpotfam-'+fid);if(!btn)return;
+    const cl=col(fid);
+    if(fid===famId){btn.style.background=cl.bg;btn.style.color=cl.c;btn.style.borderColor=cl.c;}
+    else{btn.style.background='transparent';btn.style.color='var(--text2)';btn.style.borderColor='var(--border)';}
+  });
+}
+function closeCumPot(){
+  document.getElementById('cumPotOverlay').style.display='none';
+  cumPotEvId=null; cumPotFamId=null;
+}
+function doDepositToCumPot(){
+  const amt=parseFloat(document.getElementById('cumPotAmt').value)||0;
+  const errEl=document.getElementById('cumPotErr');
+  if(!cumPotFamId||amt<=0){if(errEl)errEl.style.display='block';return;}
+  if(errEl)errEl.style.display='none';
+  const ev=events.find(e=>e.id===cumPotEvId);if(!ev)return;
+  if(!ev.potPayments)ev.potPayments=[];
+  ev.potPayments.push({famId:cumPotFamId,amt:Math.round(amt)});
+  closeCumPot();
+  save();render();
+}
 
 load();
 </script>
@@ -1878,6 +1919,26 @@ document.getElementById('manifestLink').href=URL.createObjectURL(mblob);
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onclick="doAddExpItem()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הוסף</button>
       <button onclick="closeAddExpItem()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cumulative event pot deposit modal -->
+<div id="cumPotOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCumPot()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px">💰 הפקדה לקופת האירוע</div>
+    <div class="field">
+      <label class="field-lbl">מי מפקיד</label>
+      <div id="cumPotFamPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label class="field-lbl">סכום (₪)</label>
+      <input type="number" min="0" inputmode="numeric" id="cumPotAmt" placeholder="0" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+    </div>
+    <div id="cumPotErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center">נא לבחור משפחה ולהזין סכום</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="doDepositToCumPot()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--amber-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הפקד</button>
+      <button onclick="closeCumPot()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
   </div>
 </div>
