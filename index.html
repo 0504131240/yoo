@@ -1285,29 +1285,70 @@ function famAva(f, size=34, extra=''){
 }
 let _famEditId=null;
 let _famEditPhoto=undefined;
+let _reposImgSize=null,_reposOffset={x:0,y:0},_reposDragging=false,_reposStart=null;
 function previewFamPhoto(inp){
   if(!inp.files||!inp.files[0])return;
-  const file=inp.files[0];
   const reader=new FileReader();
-  reader.onload=e=>{
-    const img=new Image();
-    img.onload=()=>{
-      const canvas=document.createElement('canvas');
-      const sz=160;
-      canvas.width=sz;canvas.height=sz;
-      const ctx=canvas.getContext('2d');
-      const s=Math.min(img.width,img.height);
-      const ox=(img.width-s)/2,oy=(img.height-s)/2;
-      ctx.drawImage(img,ox,oy,s,s,0,0,sz,sz);
-      _famEditPhoto=canvas.toDataURL('image/jpeg',0.7);
-      const preview=document.getElementById('famEditPhotoPreview');
-      const clearBtn=document.getElementById('famEditPhotoClear');
-      if(preview) preview.innerHTML=`<img src="${_famEditPhoto}" style="width:100%;height:100%;object-fit:cover">`;
-      if(clearBtn) clearBtn.style.display='inline-block';
-    };
-    img.src=e.target.result;
+  reader.onload=e=>openPhotoRepos(e.target.result);
+  reader.readAsDataURL(inp.files[0]);
+}
+function openPhotoRepos(rawUrl){
+  const modal=document.getElementById('photoReposModal');
+  const imgEl=document.getElementById('photoReposImg');
+  const circle=document.getElementById('photoReposCircle');
+  const sz=200;
+  imgEl.onload=()=>{
+    const nw=imgEl.naturalWidth,nh=imgEl.naturalHeight;
+    const scale=Math.max(sz/nw,sz/nh);
+    const dw=nw*scale,dh=nh*scale;
+    imgEl.style.width=dw+'px';imgEl.style.height=dh+'px';
+    _reposOffset={x:(sz-dw)/2,y:(sz-dh)/2};
+    imgEl.style.transform=`translate(${_reposOffset.x}px,${_reposOffset.y}px)`;
+    _reposImgSize={w:dw,h:dh,sz};
   };
-  reader.readAsDataURL(file);
+  imgEl.src=rawUrl;
+  modal.style.display='flex';
+  const onDown=e=>{
+    _reposDragging=true;
+    const p=e.touches?e.touches[0]:e;
+    _reposStart={x:p.clientX-_reposOffset.x,y:p.clientY-_reposOffset.y};
+    e.preventDefault();
+  };
+  const onMove=e=>{
+    if(!_reposDragging||!_reposImgSize)return;
+    const p=e.touches?e.touches[0]:e;
+    const s=_reposImgSize;
+    let nx=p.clientX-_reposStart.x,ny=p.clientY-_reposStart.y;
+    nx=Math.min(0,Math.max(s.sz-s.w,nx));
+    ny=Math.min(0,Math.max(s.sz-s.h,ny));
+    _reposOffset={x:nx,y:ny};
+    imgEl.style.transform=`translate(${nx}px,${ny}px)`;
+    e.preventDefault();
+  };
+  const onUp=()=>{ _reposDragging=false; };
+  circle.onmousedown=circle.ontouchstart=onDown;
+  document.onmousemove=document.ontouchmove=onMove;
+  document.onmouseup=document.ontouchend=onUp;
+}
+function confirmPhotoRepos(){
+  const imgEl=document.getElementById('photoReposImg');
+  const s=_reposImgSize;if(!s)return;
+  const canvas=document.createElement('canvas');
+  canvas.width=160;canvas.height=160;
+  const ratio=160/s.sz;
+  canvas.getContext('2d').drawImage(imgEl,_reposOffset.x*ratio,_reposOffset.y*ratio,s.w*ratio,s.h*ratio);
+  _famEditPhoto=canvas.toDataURL('image/jpeg',0.75);
+  const preview=document.getElementById('famEditPhotoPreview');
+  const clearBtn=document.getElementById('famEditPhotoClear');
+  if(preview) preview.innerHTML=`<img src="${_famEditPhoto}" style="width:100%;height:100%;object-fit:cover">`;
+  if(clearBtn) clearBtn.style.display='inline-block';
+  closePhotoRepos();
+}
+function closePhotoRepos(){
+  document.getElementById('photoReposModal').style.display='none';
+  _reposDragging=false;
+  document.onmousemove=document.ontouchmove=null;
+  document.onmouseup=document.ontouchend=null;
 }
 function clearFamPhoto(){
   _famEditPhoto=null;
@@ -2285,6 +2326,21 @@ document.getElementById('manifestLink').href=URL.createObjectURL(mblob);
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onclick="doDepositToCumPot()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--amber-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הפקד</button>
       <button onclick="closeCumPot()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo reposition modal -->
+<div id="photoReposModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">
+  <div style="background:var(--surface);border-radius:var(--r);padding:22px 20px 18px;width:100%;max-width:300px;text-align:center;box-sizing:border-box">
+    <div style="font-size:14px;font-weight:700;margin-bottom:6px">מרכז את התמונה</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px">גרור לשינוי מיקום</div>
+    <div id="photoReposCircle" style="width:200px;height:200px;border-radius:50%;overflow:hidden;margin:0 auto 18px;cursor:grab;position:relative;border:3px solid var(--blue-mid);touch-action:none;background:var(--surface2)">
+      <img id="photoReposImg" style="position:absolute;top:0;left:0;user-select:none;-webkit-user-drag:none" draggable="false" alt="">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmPhotoRepos()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--text);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ אשר</button>
+      <button onclick="closePhotoRepos()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
   </div>
 </div>
