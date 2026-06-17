@@ -208,6 +208,30 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
 .fund-tx-amt { font-weight: 700; color: var(--green-mid); }
 .fund-tx-amt.neg { color: var(--red-mid); }
 .fund-done-btn { padding: 6px 12px; border-radius: var(--r2); border: none; background: var(--blue-mid); color: #fff; font-size: 12px; font-weight: 700; font-family: var(--font); cursor: pointer; white-space: nowrap; }
+
+/* Home redesign */
+.home-banner { background: linear-gradient(145deg,#0D3A5C 0%,#1E6FA8 60%,#2A90D0 100%); border-radius: 20px; padding: 20px 20px 18px; margin-bottom: 14px; color: #fff; position: relative; overflow: hidden; }
+.home-banner::before { content:''; position:absolute; top:-40px; left:-30px; width:170px; height:170px; border-radius:50%; background:rgba(255,255,255,.06); pointer-events:none; }
+.home-banner-lbl { font-size:11px; opacity:.6; letter-spacing:.5px; margin-bottom:2px; }
+.home-banner-amt { font-size:36px; font-weight:800; letter-spacing:-1px; line-height:1; margin-bottom:16px; }
+.home-banner-row { display:flex; border-top:1px solid rgba(255,255,255,.15); padding-top:14px; }
+.home-bstat { flex:1; text-align:center; }
+.home-bstat+.home-bstat { border-right:1px solid rgba(255,255,255,.15); }
+.home-bstat-val { font-size:18px; font-weight:800; }
+.home-bstat-lbl { font-size:10px; opacity:.55; margin-top:3px; }
+.home-fam-strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:16px; scrollbar-width:none; }
+.home-fam-strip::-webkit-scrollbar { display:none; }
+.home-fam-pill { display:flex; flex-direction:column; align-items:center; gap:5px; background:var(--surface); border-radius:14px; border:1.5px solid var(--border); padding:10px 14px; flex-shrink:0; min-width:70px; }
+.home-fam-pill.pill-owe { border-color:var(--red-mid); background:var(--red-bg); }
+.home-fam-pill.pill-get { border-color:var(--green-mid); background:var(--green-bg); }
+.hev { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); margin-bottom:10px; overflow:hidden; cursor:pointer; }
+.hev-top { display:flex; align-items:center; gap:12px; padding:13px 14px 10px; }
+.hev-bar { width:4px; border-radius:4px; align-self:stretch; flex-shrink:0; }
+.hev-body { flex:1; min-width:0; }
+.hev-name { font-size:15px; font-weight:700; margin-bottom:2px; }
+.hev-sub { font-size:11px; color:var(--text2); margin-bottom:7px; }
+.hev-tags { display:flex; gap:5px; flex-wrap:wrap; }
+.hev-foot { border-top:1px solid var(--border); padding:9px 14px; display:flex; align-items:center; justify-content:space-between; }
 </style>
 </head>
 <body>
@@ -228,15 +252,15 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
 
   <!-- HOME -->
   <div class="view active" id="view-home">
-    <div id="homeFundCard"></div>
+    <div id="homeBanner"></div>
+    <div id="homeFamStrip"></div>
 
     <div id="homeGoalSection" style="display:none">
       <div class="sec-ttl">🎯 קופות למטרה</div>
       <div class="home-list" id="homeGoalList"></div>
     </div>
 
-    <div class="sec-ttl">📅 אירועים פעילים</div>
-    <div class="home-list" id="homeEventList"></div>
+    <div id="homeEvSection"></div>
   </div>
 
   <!-- EVENTS -->
@@ -708,33 +732,86 @@ function renderOpenList(){
 function renderHome(){
   const open=events.filter(e=>e.open);
 
-  document.getElementById('homeFundCard').innerHTML=`
-    <div class="home-hero" onclick="goTab('fund',document.getElementById('nb-fund'))">
-      <div class="home-hero-icon">💰</div>
-      <div class="home-hero-body">
-        <div class="home-hero-lbl">יתרת קופה משותפת</div>
-        <div class="home-hero-amt">₪${fundTotal().toLocaleString()}</div>
+  // ── Banner ──
+  const mainBal=fundTotal();
+  const goalBal=goalFunds.filter(g=>!g.archived).reduce((s,g)=>s+goalTotal(g),0);
+  const evPotsBal=open.reduce((s,ev)=>s+evPotTotal(ev),0);
+  const allBal=mainBal+goalBal+evPotsBal;
+  document.getElementById('homeBanner').innerHTML=`
+    <div class="home-banner" onclick="goTab('fund',document.getElementById('nb-fund'))" style="cursor:pointer">
+      <div class="home-banner-lbl">תשלומים משפחתיים</div>
+      <div class="home-banner-amt">₪${mainBal.toLocaleString()}</div>
+      <div class="home-banner-row">
+        <div class="home-bstat">
+          <div class="home-bstat-val">₪${mainBal.toLocaleString()}</div>
+          <div class="home-bstat-lbl">קופה ראשית</div>
+        </div>
+        <div class="home-bstat">
+          <div class="home-bstat-val">₪${allBal.toLocaleString()}</div>
+          <div class="home-bstat-lbl">כל הקופות</div>
+        </div>
       </div>
-      <span class="home-hero-arrow">‹</span>
     </div>`;
 
-  document.getElementById('homeEventList').innerHTML=open.length?open.map(ev=>{
-    const cl=col(ev.id);
-    const cost=evCost(ev);
-    const remaining=ev.totalCost!=null
-      ?Math.max(0,ev.totalCost-ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0))
-      :calcTransfers(ev).reduce((s,t)=>s+t.amt,0);
-    return`<div class="home-row" onclick="goToEvent(${ev.id})">
-      <div class="home-row-icon" style="background:${cl.bg};color:${cl.c}">📅</div>
-      <div class="home-row-body">
-        <div class="home-row-title">${esc(ev.name)}</div>
-        <div class="home-row-sub">${ev.date&&ev.date!=='לא צוין'?esc(ev.date)+' · ':''}עלות ₪${cost.toLocaleString()}</div>
-      </div>
-      ${remaining>0
-        ?`<div class="home-row-right"><div class="home-row-amt" style="color:var(--red-mid)">₪${remaining.toLocaleString()}</div><div class="home-row-amt-lbl">נותר לסידור</div></div>`
-        :`<span class="badge badge-green">✅ מאוזן</span>`}
-    </div>`;
-  }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
+  // ── Families strip ──
+  const famNet={};
+  families.forEach(f=>{ famNet[f.id]=0; });
+  open.forEach(ev=>{
+    const bal=evAdjBalance(ev);
+    ev.participants.forEach(fid=>{ famNet[fid]=(famNet[fid]||0)+(bal[fid]||0); });
+  });
+  document.getElementById('homeFamStrip').innerHTML=families.length?`
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">👥 נפשות</div>
+    <div class="home-fam-strip">${families.map(f=>{
+      const cl=col(f.id);
+      const net=Math.round(famNet[f.id]||0);
+      const cls=net>0?'pill-get':net<0?'pill-owe':'';
+      const amtColor=net>0?'var(--green-mid)':net<0?'var(--red-mid)':'var(--text3)';
+      const amtText=net>0?'+₪'+net.toLocaleString():net<0?'-₪'+Math.abs(net).toLocaleString():'מסודר';
+      return`<div class="home-fam-pill ${cls}">
+        <div class="ava" style="background:${cl.bg};color:${cl.c};width:36px;height:36px">${ini(f.name)}</div>
+        <div style="font-size:11px;font-weight:700;color:var(--text)">${esc(f.name.replace('משפחת','').trim())}</div>
+        <div style="font-size:11px;font-weight:700;color:${amtColor}">${amtText}</div>
+      </div>`;
+    }).join('')}</div>`:'';
+
+  // ── Event cards ──
+  const splitShort={equal:'שווה',percapita:'לפי נפשות',weighted:'ילד 50%'};
+  document.getElementById('homeEvSection').innerHTML=`
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <span>📅 אירועים פעילים</span>
+      ${open.length?`<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 9px;color:var(--text2);font-weight:600">${open.length}</span>`:''}
+    </div>
+    ${open.length?open.map(ev=>{
+      const cl=col(ev.id);
+      const cost=evCost(ev);
+      const pending=calcTransfers(ev);
+      const settled=(ev.settled||[]).length;
+      const total=pending.length+settled;
+      const pct=total?Math.round(settled/total*100):100;
+      const hasPot=evPotTotal(ev)>0;
+      const balanced=!pending.length;
+      const tags=[
+        !balanced?`<span class="badge badge-amber">↔ ${pending.length} העברות</span>`:`<span class="badge badge-green">✅ מאוזן</span>`,
+        hasPot?`<span class="badge" style="background:var(--amber-bg);color:var(--amber)">💰 ₪${evPotTotal(ev).toLocaleString()}</span>`:''
+      ].filter(Boolean).join('');
+      const meta=[ev.date&&ev.date!=='לא צוין'?esc(ev.date):'',ev.participants.length+' משפחות',splitShort[ev.splitMethod||'equal']].filter(Boolean).join(' · ');
+      return`<div class="hev" onclick="goToEvent(${ev.id})">
+        <div class="hev-top">
+          <div class="hev-bar" style="background:${cl.c}"></div>
+          <div class="hev-body">
+            <div class="hev-name">${esc(ev.name)}</div>
+            <div class="hev-sub">${meta}</div>
+            <div class="hev-tags">${tags}</div>
+            <div class="pbar" style="margin-top:8px"><div class="pfill ${balanced?'full':'part'}" style="width:${pct}%"></div></div>
+          </div>
+        </div>
+        <div class="hev-foot">
+          <span style="font-size:12px;color:var(--text2)">עלות כוללת <b style="color:var(--text)">₪${cost.toLocaleString()}</b></span>
+          <span style="font-size:14px;color:var(--text3)">‹</span>
+        </div>
+      </div>`;
+    }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`}`;
 
   const openGoals=goalFunds.filter(g=>!g.closed&&!g.archived);
   const goalSection=document.getElementById('homeGoalSection');
