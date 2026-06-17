@@ -1547,7 +1547,7 @@ function renderFund(){
         potsWithFunds.map(ev=>{
           const pot=evPotTotal(ev);
           const cl=col(ev.id);
-          return`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="goToEvent(${ev.id})">
+          return`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--amber);padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openPotModal(${ev.id})">
             <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">📅</div>
             <div style="flex:1">
               <div style="font-size:14px;font-weight:700">${esc(ev.name)}</div>
