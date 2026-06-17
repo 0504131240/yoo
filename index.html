@@ -497,6 +497,7 @@ let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set
 let expandedCumFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null;
 let cumPotEvId=null,cumPotFamId=null;
+let settleModalEvId=null,potModalEvId=null;
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId))collapsedEvents.delete(evId);else collapsedEvents.add(evId);
   renderOpenList();
@@ -927,7 +928,7 @@ function evCard(ev){
     </div>`:''}
     ${!creditorFids.length?`<button onclick="releasePot(${ev.id})" style="margin-top:6px;padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button>`:''}
   </div>`:'';
-  const settleBar=cost>0?`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (${shareLabel(ev)})</div>${transfers.length?settleLines:hasPot?'':'<div style="font-size:12px;color:var(--green);padding:4px 0">✅ כולם מסודרים!</div>'}${potHtml}${doneHtml}</div>`:'';
+  const settleBar='';
   const collapsed=collapsedEvents.has(ev.id);
   return`<div class="ecard" id="ecard-${ev.id}">
     <div class="ecard-head">
@@ -946,9 +947,10 @@ function evCard(ev){
     <div class="members-list" id="mlist-${ev.id}">${ev.cumulative?cumRows:mems}</div>
     ${ev.cumulative?addExpBtn:''}
     ${exclLine}
-    <div id="settlebar-${ev.id}">${settleBar}</div>
     <div class="card-actions">
       <button class="action-btn" onclick="editEv(${ev.id})">✏️ ערוך</button>
+      ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
+      ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${potTotal.toLocaleString()}</button>`:''}
       ${balanced&&cost>0?`<button class="action-btn blue" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
       <button class="action-btn red" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>`}
@@ -971,14 +973,8 @@ function liveUpdateCard(evId,inputEl,changedFid){
   });
   const bar=document.getElementById('totalbar-'+evId);
   if(bar) bar.innerHTML=`<span>סה"כ עלות האירוע</span><span style="color:var(--green-mid);font-size:16px">₪${cost.toLocaleString()}</span>`;
-  const transfers=calcTransfers(tmpEv);
-  const sb=document.getElementById('settlebar-'+evId);
-  if(sb&&cost>0){
-    const lines=transfers.map(t=>`<div class="settle-row" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 0">
-      <span style="font-size:12px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
-    </div>`).join('');
-    sb.innerHTML=`<div class="settle-bar"><div class="settle-title">📊 העברות לאיזון (${shareLabel(tmpEv)})</div>${transfers.length?lines:`<div style="font-size:12px;color:var(--green)">✅ כולם מסודרים!</div>`}</div>`;
-  } else if(sb) sb.innerHTML='';
+  // settle modal updates live if open
+  if(settleModalEvId===evId) renderSettleModal(tmpEv);
 }
 function updateExpense(evId,famId,val){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
@@ -1847,6 +1843,105 @@ function toggleCumFamily(evId,famId){
   const ev=events.find(e=>e.id===evId);
   if(el&&ev)el.outerHTML=evCard(ev);
 }
+// ── Settle modal ──────────────────────────────
+function openSettleModal(evId){
+  settleModalEvId=evId;
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  renderSettleModal(ev);
+  document.getElementById('settleModal').style.display='flex';
+}
+function closeSettleModal(){
+  document.getElementById('settleModal').style.display='none';
+  settleModalEvId=null;
+}
+function renderSettleModal(ev){
+  const el=document.getElementById('settleModalContent');if(!el)return;
+  const transfers=calcTransfers(ev);
+  const settledList=ev.settled||[];
+  const settleLines=transfers.map(t=>{
+    const canFund=canPayFromFund(t.fromFid,t.amt);
+    return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</span>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${canFund?`<button style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferFromFundM(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
+        <button style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferDirectM(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם</button>
+      </div>
+    </div>`;
+  }).join('');
+  const doneRows=settledList.length?'<div style="padding:6px 16px 2px">'+settledList.map(s=>{
+    const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
+    const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':s.method==='pot'?'<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';
+    return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(s.from)}</b> העביר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
+  }).join('')+'</div>':'';
+  el.innerHTML=`
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-size:14px;font-weight:700">📊 העברות לאיזון</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${shareLabel(ev)} · ${esc(ev.name)}</div></div>
+      <button onclick="closeSettleModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
+    </div>
+    ${transfers.length?settleLines:`<div style="padding:20px;text-align:center;font-size:15px;color:var(--green)">✅ כולם מסודרים!</div>`}
+    ${doneRows}
+    <div style="padding:10px 16px">
+      <button onclick="closeSettleModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+    </div>`;
+}
+function markTransferDirectM(evId,from,to,amt){
+  markTransferDirect(evId,from,to,amt);
+  const ev=events.find(e=>e.id===evId);if(ev)renderSettleModal(ev);
+}
+function markTransferFromFundM(evId,from,fromFid,to,toFid,amt){
+  markTransferFromFund(evId,from,fromFid,to,toFid,amt);
+  const ev=events.find(e=>e.id===evId);if(ev)renderSettleModal(ev);
+}
+// ── Pot modal ──────────────────────────────
+function openPotModal(evId){
+  potModalEvId=evId;
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  renderPotModal(ev);
+  document.getElementById('potModal').style.display='flex';
+}
+function closePotModal(){
+  document.getElementById('potModal').style.display='none';
+  potModalEvId=null;
+}
+function renderPotModal(ev){
+  const el=document.getElementById('potModalContent');if(!el)return;
+  const potPayments=ev.potPayments||[];
+  const potTotal=evPotTotal(ev);
+  const potTransfers=calcPotTransfers(ev);
+  const adjBal=evAdjBalance(ev);
+  const creditorFids=ev.participants.filter(fid=>(adjBal[fid]||0)>0.5);
+  const potByCreditor={};
+  potTransfers.forEach(t=>{if(!potByCreditor[t.toFid])potByCreditor[t.toFid]={name:t.to,fid:t.toFid,amt:0};potByCreditor[t.toFid].amt+=t.amt;});
+  const credRows=Object.values(potByCreditor).map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
+    <div style="font-size:13px;flex:1">👈 <b>${esc(c.name)}</b> יקבל ₪${c.amt.toLocaleString()}</div>
+    <button onclick="releasePotToOneM(${ev.id},${c.fid},false)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
+    <button onclick="releasePotToOneM(${ev.id},${c.fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
+  </div>`).join('');
+  el.innerHTML=`
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-size:14px;font-weight:700">💰 קופת האירוע</div><div style="font-size:11px;color:var(--text2);margin-top:2px">₪${potTotal.toLocaleString()} · ${esc(ev.name)}</div></div>
+      <button onclick="closePotModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
+    </div>
+    <div style="padding:8px 16px 4px;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">הפקדות:</div>
+      ${potPayments.map(p=>{const pf=getFam(p.famId);return`<div style="font-size:13px;padding:3px 0;color:var(--text)">✓ ${esc(pf.name.replace('משפחת','').trim())} ₪${p.amt.toLocaleString()}</div>`;}).join('')}
+    </div>
+    ${potTransfers.length?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
+    ${!creditorFids.length&&potPayments.length?`<div style="padding:10px 16px"><button onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
+    <div style="padding:${potTransfers.length||!creditorFids.length?'4':'10'}px 16px 10px">
+      <button onclick="closePotModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+    </div>`;
+}
+function releasePotToOneM(evId,creditorFid,toFund){
+  releasePotToOne(evId,creditorFid,toFund);
+  const ev=events.find(e=>e.id===evId);
+  if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+}
+function releasePotM(evId){
+  releasePot(evId);
+  closePotModal();
+}
+// ──────────────────────────────────────────
 function openCumPot(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   cumPotEvId=evId; cumPotFamId=null;
@@ -1944,6 +2039,20 @@ document.getElementById('manifestLink').href=URL.createObjectURL(mblob);
       <button onclick="doDepositToCumPot()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--amber-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הפקד</button>
       <button onclick="closeCumPot()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
+  </div>
+</div>
+
+<!-- Settle transfers modal -->
+<div id="settleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeSettleModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div id="settleModalContent"></div>
+  </div>
+</div>
+
+<!-- Pot modal -->
+<div id="potModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closePotModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div id="potModalContent"></div>
   </div>
 </div>
 </body>
