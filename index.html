@@ -504,7 +504,7 @@ let addExpItemEvId=null,addExpItemFamId=null;
 let cumPotEvId=null,cumPotFamId=null;
 let settleModalEvId=null,potModalEvId=null;
 let adminPass='';
-let editMode=sessionStorage.getItem('editMode')==='1';
+let editMode=false;
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId))collapsedEvents.delete(evId);else collapsedEvents.add(evId);
   renderOpenList();
@@ -2040,13 +2040,13 @@ function setAdminPass(){
   if(!p1){if(err){err.textContent='נא להזין סיסמה';err.style.display='block';}return;}
   if(p1!==p2){if(err){err.textContent='הסיסמאות אינן תואמות';err.style.display='block';}return;}
   adminPass=p1;editMode=true;
-  sessionStorage.setItem('editMode','1');
+  // editMode is in-memory only — resets on each page load
   applyEditMode();save();closeLockModal();
 }
 function submitUnlock(){
   const val=(document.getElementById('unlockInp')||{}).value||'';
   if(val===adminPass){
-    editMode=true;sessionStorage.setItem('editMode','1');
+    editMode=true;// editMode is in-memory only — resets on each page load
     applyEditMode();closeLockModal();
   } else {
     const err=document.getElementById('passErr');if(err)err.style.display='block';
@@ -2054,7 +2054,7 @@ function submitUnlock(){
   }
 }
 function lockApp(){
-  editMode=false;sessionStorage.removeItem('editMode');
+  editMode=false;
   applyEditMode();closeLockModal();
 }
 
