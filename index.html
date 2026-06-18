@@ -1042,7 +1042,7 @@ function renderCalendar(){
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const label=calHebrew
-      ?hebFmt({day:'numeric'}).format(new Date(calYear,calMonth,d))
+      ?hebFmt({day:'numeric'}).format(new Date(calYear,calMonth,d)).replace(/[׳״'"]/g,'')
       :String(d);
     const isToday=ds===todayStr;
     const isSel=calSelDay===ds&&!isToday;
