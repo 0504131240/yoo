@@ -992,6 +992,21 @@ function setCalMode(hebrew){
   calHebrew=hebrew;
   renderCalendar();
 }
+function toHebrewYear(hy){
+  const y=hy%1000;
+  const ONES=['','א','ב','ג','ד','ה','ו','ז','ח','ט'];
+  const TENS=['','י','כ','ל','מ','נ','ס','ע','פ','צ'];
+  let s='',r=y;
+  while(r>=400){s+='ת';r-=400;}
+  if(r>=300){s+='ש';r-=300;}
+  if(r>=200){s+='ר';r-=200;}
+  if(r>=100){s+='ק';r-=100;}
+  const t=Math.floor(r/10),o=r%10;
+  if(t===1&&o===5)s+='טו';
+  else if(t===1&&o===6)s+='טז';
+  else{if(t)s+=TENS[t];if(o)s+=ONES[o];}
+  return s.length===1?s+'׳':s.slice(0,-1)+'״'+s.slice(-1);
+}
 function _applyCalToggleStyle(){
   const hBtn=document.getElementById('calToggleHeb');
   const lBtn=document.getElementById('calToggleLat');
@@ -1008,7 +1023,10 @@ function renderCalendar(){
   _applyCalToggleStyle();
   const hebFmt=(opts)=>new Intl.DateTimeFormat('he-IL-u-ca-hebrew',opts);
   if(calHebrew){
-    titleEl.textContent=hebFmt({month:'long',year:'numeric'}).format(new Date(calYear,calMonth,15));
+    const mid=new Date(calYear,calMonth,15);
+    const hebMonth=hebFmt({month:'long'}).format(mid);
+    const hebYearNum=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(mid));
+    titleEl.textContent=hebMonth+' '+toHebrewYear(hebYearNum);
   } else {
     titleEl.textContent=HEB_MONTHS[calMonth]+' '+calYear;
   }
@@ -1046,7 +1064,12 @@ function renderCalEvList(){
   if(!list.length){el.innerHTML='';return;}
   el.innerHTML=list.map(c=>{
     const d=new Date(c.date+'T00:00:00');
-    const lbl=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric',month:'long'}).format(d);
+    const hebF=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric',month:'long'});
+    const latF=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'});
+    const hebYNum=parseInt(latF.format(d));
+    const lbl=calHebrew
+      ?hebF.format(d)+' '+toHebrewYear(hebYNum)
+      :d.toLocaleDateString('he-IL',{day:'numeric',month:'long'});
     return`<div class="fh-cal-ev">
       <div class="fh-cal-ev-dot" style="background:${c.color||'var(--blue-mid)'}"></div>
       <div class="fh-cal-ev-info">
