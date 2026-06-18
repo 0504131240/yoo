@@ -1,8 +1,8 @@
-const CACHE = 'family-pay-v3';
-const CORE = ['./','./index.html','./manifest.json','./icon.svg','./icon.jpg','./sw.js'];
+const CACHE = 'family-pay-v4';
+const STATIC = ['./icon.svg','./icon.jpg','./manifest.json'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
   self.skipWaiting();
 });
 
@@ -14,10 +14,13 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for Firebase, cache-first for app shell
-  if (e.request.url.includes('firestore') || e.request.url.includes('firebase')) {
+  const url = e.request.url;
+  // Always network-first for HTML and Firebase
+  if (url.includes('firestore') || url.includes('firebase') ||
+      url.endsWith('/') || url.endsWith('.html')) {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-  } else {
-    e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request)));
+    return;
   }
+  // Cache-first only for static assets (images, icons)
+  e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request)));
 });
