@@ -884,8 +884,11 @@ function calcTransfers(ev){
     if(adjBal[fid]>0.5) pos.push({name,fid,amt:adjBal[fid]});
     else if(adjBal[fid]<-0.5) neg.push({name,fid,amt:-adjBal[fid]});
   });
-  const transfers=[];let pi=0,ni=0;
-  const pCopy=pos.map(x=>({...x})),nCopy=neg.map(x=>({...x}));
+  const transfers=[];
+  // Sort largest first so big debtors match big creditors → fewer splits per person
+  const pCopy=pos.map(x=>({...x})).sort((a,b)=>b.amt-a.amt);
+  const nCopy=neg.map(x=>({...x})).sort((a,b)=>b.amt-a.amt);
+  let pi=0,ni=0;
   while(pi<pCopy.length&&ni<nCopy.length){
     const give=Math.min(pCopy[pi].amt,nCopy[ni].amt);
     if(give>0.5) transfers.push({from:nCopy[ni].name,fromFid:nCopy[ni].fid,to:pCopy[pi].name,toFid:pCopy[pi].fid,amt:Math.round(give)});
