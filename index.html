@@ -409,6 +409,23 @@ body:not(.at-home){padding-bottom:140px}
   </div>
 </div>
 
+<!-- Partial payment modal -->
+<div id="partPayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closePartPayModal()">
+  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:320px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">💳 רישום תשלום</div>
+    <div id="partPayInfo" style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6"></div>
+    <div class="field" style="margin-bottom:6px">
+      <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">סכום ששולם (₪)</label>
+      <input id="partPayAmt" type="number" min="1" oninput="updatePartPayRemain()" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:20px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;box-sizing:border-box;font-weight:700;text-align:center">
+    </div>
+    <div id="partPayRemain" style="font-size:12px;margin-bottom:14px;text-align:center;min-height:18px;font-weight:600"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmPartPay()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">אשר תשלום</button>
+      <button onclick="closePartPayModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div class="topbar">
   <div>
     <div class="topbar-title">👨‍👩‍👧‍👦 ינקלביץ</div>
@@ -730,6 +747,7 @@ let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=nu
 let calHebRefDate=new Date();
 let fundTxOpen=false;
 let settleModalEvId=null,potModalEvId=null;
+let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false;
 let adminPass='';
 let editMode=false;
 function toggleEvCollapse(evId){
@@ -1451,6 +1469,36 @@ function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
     date:new Date().toLocaleDateString('he-IL')});
   save();render();
 }
+function openPartPayModal(evId,from,fromFid,to,toFid,amt,isFund,fromSettle){
+  _ppEvId=evId;_ppFrom=from;_ppFromFid=fromFid;_ppTo=to;_ppToFid=toFid;
+  _ppMax=amt;_ppFund=isFund||false;_ppSettle=fromSettle||false;
+  document.getElementById('partPayInfo').innerHTML=`<b>${esc(from)}</b> → <b>${esc(to)}</b><br>נדרש: <b style="color:var(--blue-mid)">₪${amt.toLocaleString()}</b>`;
+  const amtEl=document.getElementById('partPayAmt');
+  amtEl.value=amt;amtEl.max=amt;
+  updatePartPayRemain();
+  document.getElementById('partPayModal').style.display='flex';
+  setTimeout(()=>{amtEl.focus();amtEl.select();},50);
+}
+function updatePartPayRemain(){
+  const paid=parseFloat(document.getElementById('partPayAmt').value)||0;
+  const rem=Math.round(_ppMax-paid);
+  const el=document.getElementById('partPayRemain');
+  if(paid<=0){el.textContent='';return;}
+  if(paid>_ppMax+0.5){el.style.color='var(--red-mid)';el.textContent='הסכום גבוה מהנדרש';return;}
+  if(rem>0.5){el.style.color='var(--amber)';el.textContent='נשאר לתשלום: ₪'+rem.toLocaleString();}
+  else{el.style.color='var(--green-mid)';el.textContent='תשלום מלא ✓';}
+}
+function closePartPayModal(){document.getElementById('partPayModal').style.display='none';}
+function confirmPartPay(){
+  const paid=Math.round(parseFloat(document.getElementById('partPayAmt').value)||0);
+  if(paid<=0)return;
+  if(paid>_ppMax+0.5){alert('הסכום גבוה מהנדרש');return;}
+  if(_ppFund) markTransferFromFund(_ppEvId,_ppFrom,_ppFromFid,_ppTo,_ppToFid,paid);
+  else markTransferDirect(_ppEvId,_ppFrom,_ppTo,paid);
+  if(_ppSettle){const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
+  closePartPayModal();
+}
+
 function evCard(ev){
   const cost=evCost(ev);
   const excl=families.filter(f=>ev.excluded.includes(f.id));
@@ -1529,8 +1577,8 @@ function evCard(ev){
     return`<div class="settle-row" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 0">
       <span style="font-size:12px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${canFund?`<button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferFromFund(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
-        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="markTransferDirect(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם ישירות</button>
+        ${canFund?`<button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="openPartPayModal(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},true,false)">🏦 מהקופה</button>`:''}
+        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="openPartPayModal(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},false,false)">✓ שולם ישירות</button>
       </div>
     </div>`;
   }).join('');
@@ -2664,8 +2712,8 @@ function renderSettleModal(ev){
     return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
       <span style="font-size:13px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${canFund?`<button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferFromFundM(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})">🏦 מהקופה</button>`:''}
-        <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferDirectM(${ev.id},'${esc(t.from)}','${esc(t.to)}',${t.amt})">✓ שולם</button>
+        ${canFund?`<button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-bg);color:var(--blue);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="openPartPayModal(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},true,true)">🏦 מהקופה</button>`:''}
+        <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="openPartPayModal(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},false,true)">✓ שולם</button>
       </div>
     </div>`;
   }).join('');
