@@ -332,19 +332,12 @@ body:not(.at-home){padding-bottom:140px}
     </div>
     <div class="fh-cal-grid" id="calGrid"></div>
     <div class="fh-cal-evlist" id="calEvList"></div>
-    <div style="padding:0 14px 14px">
-      <button onclick="openCalModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ הוסף אירוע ללוח שנה</button>
+    <div style="padding:0 14px 14px;display:flex;gap:8px">
+      <button onclick="openCalModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ אירוע</button>
+      <button onclick="openBdayModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #c0392b;background:transparent;color:#c0392b;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
     </div>
   </div>
 
-  <!-- Birthdays -->
-  <div class="fh-card" style="margin-bottom:14px">
-    <div class="fh-card-hdr">
-      <span class="fh-card-title">🎂 ימי הולדת עבריים</span>
-      <button onclick="openBdayModal()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">+ הוסף</button>
-    </div>
-    <div id="bdayList"></div>
-  </div>
 </div>
 
 <!-- Message modal -->
@@ -988,7 +981,6 @@ function renderFamilyHome(){
   if(calAddRow)calAddRow.style.display=editMode?'flex':'none';
   renderMessages();
   renderCalendar();
-  renderBdayList();
 }
 
 function fmtTs(ts){
