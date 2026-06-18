@@ -1158,6 +1158,24 @@ function deleteCalItem(id){
   save();renderCalendar();
 }
 
+function startEditCost(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev||ev.totalCost==null)return;
+  const dispEl=document.getElementById('costdisp-'+evId);if(!dispEl)return;
+  const inp=document.createElement('input');
+  inp.type='number';inp.value=ev.totalCost;
+  inp.style.cssText='width:90px;font-size:15px;font-weight:700;color:var(--green-mid);border:1.5px solid var(--blue-mid);border-radius:6px;padding:2px 6px;font-family:var(--font);background:var(--bg);direction:ltr';
+  inp.onblur=()=>saveCostEdit(evId,inp.value);
+  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.replaceWith(dispEl);}};
+  dispEl.replaceWith(inp);
+  inp.focus();inp.select();
+}
+function saveCostEdit(evId,val){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const newCost=parseFloat(val)||0;
+  ev.totalCost=newCost;
+  save();render();
+}
+
 function openBdayModal(){
   const mSel=document.getElementById('bdayMonth');
   const dSel=document.getElementById('bdayDay');
@@ -1509,7 +1527,10 @@ function evCard(ev){
     </div>
     <div class="total-cost-bar" id="totalbar-${ev.id}">
       <span>סה"כ עלות האירוע</span>
-      <span style="color:var(--green-mid);font-size:16px">₪${cost.toLocaleString()}</span>
+      <span style="display:flex;align-items:center;gap:4px">
+        <span id="costdisp-${ev.id}" style="color:var(--green-mid);font-size:16px">₪${cost.toLocaleString()}</span>
+        ${ev.totalCost!=null?`<button class="edit-only" onclick="startEditCost(${ev.id})" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--text3);line-height:1;opacity:.55">✏️</button>`:''}
+      </span>
     </div>
     <button class="exp-btn" onclick="toggleEvCollapse(${ev.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
     ${collapsed?'':`
@@ -1540,8 +1561,8 @@ function liveUpdateCard(evId,inputEl,changedFid){
     tag.className='exp-tag '+(b>0?'exp-tag-neg':b<0?'exp-tag-pos':'exp-tag-zero')+(ev.totalCost!=null?' exp-tag-clickable':'');
     tag.textContent=b>0?'מקבל ₪'+b.toLocaleString():b<0?'מחזיר ₪'+Math.abs(b).toLocaleString():'מסודר';
   });
-  const bar=document.getElementById('totalbar-'+evId);
-  if(bar) bar.innerHTML=`<span>סה"כ עלות האירוע</span><span style="color:var(--green-mid);font-size:16px">₪${cost.toLocaleString()}</span>`;
+  const costDispEl=document.getElementById('costdisp-'+evId);
+  if(costDispEl) costDispEl.textContent='₪'+cost.toLocaleString();
   // settle modal updates live if open
   if(settleModalEvId===evId) renderSettleModal(tmpEv);
 }
