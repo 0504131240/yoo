@@ -986,7 +986,9 @@ function renderCalendar(){
   const gridEl=document.getElementById('calGrid');
   const titleEl=document.getElementById('calTitle');
   if(!gridEl)return;
-  titleEl.textContent=HEB_MONTHS[calMonth]+' '+calYear;
+  const hebFmt=(opts)=>new Intl.DateTimeFormat('he-IL-u-ca-hebrew',opts);
+  const mid=new Date(calYear,calMonth,15);
+  titleEl.textContent=hebFmt({month:'long',year:'numeric'}).format(mid);
   const todayStr=new Date().toISOString().slice(0,10);
   const firstDay=new Date(calYear,calMonth,1).getDay();
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
@@ -994,11 +996,12 @@ function renderCalendar(){
   for(let i=0;i<firstDay;i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hebrewDay=hebFmt({day:'numeric'}).format(new Date(calYear,calMonth,d));
     const isToday=ds===todayStr;
     const isSel=calSelDay===ds&&!isToday;
     const hasEv=calItems.some(c=>c.date===ds);
     const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':''].filter(Boolean).join(' ');
-    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">${d}</div>`;
+    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')" style="font-size:10px">${hebrewDay}</div>`;
   }
   gridEl.innerHTML=html;
   renderCalEvList();
@@ -1018,7 +1021,7 @@ function renderCalEvList(){
   if(!list.length){el.innerHTML='';return;}
   el.innerHTML=list.map(c=>{
     const d=new Date(c.date+'T00:00:00');
-    const lbl=d.toLocaleDateString('he-IL',{day:'numeric',month:'short'});
+    const lbl=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric',month:'long'}).format(d);
     return`<div class="fh-cal-ev">
       <div class="fh-cal-ev-dot" style="background:${c.color||'var(--blue-mid)'}"></div>
       <div class="fh-cal-ev-info">
