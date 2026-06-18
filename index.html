@@ -233,9 +233,110 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
 .hev-sub { font-size:11px; color:var(--text2); margin-bottom:7px; }
 .hev-tags { display:flex; gap:5px; flex-wrap:wrap; }
 .hev-foot { border-top:1px solid var(--border); padding:9px 14px; display:flex; align-items:center; justify-content:space-between; }
+/* Shell */
+#shell-home{display:none;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);padding-bottom:72px;min-height:calc(100vh - 56px)}
+body.at-home #shell-home{display:flex}
+body.at-home .topbar,body.at-home .main,body.at-home .bottom-nav{display:none!important}
+body:not(.at-home) .bottom-nav{bottom:56px}
+body:not(.at-home){padding-bottom:140px}
+/* Main nav */
+#main-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:300;padding-bottom:env(safe-area-inset-bottom,0px);height:56px;box-sizing:content-box}
+.mn-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:transparent;font-size:10px;font-weight:700;color:var(--text3);cursor:pointer;padding:0;font-family:var(--font);transition:color .15s}
+.mn-btn.mn-active{color:var(--blue-mid)}
+.mn-ico{font-size:22px;line-height:1}
+/* Hero */
+.fh-hero{position:relative;min-height:210px;display:flex;align-items:flex-end;overflow:hidden;flex-shrink:0}
+.fh-hero-bg{position:absolute;inset:0;background:url('icon.jpg') center/cover no-repeat;filter:blur(3px);transform:scale(1.08)}
+.fh-hero-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.18) 0%,rgba(0,0,0,.68) 100%)}
+.fh-hero-content{position:relative;padding:22px 18px 20px;width:100%}
+.fh-hero-title{font-size:30px;font-weight:900;color:#fff;letter-spacing:-.5px;margin-bottom:3px}
+.fh-hero-sub{font-size:12px;color:rgba(255,255,255,.65)}
+/* Cards */
+.fh-card{margin:12px 14px 0;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);overflow:hidden}
+.fh-card-hdr{padding:13px 14px 0;display:flex;align-items:center;justify-content:space-between}
+.fh-card-title{font-size:13px;font-weight:700;color:var(--text2)}
+/* Messages */
+.msg-list{padding:0 14px}
+.msg-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.msg-item:last-child{border-bottom:none}
+.msg-author-row{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.msg-author{font-size:13px;font-weight:700;color:var(--text)}
+.msg-ts{font-size:10px;color:var(--text3)}
+.msg-text{font-size:13px;color:var(--text2);line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.msg-compose{padding:10px 14px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:7px}
+.msg-compose input,.msg-compose textarea{border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 11px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;width:100%;box-sizing:border-box}
+.msg-compose textarea{min-height:58px;resize:none}
+.msg-send-row{display:flex;align-items:center;justify-content:space-between}
+.msg-send-btn{background:var(--blue-mid);color:#fff;border:none;border-radius:20px;padding:8px 20px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer}
+/* Calendar */
+.fh-cal-nav{padding:12px 14px 4px;display:flex;align-items:center;justify-content:space-between}
+.fh-cal-month{font-size:14px;font-weight:700;color:var(--text)}
+.fh-cal-arrow{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);padding:2px 8px;line-height:1}
+.fh-cal-grid{padding:4px 10px 8px;display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.fh-cal-dow{text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:3px 0}
+.fh-cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:12px;cursor:pointer;position:relative;font-weight:500;color:var(--text)}
+.fh-cal-day:hover{background:var(--surface2)}
+.fh-cal-day.today{background:var(--blue-mid)!important;color:#fff!important;font-weight:800}
+.fh-cal-day.has-ev::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--amber)}
+.fh-cal-day.today.has-ev::after{background:rgba(255,255,255,.8)}
+.fh-cal-day.other-m{color:var(--text3);opacity:.4}
+.fh-cal-day.sel{background:var(--blue-bg);color:var(--blue-mid);font-weight:700}
+.fh-cal-day.empty{cursor:default}
+.fh-cal-evlist{padding:0 14px 14px;display:flex;flex-direction:column;gap:6px;min-height:4px}
+.fh-cal-ev{background:var(--surface2);border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:8px}
+.fh-cal-ev-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.fh-cal-ev-info{flex:1;min-width:0}
+.fh-cal-ev-name{font-size:13px;font-weight:600;color:var(--text)}
+.fh-cal-ev-date{font-size:11px;color:var(--text3);margin-top:2px}
+.fh-cal-add-row{padding:0 14px 14px;display:flex;gap:7px}
+.fh-cal-add-row input{border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 11px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box}
 </style>
 </head>
-<body>
+<body class="at-home">
+
+<!-- FAMILY HOME SHELL -->
+<div id="shell-home">
+  <div class="fh-hero">
+    <div class="fh-hero-bg"></div>
+    <div class="fh-hero-overlay"></div>
+    <div class="fh-hero-content">
+      <div class="fh-hero-title">משפחת ינקלביץ</div>
+      <div class="fh-hero-sub" id="fhSub"></div>
+    </div>
+  </div>
+
+  <!-- Messages board -->
+  <div class="fh-card">
+    <div class="fh-card-hdr">
+      <span class="fh-card-title">💌 לוח הודעות וברכות</span>
+    </div>
+    <div class="msg-list" id="msgList"></div>
+    <div class="msg-compose">
+      <input id="msgAuthor" placeholder="שמך" maxlength="40">
+      <textarea id="msgText" placeholder="כתוב הודעה או ברכה..." maxlength="500" oninput="document.getElementById('msgCharCount').textContent=this.value.length+'/500'"></textarea>
+      <div class="msg-send-row">
+        <span style="font-size:11px;color:var(--text3)" id="msgCharCount"></span>
+        <button class="msg-send-btn" onclick="sendMessage()">שלח ›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="fh-card" style="margin-bottom:14px">
+    <div class="fh-cal-nav">
+      <button class="fh-cal-arrow" onclick="nextCalMonth()">‹</button>
+      <span class="fh-cal-month" id="calTitle"></span>
+      <button class="fh-cal-arrow" onclick="prevCalMonth()">›</button>
+    </div>
+    <div class="fh-cal-grid" id="calGrid"></div>
+    <div class="fh-cal-evlist" id="calEvList"></div>
+    <div class="fh-cal-add-row edit-only" id="calAddRow" style="display:none">
+      <input id="calAddTitle" placeholder="שם האירוע" style="flex:1">
+      <input id="calAddDate" type="date" style="width:140px">
+      <button onclick="addCalItem()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:9px 14px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ הוסף</button>
+    </div>
+  </div>
+</div>
 
 <div class="topbar">
   <div>
@@ -525,6 +626,16 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
   </button>
 </nav>
 
+<!-- MAIN SHELL NAV -->
+<div id="main-nav">
+  <button id="mn-home" class="mn-btn mn-active" onclick="switchShell('home')">
+    <span class="mn-ico">🏠</span>בית
+  </button>
+  <button id="mn-pay" class="mn-btn" onclick="switchShell('pay')">
+    <span class="mn-ico">💰</span>תשלומים
+  </button>
+</div>
+
 <script>
 const COLORS=[
   {bg:'#EEEDFE',c:'#3C3489'},{bg:'#E1F5EE',c:'#085041'},
@@ -539,6 +650,11 @@ let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set
 let expandedCumFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null;
 let cumPotEvId=null,cumPotFamId=null;
+let messages=[];
+let calItems=[];
+let nxtMsg=1,nxtCal=1;
+let currentShell='home';
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null;
 let fundTxOpen=false;
 let settleModalEvId=null,potModalEvId=null;
 let adminPass='';
@@ -643,6 +759,8 @@ function saveLocal(){
     localStorage.setItem('nxtTx',String(nxtTx));
     localStorage.setItem('goalFunds',JSON.stringify(goalFunds));
     localStorage.setItem('adminPass',adminPass);
+    localStorage.setItem('messages',JSON.stringify(messages));
+    localStorage.setItem('calItems',JSON.stringify(calItems));
   }catch(e){}
 }
 
@@ -653,7 +771,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass,messages,calItems});
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
     console.warn('save failed:',e);
@@ -675,6 +793,10 @@ async function load(){
     if(!fund.famBalances)fund.famBalances={};
     goalFunds=d.goalFunds||[];
     adminPass=d.adminPass||'';
+    messages=d.messages||[];
+    calItems=d.calItems||[];
+    nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
+    nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
@@ -689,6 +811,10 @@ async function load(){
       const tx=localStorage.getItem('nxtTx');if(tx)nxtTx=parseInt(tx);
       const gf=localStorage.getItem('goalFunds');if(gf)goalFunds=JSON.parse(gf);
       const ap=localStorage.getItem('adminPass');if(ap)adminPass=ap;
+      const msgs=localStorage.getItem('messages');if(msgs)messages=JSON.parse(msgs);
+      const cals=localStorage.getItem('calItems');if(cals)calItems=JSON.parse(cals);
+      nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
+      nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
       nxtId=events.reduce((a,e)=>Math.max(a,e.id),0)+1;
       nxtFam=families.reduce((a,f)=>Math.max(a,f.id),0)+1;
       nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
@@ -703,7 +829,7 @@ function showSyncStatus(msg,hideAfter){
   if(!el){
     el=document.createElement('div');
     el.id='syncStatus';
-    el.style.cssText='position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#1A1A18;color:#fff;font-size:12px;font-weight:600;padding:6px 16px;border-radius:20px;z-index:500;transition:opacity 0.3s;white-space:nowrap;pointer-events:none';
+    el.style.cssText='position:fixed;bottom:calc(130px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#1A1A18;color:#fff;font-size:12px;font-weight:600;padding:6px 16px;border-radius:20px;z-index:500;transition:opacity 0.3s;white-space:nowrap;pointer-events:none';
     document.body.appendChild(el);
   }
   el.textContent=msg;
@@ -716,7 +842,7 @@ function showSyncStatus(msg,hideAfter){
 
 function render(){
   applyEditMode();
-  renderHome();renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();renderGoalFunds();
+  renderHome();renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();renderGoalFunds();renderFamilyHome();
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
   document.getElementById('topSub').textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופה: ₪'+fundTotal().toLocaleString();
@@ -741,6 +867,139 @@ function renderOpenList(){
   const open=events.filter(e=>e.open);
   document.getElementById('openList').innerHTML=open.length?open.map(evCard).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`;
 }
+function switchShell(s){
+  currentShell=s;
+  document.body.classList.toggle('at-home',s==='home');
+  document.getElementById('mn-home').classList.toggle('mn-active',s==='home');
+  document.getElementById('mn-pay').classList.toggle('mn-active',s==='pay');
+  if(s==='home')renderFamilyHome();
+}
+
+const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const HEB_DAYS_SHORT=['א\'','ב\'','ג\'','ד\'','ה\'','ו\'','ש\''];
+
+function renderFamilyHome(){
+  const sub=document.getElementById('fhSub');
+  if(sub){
+    const openCount=events.filter(e=>e.open).length;
+    const famCount=families.length;
+    sub.textContent=[famCount?famCount+' משפחות':'',openCount?openCount+' אירועים פעילים':''].filter(Boolean).join(' · ')||'ברוכים הבאים';
+  }
+  const calAddRow=document.getElementById('calAddRow');
+  if(calAddRow)calAddRow.style.display=editMode?'flex':'none';
+  renderMessages();
+  renderCalendar();
+}
+
+function fmtTs(ts){
+  const d=new Date(ts);
+  return d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+}
+
+function sendMessage(){
+  const aEl=document.getElementById('msgAuthor');
+  const tEl=document.getElementById('msgText');
+  const author=aEl.value.trim();
+  const text=tEl.value.trim();
+  if(!author||!text)return;
+  messages.push({id:nxtMsg++,author,text,ts:Date.now()});
+  aEl.value='';tEl.value='';
+  save();renderMessages();
+}
+
+function deleteMsg(id){
+  if(!editMode)return;
+  messages=messages.filter(m=>m.id!==id);
+  save();renderMessages();
+}
+
+function renderMessages(){
+  const el=document.getElementById('msgList');if(!el)return;
+  if(!messages.length){
+    el.innerHTML='<div style="padding:16px 0;text-align:center;color:var(--text3);font-size:13px">עדיין אין הודעות — היה הראשון! 💌</div>';
+    return;
+  }
+  el.innerHTML=[...messages].reverse().map(m=>`
+    <div class="msg-item">
+      <div class="msg-author-row">
+        <span class="msg-author">${esc(m.author)}</span>
+        <span class="msg-ts">${fmtTs(m.ts)}</span>
+        ${editMode?`<button onclick="deleteMsg(${m.id})" style="margin-right:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0">🗑</button>`:''}
+      </div>
+      <div class="msg-text">${esc(m.text)}</div>
+    </div>`).join('');
+}
+
+function prevCalMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();}
+function nextCalMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();}
+
+function renderCalendar(){
+  const gridEl=document.getElementById('calGrid');
+  const titleEl=document.getElementById('calTitle');
+  if(!gridEl)return;
+  titleEl.textContent=HEB_MONTHS[calMonth]+' '+calYear;
+  const todayStr=new Date().toISOString().slice(0,10);
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  let html=HEB_DAYS_SHORT.map(d=>`<div class="fh-cal-dow">${d}</div>`).join('');
+  for(let i=0;i<firstDay;i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=ds===todayStr;
+    const isSel=calSelDay===ds&&!isToday;
+    const hasEv=calItems.some(c=>c.date===ds);
+    const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':''].filter(Boolean).join(' ');
+    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">${d}</div>`;
+  }
+  gridEl.innerHTML=html;
+  renderCalEvList();
+}
+
+function selectCalDay(ds){
+  calSelDay=calSelDay===ds?null:ds;
+  renderCalendar();
+}
+
+function renderCalEvList(){
+  const el=document.getElementById('calEvList');if(!el)return;
+  const monthStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}`;
+  let list=calSelDay
+    ?calItems.filter(c=>c.date===calSelDay)
+    :calItems.filter(c=>c.date.startsWith(monthStr)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!list.length){el.innerHTML='';return;}
+  el.innerHTML=list.map(c=>{
+    const d=new Date(c.date+'T00:00:00');
+    const lbl=d.toLocaleDateString('he-IL',{day:'numeric',month:'short'});
+    return`<div class="fh-cal-ev">
+      <div class="fh-cal-ev-dot" style="background:${c.color||'var(--blue-mid)'}"></div>
+      <div class="fh-cal-ev-info">
+        <div class="fh-cal-ev-name">${esc(c.title)}</div>
+        <div class="fh-cal-ev-date">${lbl}</div>
+      </div>
+      ${editMode?`<button onclick="deleteCalItem(${c.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px">✕</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+function addCalItem(){
+  const tEl=document.getElementById('calAddTitle');
+  const dEl=document.getElementById('calAddDate');
+  const title=tEl.value.trim();
+  const date=dEl.value;
+  if(!title||!date)return;
+  const colors=['#1E88D8','#1D9E75','#E53935','#8E24AA','#F4511E','#F6BF26'];
+  const color=colors[calItems.length%colors.length];
+  calItems.push({id:nxtCal++,title,date,color});
+  tEl.value='';dEl.value='';
+  save();renderCalendar();
+}
+
+function deleteCalItem(id){
+  if(!editMode)return;
+  calItems=calItems.filter(c=>c.id!==id);
+  save();renderCalendar();
+}
+
 function renderHome(){
   const open=events.filter(e=>e.open);
 
@@ -2252,6 +2511,7 @@ function applyEditMode(){
   document.body.classList.toggle('edit-mode',editMode);
   const icon=document.getElementById('lockIcon');
   if(icon)icon.textContent=editMode?'🔓':'🔒';
+  if(currentShell==='home')renderFamilyHome();
 }
 function openLockModal(){
   renderLockModal(editMode?'lock':adminPass?'unlock':'set');

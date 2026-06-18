@@ -1,5 +1,5 @@
-const CACHE = 'family-pay-v2';
-const CORE = ['./','./index.html','./manifest.json','./icon.svg'];
+const CACHE = 'family-pay-v3';
+const CORE = ['./','./index.html','./manifest.json','./icon.svg','./icon.jpg','./sw.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
