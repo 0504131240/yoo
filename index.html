@@ -729,6 +729,7 @@ let events=[];
 let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
+let expandedPotFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null;
 let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
@@ -1610,9 +1611,29 @@ function evCard(ev){
     <button onclick="releasePotToOne(${ev.id},${c.fid},false)" style="padding:3px 7px;border-radius:5px;border:none;background:var(--blue-mid);color:#fff;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
     <button onclick="releasePotToOne(${ev.id},${c.fid},true)" style="padding:3px 7px;border-radius:5px;border:none;background:var(--green-mid);color:#fff;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
   </div>`).join('');
+  const potByFam={};
+  potPayments.forEach(p=>{if(!potByFam[p.famId])potByFam[p.famId]=[];potByFam[p.famId].push(p);});
+  const famPayRows=Object.entries(potByFam).map(([fidStr,payments])=>{
+    const fid=parseInt(fidStr);const pf=getFam(fid);if(!pf)return'';
+    const name=pf.name.replace('משפחת','').trim();
+    const total=payments.reduce((s,p)=>s+p.amt,0);
+    const multi=payments.length>1;
+    const key=ev.id+'-pot-'+fid;
+    const isExp=expandedPotFamilies.has(key);
+    const details=multi&&isExp?'<div style="padding:4px 0 2px 14px;border-top:1px solid rgba(180,130,0,.15);margin-top:3px">'
+      +payments.map((p,i)=>`<div style="font-size:10px;color:var(--text2);padding:1px 0">תשלום ${i+1}: ₪${p.amt.toLocaleString()}</div>`).join('')
+      +'</div>':'';
+    return`<div style="margin-bottom:${multi?'1':'0'}px">
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px">
+        <span style="color:var(--green-mid)">✓</span>
+        <span style="flex:1;color:var(--text2)"><b style="color:var(--text)">${esc(name)}</b> שילם ₪${total.toLocaleString()}</span>
+        ${multi?`<button onclick="togglePotFamily(${ev.id},${fid})" style="background:none;border:none;font-size:10px;color:var(--amber);cursor:pointer;padding:0 3px;font-weight:700;font-family:var(--font)">${isExp?'▲':'▼ '+payments.length}</button>`:''}
+      </div>${details}
+    </div>`;
+  }).join('');
   const potHtml=hasPot?`<div style="margin:8px 0 0;background:var(--amber-bg);border-radius:var(--r2);padding:8px 10px">
     <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:4px">💰 קופת האירוע · ₪${potTotal.toLocaleString()}</div>
-    ${potPayments.map(p=>{const pf=getFam(p.famId);return`<div style="font-size:11px;color:var(--text2)">✓ ${esc(pf.name.replace('משפחת','').trim())} שילם ₪${p.amt.toLocaleString()}</div>`;}).join('')}
+    ${famPayRows}
     ${potTransfers.length?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(180,130,0,0.2)">
       <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:4px">יש להעביר:</div>
       ${creditorRowsHtml}
@@ -2697,6 +2718,14 @@ function toggleCumFamily(evId,famId){
   const key=evId+'-'+famId;
   if(expandedCumFamilies.has(key))expandedCumFamilies.delete(key);
   else expandedCumFamilies.add(key);
+  const el=document.getElementById('ecard-'+evId);
+  const ev=events.find(e=>e.id===evId);
+  if(el&&ev)el.outerHTML=evCard(ev);
+}
+function togglePotFamily(evId,famId){
+  const key=evId+'-pot-'+famId;
+  if(expandedPotFamilies.has(key))expandedPotFamilies.delete(key);
+  else expandedPotFamilies.add(key);
   const el=document.getElementById('ecard-'+evId);
   const ev=events.find(e=>e.id===evId);
   if(el&&ev)el.outerHTML=evCard(ev);
