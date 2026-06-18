@@ -912,7 +912,8 @@ function switchShell(s){
 }
 
 const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-const HEB_DAYS_SHORT=['א\'','ב\'','ג\'','ד\'','ה\'','ו\'','ש\''];
+const HEB_DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
+const LAT_DAYS_SHORT=["א'","ב'","ג'","ד'","ה'","ו'","ש'"];
 
 function renderFamilyHome(){
   const sub=document.getElementById('fhSub');
@@ -1035,7 +1036,8 @@ function renderCalendar(){
   const todayStr=new Date().toISOString().slice(0,10);
   const firstDay=new Date(calYear,calMonth,1).getDay();
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
-  let html=HEB_DAYS_SHORT.map(d=>`<div class="fh-cal-dow">${d}</div>`).join('');
+  const dowLabels=calHebrew?HEB_DAYS_SHORT:LAT_DAYS_SHORT;
+  let html=dowLabels.map(d=>`<div class="fh-cal-dow">${d}</div>`).join('');
   for(let i=0;i<firstDay;i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
