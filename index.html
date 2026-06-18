@@ -309,16 +309,9 @@ body:not(.at-home){padding-bottom:140px}
   <div class="fh-card">
     <div class="fh-card-hdr">
       <span class="fh-card-title">💌 לוח הודעות וברכות</span>
+      <button onclick="openMsgModal()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">+ הוסף</button>
     </div>
     <div class="msg-list" id="msgList"></div>
-    <div class="msg-compose">
-      <input id="msgAuthor" placeholder="שמך (אופציונלי)" maxlength="40">
-      <textarea id="msgText" placeholder="כתוב הודעה או ברכה..." maxlength="500" oninput="document.getElementById('msgCharCount').textContent=this.value.length+'/500'"></textarea>
-      <div class="msg-send-row">
-        <span style="font-size:11px;color:var(--text3)" id="msgCharCount"></span>
-        <button class="msg-send-btn" onclick="sendMessage()">שלח ›</button>
-      </div>
-    </div>
   </div>
 
   <!-- Calendar -->
@@ -330,10 +323,45 @@ body:not(.at-home){padding-bottom:140px}
     </div>
     <div class="fh-cal-grid" id="calGrid"></div>
     <div class="fh-cal-evlist" id="calEvList"></div>
-    <div class="fh-cal-add-row edit-only" id="calAddRow" style="display:none">
-      <input id="calAddTitle" placeholder="שם האירוע" style="flex:1">
-      <input id="calAddDate" type="date" style="width:140px">
-      <button onclick="addCalItem()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:9px 14px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ הוסף</button>
+    <div style="padding:0 14px 14px">
+      <button onclick="openCalModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ הוסף אירוע ללוח שנה</button>
+    </div>
+  </div>
+</div>
+
+<!-- Message modal -->
+<div id="msgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeMsgModal()">
+  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px">💌 הוסף הודעה</div>
+    <div class="field" style="margin-bottom:10px">
+      <input id="msgAuthor" placeholder="שמך (אופציונלי)" maxlength="40" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <textarea id="msgText" placeholder="כתוב הודעה או ברכה..." maxlength="500" oninput="document.getElementById('msgCharCount').textContent=this.value.length+'/500'" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box;min-height:90px;resize:none"></textarea>
+      <div style="font-size:11px;color:var(--text3);text-align:left;margin-top:3px" id="msgCharCount"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="sendMessage()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח</button>
+      <button onclick="closeMsgModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar event modal -->
+<div id="calModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCalModal()">
+  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px">📅 הוסף אירוע</div>
+    <div class="field" style="margin-bottom:10px">
+      <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">שם האירוע</label>
+      <input id="calAddTitle" placeholder="לדוגמה: יום הולדת, חתונה..." style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">תאריך</label>
+      <input id="calAddDate" type="date" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="addCalItem()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">הוסף</button>
+      <button onclick="closeCalModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
   </div>
 </div>
@@ -896,6 +924,16 @@ function fmtTs(ts){
   return d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
 }
 
+function openMsgModal(){
+  document.getElementById('msgModal').style.display='flex';
+  setTimeout(()=>{const i=document.getElementById('msgAuthor');if(i)i.focus();},50);
+}
+function closeMsgModal(){
+  document.getElementById('msgModal').style.display='none';
+  document.getElementById('msgAuthor').value='';
+  document.getElementById('msgText').value='';
+  document.getElementById('msgCharCount').textContent='';
+}
 function sendMessage(){
   const aEl=document.getElementById('msgAuthor');
   const tEl=document.getElementById('msgText');
@@ -903,8 +941,19 @@ function sendMessage(){
   const text=tEl.value.trim();
   if(!text)return;
   messages.push({id:nxtMsg++,author,text,ts:Date.now()});
-  aEl.value='';tEl.value='';
   save();renderMessages();
+  closeMsgModal();
+}
+function openCalModal(){
+  const dEl=document.getElementById('calAddDate');
+  if(calSelDay)dEl.value=calSelDay;
+  document.getElementById('calModal').style.display='flex';
+  setTimeout(()=>{const i=document.getElementById('calAddTitle');if(i)i.focus();},50);
+}
+function closeCalModal(){
+  document.getElementById('calModal').style.display='none';
+  document.getElementById('calAddTitle').value='';
+  document.getElementById('calAddDate').value='';
 }
 
 function deleteMsg(id){
@@ -976,7 +1025,7 @@ function renderCalEvList(){
         <div class="fh-cal-ev-name">${esc(c.title)}</div>
         <div class="fh-cal-ev-date">${lbl}</div>
       </div>
-      ${editMode?`<button onclick="deleteCalItem(${c.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px">✕</button>`:''}
+      <button onclick="deleteCalItem(${c.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>
     </div>`;
   }).join('');
 }
@@ -990,12 +1039,12 @@ function addCalItem(){
   const colors=['#1E88D8','#1D9E75','#E53935','#8E24AA','#F4511E','#F6BF26'];
   const color=colors[calItems.length%colors.length];
   calItems.push({id:nxtCal++,title,date,color});
-  tEl.value='';dEl.value='';
   save();renderCalendar();
+  closeCalModal();
 }
 
 function deleteCalItem(id){
-  if(!editMode)return;
+  if(!confirm('למחוק אירוע זה?'))return;
   calItems=calItems.filter(c=>c.id!==id);
   save();renderCalendar();
 }
