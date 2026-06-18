@@ -320,7 +320,7 @@ body:not(.at-home){padding-bottom:140px}
   <!-- Calendar -->
   <div class="fh-card" style="margin-bottom:14px">
     <div class="fh-cal-nav">
-      <button class="fh-cal-arrow" onclick="nextCalMonth()">‹</button>
+      <button class="fh-cal-arrow" onclick="prevCalMonth()">›</button>
       <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
         <span class="fh-cal-month" id="calTitle"></span>
         <div style="display:flex;border:1.5px solid var(--border);border-radius:20px;overflow:hidden;font-size:10px;font-weight:700">
@@ -328,7 +328,7 @@ body:not(.at-home){padding-bottom:140px}
           <button id="calToggleLat" onclick="setCalMode(false)" style="padding:2px 9px;border:none;font-family:var(--font);cursor:pointer;font-size:10px;font-weight:700;transition:background .15s">לועזי</button>
         </div>
       </div>
-      <button class="fh-cal-arrow" onclick="prevCalMonth()">›</button>
+      <button class="fh-cal-arrow" onclick="nextCalMonth()">‹</button>
     </div>
     <div class="fh-cal-grid" id="calGrid"></div>
     <div class="fh-cal-evlist" id="calEvList"></div>
@@ -727,6 +727,7 @@ let birthdays=[];
 let nxtMsg=1,nxtCal=1,nxtBday=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
+let calHebRefDate=new Date();
 let fundTxOpen=false;
 let settleModalEvId=null,potModalEvId=null;
 let adminPass='';
@@ -1032,12 +1033,37 @@ function renderMessages(){
     </div>`).join('');
 }
 
-function prevCalMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();}
-function nextCalMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();}
+function prevCalMonth(){
+  if(calHebrew){calHebRefDate=new Date(calHebRefDate);calHebRefDate.setDate(calHebRefDate.getDate()-29);}
+  else{calMonth--;if(calMonth<0){calMonth=11;calYear--;}}
+  renderCalendar();
+}
+function nextCalMonth(){
+  if(calHebrew){calHebRefDate=new Date(calHebRefDate);calHebRefDate.setDate(calHebRefDate.getDate()+29);}
+  else{calMonth++;if(calMonth>11){calMonth=0;calYear++;}}
+  renderCalendar();
+}
 
 function setCalMode(hebrew){
+  if(hebrew&&!calHebrew) calHebRefDate=new Date(calYear,calMonth,15);
+  else if(!hebrew&&calHebrew){calYear=calHebRefDate.getFullYear();calMonth=calHebRefDate.getMonth();}
   calHebrew=hebrew;
   renderCalendar();
+}
+
+function getHebMonthDays(refDate){
+  const mFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'});
+  const target=mFmt.format(refDate);
+  let start=new Date(refDate);
+  for(let i=0;i<32;i++){
+    const prev=new Date(start);prev.setDate(prev.getDate()-1);
+    if(mFmt.format(prev)!==target)break;
+    start=prev;
+  }
+  const days=[];
+  let cur=new Date(start);
+  while(mFmt.format(cur)===target){days.push(new Date(cur));cur=new Date(cur);cur.setDate(cur.getDate()+1);}
+  return days;
 }
 function toHebrewYear(hy){
   const y=hy%1000;
@@ -1068,44 +1094,60 @@ function renderCalendar(){
   const titleEl=document.getElementById('calTitle');
   if(!gridEl)return;
   _applyCalToggleStyle();
-  const hebFmt=(opts)=>new Intl.DateTimeFormat('he-IL-u-ca-hebrew',opts);
+  const todayStr=new Date().toISOString().slice(0,10);
+  let html='';
+  let hebDays=null;
   if(calHebrew){
-    const mid=new Date(calYear,calMonth,15);
-    const hebMonth=hebFmt({month:'long'}).format(mid);
-    const hebYearNum=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(mid));
+    hebDays=getHebMonthDays(calHebRefDate);
+    const first=hebDays[0];
+    const hebMonth=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(first);
+    const hebYearNum=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(first));
     titleEl.textContent=hebMonth+' '+toHebrewYear(hebYearNum);
+    html=HEB_DAYS_SHORT.map(d=>`<div class="fh-cal-dow">${d}</div>`).join('');
+    for(let i=0;i<first.getDay();i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
+    for(const dayDate of hebDays){
+      const ds=dayDate.toISOString().slice(0,10);
+      const hebDayNumInt=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'}).format(dayDate));
+      const label=HEB_DAY_NUM[hebDayNumInt]||String(hebDayNumInt);
+      const hebMonthName=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(dayDate);
+      const isToday=ds===todayStr;
+      const isSel=calSelDay===ds&&!isToday;
+      const evOnDay=calItems.filter(c=>c.date===ds);
+      const bdayOnDay=birthdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
+      const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;
+      const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
+      html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
+        <span style="font-size:10px;line-height:1">${label}</span>
+        ${hasEv?`<span class="fh-cal-day-ev">${evOnDay.map(c=>c.title.slice(0,5)).join(',')}</span>`:''}
+        ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayOnDay.map(b=>b.name.slice(0,4)).join(',')}</span>`:''}
+      </div>`;
+    }
   } else {
     titleEl.textContent=HEB_MONTHS[calMonth]+' '+calYear;
-  }
-  const todayStr=new Date().toISOString().slice(0,10);
-  const firstDay=new Date(calYear,calMonth,1).getDay();
-  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
-  const dowLabels=calHebrew?HEB_DAYS_SHORT:LAT_DAYS_SHORT;
-  let html=dowLabels.map(d=>`<div class="fh-cal-dow">${d}</div>`).join('');
-  for(let i=0;i<firstDay;i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
-  for(let d=1;d<=daysInMonth;d++){
-    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dayDate=new Date(calYear,calMonth,d);
-    const hebDayNumInt=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'}).format(dayDate));
-    const label=calHebrew?(HEB_DAY_NUM[hebDayNumInt]||String(hebDayNumInt)):String(d);
-    const hebMonthName=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(dayDate);
-    const isToday=ds===todayStr;
-    const isSel=calSelDay===ds&&!isToday;
-    const evOnDay=calItems.filter(c=>c.date===ds);
-    const bdayOnDay=birthdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
-    const hasEv=evOnDay.length>0;
-    const hasBday=bdayOnDay.length>0;
-    const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
-    const evNames=evOnDay.map(c=>c.title.slice(0,5)).join(',');
-    const bdayNames=bdayOnDay.map(b=>b.name.slice(0,4)).join(',');
-    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
-      <span style="font-size:${calHebrew?'10px':'12px'};line-height:1">${label}</span>
-      ${hasEv?`<span class="fh-cal-day-ev">${evNames}</span>`:''}
-      ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayNames}</span>`:''}
-    </div>`;
+    html=LAT_DAYS_SHORT.map(d=>`<div class="fh-cal-dow">${d}</div>`).join('');
+    const firstDay=new Date(calYear,calMonth,1).getDay();
+    const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+    for(let i=0;i<firstDay;i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
+    for(let d=1;d<=daysInMonth;d++){
+      const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dayDate=new Date(calYear,calMonth,d);
+      const hebDayNumInt=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'}).format(dayDate));
+      const hebMonthName=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(dayDate);
+      const isToday=ds===todayStr;
+      const isSel=calSelDay===ds&&!isToday;
+      const evOnDay=calItems.filter(c=>c.date===ds);
+      const bdayOnDay=birthdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
+      const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;
+      const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
+      html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
+        <span style="font-size:12px;line-height:1">${d}</span>
+        ${hasEv?`<span class="fh-cal-day-ev">${evOnDay.map(c=>c.title.slice(0,5)).join(',')}</span>`:''}
+        ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayOnDay.map(b=>b.name.slice(0,4)).join(',')}</span>`:''}
+      </div>`;
+    }
   }
   gridEl.innerHTML=html;
-  renderCalEvList();
+  renderCalEvList(hebDays);
 }
 
 function selectCalDay(ds){
@@ -1113,12 +1155,18 @@ function selectCalDay(ds){
   renderCalendar();
 }
 
-function renderCalEvList(){
+function renderCalEvList(hebDays){
   const el=document.getElementById('calEvList');if(!el)return;
-  const monthStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}`;
-  let list=calSelDay
-    ?calItems.filter(c=>c.date===calSelDay)
-    :calItems.filter(c=>c.date.startsWith(monthStr)).sort((a,b)=>a.date.localeCompare(b.date));
+  let list;
+  if(calSelDay){
+    list=calItems.filter(c=>c.date===calSelDay);
+  } else if(hebDays){
+    const ds=new Set(hebDays.map(d=>d.toISOString().slice(0,10)));
+    list=calItems.filter(c=>ds.has(c.date)).sort((a,b)=>a.date.localeCompare(b.date));
+  } else {
+    const monthStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}`;
+    list=calItems.filter(c=>c.date.startsWith(monthStr)).sort((a,b)=>a.date.localeCompare(b.date));
+  }
   if(!list.length){el.innerHTML='';return;}
   el.innerHTML=list.map(c=>{
     const d=new Date(c.date+'T00:00:00');
