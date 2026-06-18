@@ -1795,14 +1795,17 @@ function calcPotTransfers(ev){
 }
 function calcPotExcessByFamily(ev){
   const pots=ev.potPayments||[];if(!pots.length)return{};
-  const baseBal=evAdjBalance({...ev,potPayments:[]});
+  // Group total pot per family
   const potByFam={};
   pots.forEach(p=>{potByFam[p.famId]=(potByFam[p.famId]||0)+p.amt;});
+  // What was actually distributed from each family to creditors
+  const distributed={};
+  calcPotTransfers(ev).forEach(t=>{distributed[t.fromFid]=(distributed[t.fromFid]||0)+t.amt;});
+  // Excess = what they put in - what actually went to creditors
   const result={};
   Object.entries(potByFam).forEach(([fidStr,potAmt])=>{
     const fid=parseInt(fidStr);
-    const debt=Math.max(0,-(baseBal[fid]||0));
-    const exc=Math.round(potAmt-Math.min(potAmt,debt));
+    const exc=Math.round(potAmt-(distributed[fid]||0));
     if(exc>0.5) result[fid]=exc;
   });
   return result;
@@ -2894,7 +2897,7 @@ function renderPotModal(ev){
     </div>
     <div style="padding:8px 16px 4px;border-bottom:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">הפקדות:</div>
-      ${potPayments.map(p=>{const pf=getFam(p.famId);return`<div style="font-size:13px;padding:3px 0;color:var(--text)">✓ ${esc(pf.name.replace('משפחת','').trim())} ₪${p.amt.toLocaleString()}</div>`;}).join('')}
+      ${(()=>{const byFam={};potPayments.forEach(p=>{byFam[p.famId]=(byFam[p.famId]||0)+p.amt;});return Object.entries(byFam).map(([fidStr,tot])=>{const pf=getFam(parseInt(fidStr));if(!pf)return'';return`<div style="font-size:13px;padding:3px 0;color:var(--text)">✓ ${esc(pf.name.replace('משפחת','').trim())} ₪${tot.toLocaleString()}</div>`;}).join('');})()}
     </div>
     ${potTransfers.length?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
     ${excessRows}
