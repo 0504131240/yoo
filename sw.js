@@ -1,4 +1,4 @@
-const CACHE = 'family-pay-v1';
+const CACHE = 'family-pay-v2';
 const CORE = ['./','./index.html','./manifest.json','./icon.svg'];
 
 self.addEventListener('install', e => {
