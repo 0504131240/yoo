@@ -318,7 +318,13 @@ body:not(.at-home){padding-bottom:140px}
   <div class="fh-card" style="margin-bottom:14px">
     <div class="fh-cal-nav">
       <button class="fh-cal-arrow" onclick="nextCalMonth()">‹</button>
-      <span class="fh-cal-month" id="calTitle"></span>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span class="fh-cal-month" id="calTitle"></span>
+        <div style="display:flex;border:1.5px solid var(--border);border-radius:20px;overflow:hidden;font-size:10px;font-weight:700">
+          <button id="calToggleHeb" onclick="setCalMode(true)" style="padding:2px 9px;border:none;font-family:var(--font);cursor:pointer;font-size:10px;font-weight:700;transition:background .15s">עברי</button>
+          <button id="calToggleLat" onclick="setCalMode(false)" style="padding:2px 9px;border:none;font-family:var(--font);cursor:pointer;font-size:10px;font-weight:700;transition:background .15s">לועזי</button>
+        </div>
+      </div>
       <button class="fh-cal-arrow" onclick="prevCalMonth()">›</button>
     </div>
     <div class="fh-cal-grid" id="calGrid"></div>
@@ -682,7 +688,7 @@ let messages=[];
 let calItems=[];
 let nxtMsg=1,nxtCal=1;
 let currentShell='home';
-let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null;
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
 let fundTxOpen=false;
 let settleModalEvId=null,potModalEvId=null;
 let adminPass='';
@@ -982,13 +988,30 @@ function renderMessages(){
 function prevCalMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();}
 function nextCalMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();}
 
+function setCalMode(hebrew){
+  calHebrew=hebrew;
+  renderCalendar();
+}
+function _applyCalToggleStyle(){
+  const hBtn=document.getElementById('calToggleHeb');
+  const lBtn=document.getElementById('calToggleLat');
+  if(!hBtn||!lBtn)return;
+  hBtn.style.background=calHebrew?'var(--blue-mid)':'transparent';
+  hBtn.style.color=calHebrew?'#fff':'var(--text2)';
+  lBtn.style.background=!calHebrew?'var(--blue-mid)':'transparent';
+  lBtn.style.color=!calHebrew?'#fff':'var(--text2)';
+}
 function renderCalendar(){
   const gridEl=document.getElementById('calGrid');
   const titleEl=document.getElementById('calTitle');
   if(!gridEl)return;
+  _applyCalToggleStyle();
   const hebFmt=(opts)=>new Intl.DateTimeFormat('he-IL-u-ca-hebrew',opts);
-  const mid=new Date(calYear,calMonth,15);
-  titleEl.textContent=hebFmt({month:'long',year:'numeric'}).format(mid);
+  if(calHebrew){
+    titleEl.textContent=hebFmt({month:'long',year:'numeric'}).format(new Date(calYear,calMonth,15));
+  } else {
+    titleEl.textContent=HEB_MONTHS[calMonth]+' '+calYear;
+  }
   const todayStr=new Date().toISOString().slice(0,10);
   const firstDay=new Date(calYear,calMonth,1).getDay();
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
@@ -996,12 +1019,14 @@ function renderCalendar(){
   for(let i=0;i<firstDay;i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const hebrewDay=hebFmt({day:'numeric'}).format(new Date(calYear,calMonth,d));
+    const label=calHebrew
+      ?hebFmt({day:'numeric'}).format(new Date(calYear,calMonth,d))
+      :String(d);
     const isToday=ds===todayStr;
     const isSel=calSelDay===ds&&!isToday;
     const hasEv=calItems.some(c=>c.date===ds);
     const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':''].filter(Boolean).join(' ');
-    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')" style="font-size:10px">${hebrewDay}</div>`;
+    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')" style="font-size:${calHebrew?'10px':'12px'}">${label}</div>`;
   }
   gridEl.innerHTML=html;
   renderCalEvList();
