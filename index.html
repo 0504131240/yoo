@@ -272,15 +272,17 @@ body:not(.at-home){padding-bottom:140px}
 .fh-cal-nav{padding:10px 14px 2px;display:flex;align-items:center;justify-content:space-between}
 .fh-cal-month{font-size:14px;font-weight:700;color:var(--text)}
 .fh-cal-arrow{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);padding:2px 8px;line-height:1}
-.fh-cal-grid{padding:2px 10px 6px;display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
-.fh-cal-dow{text-align:center;font-size:9px;font-weight:700;color:var(--text3);padding:2px 0}
-.fh-cal-day{height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:11px;cursor:pointer;position:relative;font-weight:500;color:var(--text)}
+.fh-cal-grid{padding:4px 8px 8px;display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.fh-cal-dow{text-align:center;font-size:9px;font-weight:700;color:var(--text3);padding:3px 0}
+.fh-cal-day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-radius:10px;font-size:11px;cursor:pointer;position:relative;font-weight:600;color:var(--text);padding:3px 1px;box-sizing:border-box}
 .fh-cal-day:hover{background:var(--surface2)}
 .fh-cal-day.today{background:var(--blue-mid)!important;color:#fff!important;font-weight:800}
-.fh-cal-day.has-ev::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--amber)}
-.fh-cal-day.today.has-ev::after{background:rgba(255,255,255,.8)}
-.fh-cal-day.other-m{color:var(--text3);opacity:.4}
-.fh-cal-day.sel{background:var(--blue-bg);color:var(--blue-mid);font-weight:700}
+.fh-cal-day.has-ev{background:var(--amber-bg)}
+.fh-cal-day.today.has-ev{background:var(--blue-mid)!important}
+.fh-cal-day-ev{font-size:7px;font-weight:700;color:var(--amber);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:0 2px;line-height:1.1}
+.fh-cal-day.today .fh-cal-day-ev{color:rgba(255,255,255,.85)}
+.fh-cal-day.other-m{color:var(--text3);opacity:.35}
+.fh-cal-day.sel{background:var(--blue-bg)!important;color:var(--blue-mid);font-weight:700}
 .fh-cal-day.empty{cursor:default}
 .fh-cal-evlist{padding:0 14px 14px;display:flex;flex-direction:column;gap:6px;min-height:4px}
 .fh-cal-ev{background:var(--surface2);border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:8px}
@@ -1042,9 +1044,14 @@ function renderCalendar(){
       :String(d);
     const isToday=ds===todayStr;
     const isSel=calSelDay===ds&&!isToday;
-    const hasEv=calItems.some(c=>c.date===ds);
+    const evOnDay=calItems.filter(c=>c.date===ds);
+    const hasEv=evOnDay.length>0;
     const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':''].filter(Boolean).join(' ');
-    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')" style="font-size:${calHebrew?'10px':'12px'}">${label}</div>`;
+    const evNames=evOnDay.map(c=>c.title.slice(0,5)).join(',');
+    html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
+      <span style="font-size:${calHebrew?'10px':'12px'};line-height:1">${label}</span>
+      ${hasEv?`<span class="fh-cal-day-ev">${evNames}</span>`:''}
+    </div>`;
   }
   gridEl.innerHTML=html;
   renderCalEvList();
