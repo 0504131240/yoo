@@ -2807,6 +2807,13 @@ function togglePotFamily(evId,famId){
   const ev=events.find(e=>e.id===evId);
   if(el&&ev)el.outerHTML=evCard(ev);
 }
+function togglePotModalFamily(evId,famId){
+  const key=evId+'-pot-'+famId;
+  if(expandedPotFamilies.has(key))expandedPotFamilies.delete(key);
+  else expandedPotFamilies.add(key);
+  const ev=events.find(e=>e.id===evId);
+  if(ev)renderPotModal(ev);
+}
 // ── Settle modal ──────────────────────────────
 function openSettleModal(evId){
   settleModalEvId=evId;
@@ -2898,7 +2905,7 @@ function renderPotModal(ev){
     </div>
     <div style="padding:8px 16px 4px;border-bottom:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">הפקדות:</div>
-      ${(()=>{const byFam={};potPayments.forEach(p=>{byFam[p.famId]=(byFam[p.famId]||0)+p.amt;});return Object.entries(byFam).map(([fidStr,tot])=>{const pf=getFam(parseInt(fidStr));if(!pf)return'';return`<div style="font-size:13px;padding:3px 0;color:var(--text)">✓ ${esc(pf.name.replace('משפחת','').trim())} ₪${tot.toLocaleString()}</div>`;}).join('');})()}
+      ${(()=>{const byFam={};const ord=[];potPayments.forEach(p=>{if(!byFam[p.famId]){byFam[p.famId]=[];ord.push(p.famId);}byFam[p.famId].push(p);});return ord.map(fid=>{const pmnts=byFam[fid];const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const tot=pmnts.reduce((s,p)=>s+p.amt,0);const multi=pmnts.length>1;const key=ev.id+'-pot-'+fid;const isExp=expandedPotFamilies.has(key);const details=multi&&isExp?'<div style="padding:2px 0 2px 16px">'+pmnts.map((p,i)=>`<div style="font-size:11px;color:var(--text2);padding:1px 0">תשלום ${i+1}: ₪${p.amt.toLocaleString()}</div>`).join('')+'</div>':'';return`<div style="padding:2px 0"><div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text)"><span style="color:var(--green-mid)">✓</span><span style="flex:1">${esc(name)} ₪${tot.toLocaleString()}</span>${multi?`<button onclick="togglePotModalFamily(${ev.id},${fid})" style="background:none;border:none;font-size:11px;color:var(--text2);cursor:pointer;padding:0 2px;font-family:var(--font)">${isExp?'▲':'▼ '+pmnts.length}</button>`:''}</div>${details}</div>`;}).join('');})()}
     </div>
     ${potTransfers.length?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
     ${excessRows}
