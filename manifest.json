@@ -1,6 +1,6 @@
 {
-  "name": "תשלומים משפחתיים",
-  "short_name": "תשלומים",
+  "name": "ינקלביץ",
+  "short_name": "ינקלביץ",
   "description": "ניהול תשלומים ואירועים משפחתיים",
   "start_url": "./",
   "scope": "./",
@@ -12,15 +12,15 @@
   "lang": "he",
   "icons": [
     {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
       "purpose": "maskable"
     }
   ]
