@@ -908,7 +908,7 @@ function sendMessage(){
 }
 
 function deleteMsg(id){
-  if(!editMode)return;
+  if(!confirm('למחוק הודעה זו?'))return;
   messages=messages.filter(m=>m.id!==id);
   save();renderMessages();
 }
@@ -924,7 +924,7 @@ function renderMessages(){
       <div class="msg-author-row">
         ${m.author?`<span class="msg-author">${esc(m.author)}</span>`:''}
         <span class="msg-ts">${fmtTs(m.ts)}</span>
-        ${editMode?`<button onclick="deleteMsg(${m.id})" style="margin-right:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0">🗑</button>`:''}
+        <button onclick="deleteMsg(${m.id})" style="margin-right:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:0;opacity:.5">🗑</button>
       </div>
       <div class="msg-text">${esc(m.text)}</div>
     </div>`).join('');
