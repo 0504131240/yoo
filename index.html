@@ -2887,7 +2887,8 @@ function renderPotModal(ev){
     const name=pf.name.replace('משפחת','').trim();
     return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--blue-bg)">
       <div style="font-size:13px;flex:1">↩ <b>${esc(name)}</b> מקבל החזר ₪${exc.toLocaleString()}</div>
-      <button class="edit-only" onclick="releasePotExcessM(${ev.id})" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
+      <button class="edit-only" onclick="releasePotExcessToOneM(${ev.id},${fid},false)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
+      <button class="edit-only" onclick="releasePotExcessToOneM(${ev.id},${fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
     </div>`;
   }).join('');
   el.innerHTML=`
@@ -2945,6 +2946,31 @@ function releasePotExcess(evId){
 function releasePotExcessM(evId){
   releasePotExcess(evId);
   closePotModal();
+}
+function releasePotExcessToOne(evId,famId,toFund){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const excessByFam=calcPotExcessByFamily(ev);
+  const exc=excessByFam[famId];if(!exc||exc<0.5)return;
+  if(toFund){
+    const fam=getFam(famId);if(!fam)return;
+    const key=String(famId);
+    fund.famBalances[key]=(fund.famBalances[key]||0)+exc;
+    fund.transactions.push({id:nxtTx++,type:'deposit',famId,amount:exc,
+      desc:'החזר עודף מקופת האירוע · '+ev.name,
+      date:new Date().toLocaleDateString('he-IL')});
+  }
+  // Trim this family's potPayments to only the amount that was actually distributed to creditors
+  const distributed={};
+  calcPotTransfers(ev).forEach(t=>{distributed[t.fromFid]=(distributed[t.fromFid]||0)+t.amt;});
+  const effAmt=Math.round(distributed[famId]||0);
+  ev.potPayments=(ev.potPayments||[]).filter(p=>p.famId!==famId);
+  if(effAmt>0.5) ev.potPayments.push({famId,amt:effAmt});
+  save();render();
+}
+function releasePotExcessToOneM(evId,famId,toFund){
+  releasePotExcessToOne(evId,famId,toFund);
+  const ev=events.find(e=>e.id===evId);
+  if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
 }
 // ──────────────────────────────────────────
 function openCumPot(evId){
