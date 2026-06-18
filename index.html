@@ -740,7 +740,7 @@ let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=nu
 let calHebRefDate=new Date();
 let fundTxOpen=false;
 let settleModalEvId=null,potModalEvId=null;
-let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false;
+let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false,_ppPot=false;
 let adminPass='';
 let editMode=false;
 function toggleEvCollapse(evId){
@@ -1485,10 +1485,26 @@ function confirmPartPay(){
   const paid=Math.round(parseFloat(document.getElementById('partPayAmt').value)||0);
   if(paid<=0)return;
   if(paid>_ppMax+0.5){alert('הסכום גבוה מהנדרש');return;}
-  if(_ppFund) markTransferFromFund(_ppEvId,_ppFrom,_ppFromFid,_ppTo,_ppToFid,paid);
+  if(_ppPot) payToPot(_ppEvId,_ppFromFid,paid);
+  else if(_ppFund) markTransferFromFund(_ppEvId,_ppFrom,_ppFromFid,_ppTo,_ppToFid,paid);
   else markTransferDirect(_ppEvId,_ppFrom,_ppTo,paid);
   if(_ppSettle){const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
   closePartPayModal();
+}
+function openPotPayModal(evId,famId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const f=getFam(famId);if(!f)return;
+  const adj=evAdjBalance(ev);
+  const owed=Math.round(Math.max(0,-(adj[famId]||0)));
+  if(owed<=0)return;
+  _ppEvId=evId;_ppFromFid=famId;_ppMax=owed;_ppPot=true;_ppFund=false;_ppSettle=false;
+  const name=f.name.replace('משפחת','').trim();
+  document.getElementById('partPayInfo').innerHTML=`<b>${esc(name)}</b> משלם לקופת האירוע<br>נדרש: <b style="color:var(--blue-mid)">₪${owed.toLocaleString()}</b>`;
+  const amtEl=document.getElementById('partPayAmt');
+  amtEl.value=owed;amtEl.max=owed;
+  updatePartPayRemain();
+  document.getElementById('partPayModal').style.display='flex';
+  setTimeout(()=>{amtEl.focus();amtEl.select();},50);
 }
 
 function evCard(ev){
@@ -1511,7 +1527,7 @@ function evCard(ev){
     const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
     const isDebtor=b<-0.5;
     const tagTag=isDebtor?'button':'span';
-    const tagClick=isDebtor?` onclick="payToPot(${ev.id},${fid})"` : '';
+    const tagClick=isDebtor?` onclick="openPotPayModal(${ev.id},${fid})"` : '';
     const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
     return`<div class="exp-input-row">
       ${famAva(f)}
@@ -1669,13 +1685,14 @@ function markSettled(evId,fid){
   ev.expenses[fid]=evShares(ev)[fid]||0;
   save();render();
 }
-function payToPot(evId,famId){
+function payToPot(evId,famId,amt){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   const adj=evAdjBalance(ev);
   const owed=Math.round(Math.max(0,-(adj[famId]||0)));
   if(owed<=0)return;
+  const payment=amt!=null?Math.min(Math.round(amt),owed):owed;
   if(!ev.potPayments)ev.potPayments=[];
-  ev.potPayments.push({famId,amt:owed});
+  ev.potPayments.push({famId,amt:payment});
   save();render();
 }
 function calcPotTransfers(ev){
