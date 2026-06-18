@@ -278,6 +278,7 @@ body:not(.at-home){padding-bottom:140px}
 .fh-cal-day:hover{background:var(--surface2)}
 .fh-cal-day.today{background:var(--blue-mid)!important;color:#fff!important;font-weight:800}
 .fh-cal-day.has-ev{background:var(--amber-bg)}
+.fh-cal-day.has-bday{background:#FDE8E8}
 .fh-cal-day.today.has-ev{background:var(--blue-mid)!important}
 .fh-cal-day-ev{font-size:7px;font-weight:700;color:var(--amber);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:0 2px;line-height:1.1}
 .fh-cal-day.today .fh-cal-day-ev{color:rgba(255,255,255,.85)}
@@ -335,6 +336,15 @@ body:not(.at-home){padding-bottom:140px}
       <button onclick="openCalModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ הוסף אירוע ללוח שנה</button>
     </div>
   </div>
+
+  <!-- Birthdays -->
+  <div class="fh-card" style="margin-bottom:14px">
+    <div class="fh-card-hdr">
+      <span class="fh-card-title">🎂 ימי הולדת עבריים</span>
+      <button onclick="openBdayModal()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">+ הוסף</button>
+    </div>
+    <div id="bdayList"></div>
+  </div>
 </div>
 
 <!-- Message modal -->
@@ -370,6 +380,31 @@ body:not(.at-home){padding-bottom:140px}
     <div style="display:flex;gap:8px">
       <button onclick="addCalItem()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">הוסף</button>
       <button onclick="closeCalModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- Birthday modal -->
+<div id="bdayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeBdayModal()">
+  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px">🎂 הוסף יום הולדת עברי</div>
+    <div class="field" style="margin-bottom:10px">
+      <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">שם</label>
+      <input id="bdayName" placeholder="שם בן/בת המשפחה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div class="field" style="flex:1">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">חודש</label>
+        <select id="bdayMonth" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box"></select>
+      </div>
+      <div class="field" style="flex:1">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">יום</label>
+        <select id="bdayDay" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box"></select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="saveBday()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">הוסף</button>
+      <button onclick="closeBdayModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
   </div>
 </div>
@@ -688,7 +723,8 @@ let addExpItemEvId=null,addExpItemFamId=null;
 let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
 let calItems=[];
-let nxtMsg=1,nxtCal=1;
+let birthdays=[];
+let nxtMsg=1,nxtCal=1,nxtBday=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
 let fundTxOpen=false;
@@ -797,6 +833,7 @@ function saveLocal(){
     localStorage.setItem('adminPass',adminPass);
     localStorage.setItem('messages',JSON.stringify(messages));
     localStorage.setItem('calItems',JSON.stringify(calItems));
+    localStorage.setItem('birthdays',JSON.stringify(birthdays));
   }catch(e){}
 }
 
@@ -807,7 +844,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass,messages,calItems});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass,messages,calItems,birthdays});
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
     console.warn('save failed:',e);
@@ -831,8 +868,10 @@ async function load(){
     adminPass=d.adminPass||'';
     messages=d.messages||[];
     calItems=d.calItems||[];
+    birthdays=d.birthdays||[];
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
+    nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
@@ -849,8 +888,10 @@ async function load(){
       const ap=localStorage.getItem('adminPass');if(ap)adminPass=ap;
       const msgs=localStorage.getItem('messages');if(msgs)messages=JSON.parse(msgs);
       const cals=localStorage.getItem('calItems');if(cals)calItems=JSON.parse(cals);
+      const bds=localStorage.getItem('birthdays');if(bds)birthdays=JSON.parse(bds);
       nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
       nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
+      nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
       nxtId=events.reduce((a,e)=>Math.max(a,e.id),0)+1;
       nxtFam=families.reduce((a,f)=>Math.max(a,f.id),0)+1;
       nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
@@ -915,6 +956,7 @@ const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','י
 const HEB_DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
 const LAT_DAYS_SHORT=["א'","ב'","ג'","ד'","ה'","ו'","ש'"];
 const HEB_DAY_NUM=['','א','ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב','יג','יד','טו','טז','יז','יח','יט','כ','כא','כב','כג','כד','כה','כו','כז','כח','כט','ל'];
+const HEB_MONTHS_LIST=['תשרי','חשוון','כסלו','טבת','שבט','אדר','אדר ב\'','ניסן','אייר','סיון','תמוז','אב','אלול'];
 
 function renderFamilyHome(){
   const sub=document.getElementById('fhSub');
@@ -927,6 +969,7 @@ function renderFamilyHome(){
   if(calAddRow)calAddRow.style.display=editMode?'flex':'none';
   renderMessages();
   renderCalendar();
+  renderBdayList();
 }
 
 function fmtTs(ts){
@@ -1042,18 +1085,23 @@ function renderCalendar(){
   for(let i=0;i<firstDay;i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const label=calHebrew
-      ?(()=>{const n=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'}).format(new Date(calYear,calMonth,d)));return HEB_DAY_NUM[n]||String(n);})()
-      :String(d);
+    const dayDate=new Date(calYear,calMonth,d);
+    const hebDayNumInt=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'}).format(dayDate));
+    const label=calHebrew?(HEB_DAY_NUM[hebDayNumInt]||String(hebDayNumInt)):String(d);
+    const hebMonthName=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(dayDate);
     const isToday=ds===todayStr;
     const isSel=calSelDay===ds&&!isToday;
     const evOnDay=calItems.filter(c=>c.date===ds);
+    const bdayOnDay=birthdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
     const hasEv=evOnDay.length>0;
-    const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':''].filter(Boolean).join(' ');
+    const hasBday=bdayOnDay.length>0;
+    const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
     const evNames=evOnDay.map(c=>c.title.slice(0,5)).join(',');
+    const bdayNames=bdayOnDay.map(b=>b.name.slice(0,4)).join(',');
     html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
       <span style="font-size:${calHebrew?'10px':'12px'};line-height:1">${label}</span>
       ${hasEv?`<span class="fh-cal-day-ev">${evNames}</span>`:''}
+      ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayNames}</span>`:''}
     </div>`;
   }
   gridEl.innerHTML=html;
@@ -1108,6 +1156,53 @@ function deleteCalItem(id){
   if(!confirm('למחוק אירוע זה?'))return;
   calItems=calItems.filter(c=>c.id!==id);
   save();renderCalendar();
+}
+
+function openBdayModal(){
+  const mSel=document.getElementById('bdayMonth');
+  const dSel=document.getElementById('bdayDay');
+  if(mSel&&!mSel.options.length){
+    HEB_MONTHS_LIST.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;mSel.appendChild(o);});
+  }
+  if(dSel&&!dSel.options.length){
+    for(let i=1;i<=30;i++){const o=document.createElement('option');o.value=i;o.textContent=HEB_DAY_NUM[i]+' ('+i+')';dSel.appendChild(o);}
+  }
+  document.getElementById('bdayName').value='';
+  document.getElementById('bdayModal').style.display='flex';
+  setTimeout(()=>{const i=document.getElementById('bdayName');if(i)i.focus();},50);
+}
+function closeBdayModal(){
+  document.getElementById('bdayModal').style.display='none';
+}
+function saveBday(){
+  const name=document.getElementById('bdayName').value.trim();
+  const hebMonth=document.getElementById('bdayMonth').value;
+  const hebDay=parseInt(document.getElementById('bdayDay').value);
+  if(!name)return;
+  birthdays.push({id:nxtBday++,name,hebMonth,hebDay});
+  save();renderBdayList();renderCalendar();
+  closeBdayModal();
+}
+function deleteBday(id){
+  if(!confirm('למחוק יום הולדת זה?'))return;
+  birthdays=birthdays.filter(b=>b.id!==id);
+  save();renderBdayList();renderCalendar();
+}
+function renderBdayList(){
+  const el=document.getElementById('bdayList');if(!el)return;
+  if(!birthdays.length){
+    el.innerHTML='<div style="padding:12px 16px;text-align:center;color:var(--text3);font-size:13px">עדיין אין ימי הולדת — הוסף את הראשון 🎂</div>';
+    return;
+  }
+  el.innerHTML=birthdays.map(b=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border)">
+      <span style="font-size:18px">🎂</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(b.name)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${HEB_DAY_NUM[b.hebDay]} ${esc(b.hebMonth)}</div>
+      </div>
+      <button onclick="deleteBday(${b.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0;opacity:.5">✕</button>
+    </div>`).join('');
 }
 
 function renderHome(){
