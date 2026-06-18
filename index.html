@@ -902,7 +902,7 @@ function sendMessage(){
   const author=aEl.value.trim();
   const text=tEl.value.trim();
   if(!text)return;
-  messages.push({id:nxtMsg++,author:author||'אנונימי',text,ts:Date.now()});
+  messages.push({id:nxtMsg++,author,text,ts:Date.now()});
   aEl.value='';tEl.value='';
   save();renderMessages();
 }
@@ -922,7 +922,7 @@ function renderMessages(){
   el.innerHTML=[...messages].reverse().map(m=>`
     <div class="msg-item">
       <div class="msg-author-row">
-        <span class="msg-author">${esc(m.author)}</span>
+        ${m.author?`<span class="msg-author">${esc(m.author)}</span>`:''}
         <span class="msg-ts">${fmtTs(m.ts)}</span>
         ${editMode?`<button onclick="deleteMsg(${m.id})" style="margin-right:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0">🗑</button>`:''}
       </div>
