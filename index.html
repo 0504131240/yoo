@@ -730,7 +730,7 @@ let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
-let addExpItemEvId=null,addExpItemFamId=null;
+let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null;
 let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
 let calItems=[];
@@ -781,18 +781,26 @@ const famWeight=(f,method,childOverride)=>{
 };
 const evShares=ev=>{
   const method=ev.splitMethod||'equal';
-  const cost=evCost(ev);
+  const totalCost=evCost(ev);
+  const partialItems=(ev.expenseItems||[]).filter(it=>it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length);
+  const partialAmt=partialItems.reduce((s,it)=>s+it.amt,0);
+  const globalCost=totalCost-partialAmt;
   let totalW=0; const w={};
   ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method,ev.childOverrides?.[fid]); totalW+=w[fid]; });
   if(!totalW) return Object.fromEntries(ev.participants.map(fid=>[fid,0]));
-  // Largest remainder method: floor each share, then distribute extra shekels
-  // to families with largest fractional parts — no family differs by more than ₪1
-  const exact={}, floors={};
-  ev.participants.forEach(fid=>{ exact[fid]=cost*w[fid]/totalW; floors[fid]=Math.floor(exact[fid]); });
-  let remainder=Math.round(cost-ev.participants.reduce((s,fid)=>s+floors[fid],0));
-  const sorted=[...ev.participants].sort((a,b)=>(exact[b]-floors[b])-(exact[a]-floors[a]));
+  const exact={};
+  ev.participants.forEach(fid=>{ exact[fid]=globalCost*(w[fid]/totalW); });
+  partialItems.forEach(it=>{
+    const sw=it.sharedWith.filter(fid=>ev.participants.includes(fid));
+    if(!sw.length)return;
+    sw.forEach(fid=>{ exact[fid]=(exact[fid]||0)+it.amt/sw.length; });
+  });
+  const floors={};
+  ev.participants.forEach(fid=>{ floors[fid]=Math.floor(exact[fid]||0); });
+  let remainder=Math.round(totalCost-ev.participants.reduce((s,fid)=>s+floors[fid],0));
+  const sorted=[...ev.participants].sort((a,b)=>((exact[b]||0)-floors[b])-((exact[a]||0)-floors[a]));
   const shares={...floors};
-  for(let i=0;i<remainder;i++) shares[sorted[i]]++;
+  for(let i=0;i<remainder&&i<sorted.length;i++) shares[sorted[i]]++;
   return shares;
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
@@ -1598,11 +1606,12 @@ function evCard(ev){
     const key=ev.id+'-'+fid;
     const isExpanded=expandedCumFamilies.has(key);
     const detailList=items.length&&isExpanded?`<div style="padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px">
-      ${items.map(it=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
-        <span style="flex:1;color:var(--text2)">${esc(it.name)}</span>
+      ${items.map(it=>{const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
+        <div style="flex:1;min-width:0"><span style="color:var(--text2)">${esc(it.name)}</span>${swNames?`<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">👥 ${esc(swNames)}</span>`:''}
+        </div>
         <span style="font-weight:600;color:var(--text)">₪${it.amt.toLocaleString()}</span>
         <button onclick="deleteExpItem(${ev.id},${it.id})" class="edit-only" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
-      </div>`).join('')}
+      </div>`}).join('')}
     </div>`:'';
     return`<div class="exp-input-row"${isExpanded?' style="flex-direction:column;align-items:stretch"':''}>
       <div style="display:flex;align-items:center;gap:8px">
@@ -2745,16 +2754,28 @@ function confirmDeposit(){
 function openAddExpItem(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   addExpItemEvId=evId; addExpItemFamId=null;
+  addExpItemSharedWith=new Set(ev.participants);
   document.getElementById('expItemName').value='';
   document.getElementById('expItemAmt').value='';
   const errEl=document.getElementById('expItemErr');if(errEl)errEl.style.display='none';
   const picker=document.getElementById('expItemFamPicker');
   picker.innerHTML=ev.participants.map(fid=>{
     const f=getFam(fid);if(!f)return'';
-    const cl=col(fid);
     return`<button onclick="selectAddExpFam(${fid})" id="expfam-${fid}" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(f.name.replace('משפחת','').trim())}</button>`;
   }).join('');
+  const sharePicker=document.getElementById('expItemSharePicker');
+  sharePicker.innerHTML=ev.participants.map(fid=>{
+    const f=getFam(fid);if(!f)return'';
+    return`<button onclick="toggleExpShareFam(${fid})" id="expshare-${fid}" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--blue-mid);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(f.name.replace('משפחת','').trim())}</button>`;
+  }).join('');
   document.getElementById('addExpItemOverlay').style.display='flex';
+}
+function toggleExpShareFam(famId){
+  if(addExpItemSharedWith.has(famId))addExpItemSharedWith.delete(famId);
+  else addExpItemSharedWith.add(famId);
+  const btn=document.getElementById('expshare-'+famId);if(!btn)return;
+  if(addExpItemSharedWith.has(famId)){btn.style.background='var(--blue-bg)';btn.style.color='var(--blue)';btn.style.borderColor='var(--blue-mid)';}
+  else{btn.style.background='transparent';btn.style.color='var(--text2)';btn.style.borderColor='var(--border)';}
 }
 function selectAddExpFam(famId){
   addExpItemFamId=famId;
@@ -2779,7 +2800,11 @@ function doAddExpItem(){
   const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
   if(!ev.expenseItems)ev.expenseItems=[];
   ev.expItemId=(ev.expItemId||0)+1;
-  ev.expenseItems.push({id:ev.expItemId,famId:addExpItemFamId,name,amt});
+  const sw=[...(addExpItemSharedWith||new Set(ev.participants))].filter(fid=>ev.participants.includes(fid));
+  const isPartial=sw.length>0&&sw.length<ev.participants.length;
+  const item={id:ev.expItemId,famId:addExpItemFamId,name,amt};
+  if(isPartial)item.sharedWith=sw;
+  ev.expenseItems.push(item);
   ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;
   closeAddExpItem();
   save();render();
@@ -3107,6 +3132,10 @@ if ('serviceWorker' in navigator) {
     <div class="field" style="margin-top:12px">
       <label class="field-lbl">מי שילם</label>
       <div id="expItemFamPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label class="field-lbl">מי משתתף בחלוקה</label>
+      <div id="expItemSharePicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
     </div>
     <div class="field" style="margin-top:12px">
       <label class="field-lbl">סכום (₪)</label>
