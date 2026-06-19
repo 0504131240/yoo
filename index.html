@@ -131,7 +131,7 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
 .exp-input-row { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
 .exp-inp { width: 90px; border: 1.5px solid var(--border); border-radius: var(--r2); padding: 6px 9px; font-size: 14px; font-family: var(--font); background: var(--bg); color: var(--text); text-align: left; direction: ltr; }
 .exp-inp:focus { outline: none; border-color: var(--green-mid); }
-.exp-tag { font-size: 14px; padding: 5px 14px; border-radius: 20px; font-weight: 700; border: none; font-family: var(--font); flex-shrink: 0; white-space: nowrap; }
+.exp-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; border: none; font-family: var(--font); flex-shrink: 0; white-space: nowrap; }
 .exp-tag-clickable { cursor: pointer; }
 .exp-tag-pos { background: var(--red-bg); color: var(--red); }
 .exp-tag-neg { background: var(--blue-bg); color: var(--blue); }
@@ -1576,7 +1576,7 @@ function evCard(ev){
       ${famAva(f)}
       <div style="flex:1;min-width:0">
         <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-        ${cost>0?`<div style="font-size:10px;color:var(--text2)">חלק: ₪${share.toLocaleString()}</div>`:''}
+        ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
       </div>
       ${spent>0?`<span style="font-size:13px;font-weight:600;color:var(--text2);flex-shrink:0">שילם ₪${spent.toLocaleString()}</span>`:''}
       <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
@@ -1609,7 +1609,7 @@ function evCard(ev){
         ${famAva(f)}
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-          ${cost>0?`<div style="font-size:10px;color:var(--text2)">חלק: ₪${share.toLocaleString()}</div>`:''}
+          ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
         </div>
         ${spent>0?`<span style="font-size:12px;font-weight:700;color:var(--text);flex-shrink:0">₪${spent.toLocaleString()}</span>`:''}
         ${items.length?`<button onclick="toggleCumFamily(${ev.id},${fid})" style="padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer;flex-shrink:0">${isExpanded?'▲':'▼ '+items.length}</button>`:''}
