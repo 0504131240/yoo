@@ -2532,15 +2532,12 @@ function doCreate(){
     const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides};
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
     events.unshift(newEv);
-    // notify participants of new event
+    // notify participants only for non-cumulative events
     (()=>{
-      const evName=newEv.name;
-      const isCum=!!newEv.cumulative;
+      if(newEv.cumulative) return;
       const parts=newEv.participants;
       const recips=parts.map(fid=>getFam(fid)).filter(x=>x&&x.email).map(x=>({email:x.email,email2:x.email2,name:x.name.replace('משפחת','').trim()}));
-      const subj=isCum?'📅 אירוע מתמשך חדש · ינקלביץ':'📅 אירוע חדש · ינקלביץ';
-      const body=isCum?`נפתח אירוע מתמשך חדש: "${evName}". אתה/את רשומ/ה כמשתתפ/ת — ניתן לרשום הוצאות ולהפקיד לקופה.`:`נוסף אירוע: "${evName}". אתה/את רשומ/ה כמשתתפ/ת.`;
-      sendEmailNotif(recips,subj,body);
+      sendEmailNotif(recips,'📅 אירוע חדש · ינקלביץ',`נוסף אירוע: "${newEv.name}". אתה/את רשומ/ה כמשתתפ/ת.`);
     })();
   }
   hideForm();save();render();
