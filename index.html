@@ -601,10 +601,16 @@ body:not(.at-home){padding-bottom:140px}
         </div>
         <input type="text" id="famEditName" placeholder="שם המשפחה"
           style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
-        <input type="email" id="famEditEmail" placeholder="מייל ראשי (לקבלת התראות)"
-          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:6px;box-sizing:border-box;direction:ltr;text-align:right">
-        <input type="email" id="famEditEmail2" placeholder="מייל נוסף (אופציונלי)"
-          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box;direction:ltr;text-align:right">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <input type="email" id="famEditEmail" placeholder="מייל ראשי (לקבלת התראות)"
+            style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:right">
+          <button type="button" id="testBtn1" onclick="testSingleEmail('famEditEmail','testBtn1')" style="flex-shrink:0;padding:8px 10px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-family:var(--font);cursor:pointer;color:var(--text2)">בדוק</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <input type="email" id="famEditEmail2" placeholder="מייל נוסף (אופציונלי)"
+            style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:right">
+          <button type="button" id="testBtn2" onclick="testSingleEmail('famEditEmail2','testBtn2')" style="flex-shrink:0;padding:8px 10px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-family:var(--font);cursor:pointer;color:var(--text2)">בדוק</button>
+        </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <span style="font-size:13px;font-weight:600;color:var(--text2)">ילדים</span>
           <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
@@ -907,6 +913,24 @@ function testEjsEmail(){
   },i*600));
 }
 const _validEmail=e=>!!e&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+function testSingleEmail(inputId,btnId){
+  const key=localStorage.getItem('ejsPublicKey');
+  const svc=localStorage.getItem('ejsServiceId');
+  const tpl=localStorage.getItem('ejsTemplateId');
+  const email=(document.getElementById(inputId)?.value||'').trim().toLowerCase();
+  const btn=document.getElementById(btnId);
+  if(!key||!svc||!tpl){if(btn){btn.textContent='הגדר EmailJS קודם';btn.style.color='var(--red)';}return;}
+  if(!_validEmail(email)){if(btn){btn.textContent='✗ מייל לא תקין';btn.style.color='var(--red)';}setTimeout(()=>{if(btn){btn.textContent='בדוק';btn.style.color='var(--text2)';}},2500);return;}
+  if(btn){btn.textContent='שולח...';btn.style.color='var(--text2)';btn.disabled=true;}
+  const name=document.getElementById('famEditName')?.value.trim()||'';
+  emailjs.send(svc,tpl,{to_email:email,to_name:name,subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'})
+    .then(()=>{
+      const verified=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));
+      verified.add(email);localStorage.setItem('verifiedEmails',JSON.stringify([...verified]));
+      if(btn){btn.textContent='✓';btn.style.color='var(--green)';btn.style.fontWeight='700';btn.disabled=false;}
+    })
+    .catch(e=>{if(btn){btn.textContent='✗ שגיאה';btn.style.color='var(--red)';btn.disabled=false;}setTimeout(()=>{if(btn){btn.textContent='בדוק';btn.style.color='var(--text2)';btn.style.fontWeight='';}},3000);});
+}
 function sendEmailNotif(recipients,subject,message){
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
@@ -2257,6 +2281,11 @@ function openFamEditSheet(fid){
   document.getElementById('famEditChildren').value=f.children||0;
   document.getElementById('famEditEmail').value=f.email||'';
   document.getElementById('famEditEmail2').value=f.email2||'';
+  const verified=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));
+  const b1=document.getElementById('testBtn1');const b2=document.getElementById('testBtn2');
+  if(b1){b1.textContent=f.email&&verified.has(f.email)?'✓':'בדוק';b1.style.color=f.email&&verified.has(f.email)?'var(--green)':'var(--text2)';b1.style.fontWeight=f.email&&verified.has(f.email)?'700':'';}
+  if(b2){b2.textContent=f.email2&&verified.has(f.email2)?'✓':'בדוק';b2.style.color=f.email2&&verified.has(f.email2)?'var(--green)':'var(--text2)';b2.style.fontWeight=f.email2&&verified.has(f.email2)?'700':'';}
+
   document.getElementById('famEditOverlay').style.display='flex';
 }
 function closeFamEditSheet(){
