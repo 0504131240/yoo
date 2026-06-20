@@ -894,9 +894,13 @@ function testEjsEmail(){
   if(!key||!svc||!tpl){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא לשמור הגדרות תחילה';st.style.color='var(--red)';}return;}
   if(!testEmail){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
   const st=document.getElementById('ejsStatus');if(st){st.textContent='שולח...';st.style.color='var(--text2)';}
-  emailjs.send(svc,tpl,{to_email:testEmail,to_name:testFam.name.replace('משפחת','').trim(),subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'})
+  const tName=testFam.name.replace('משפחת','').trim();
+  const params={subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'};
+  const sends=[emailjs.send(svc,tpl,{...params,to_email:testEmail,to_name:tName})];
+  if(testFam.email2) sends.push(emailjs.send(svc,tpl,{...params,to_email:testFam.email2,to_name:tName}));
+  Promise.all(sends)
     .then(()=>{if(st){st.textContent='✓ נשלח! בדוק את תיבת הדואר';st.style.color='var(--green)';}})
-    .catch(e=>{if(st){st.textContent='שגיאה: '+e.text;st.style.color='var(--red)';}});
+    .catch(e=>{if(st){st.textContent='שגיאה: '+(e.text||e);st.style.color='var(--red)';}});
 }
 function sendEmailNotif(recipients,subject,message){
   const key=localStorage.getItem('ejsPublicKey');
