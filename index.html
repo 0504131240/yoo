@@ -2532,12 +2532,17 @@ function doCreate(){
     const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides};
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
     events.unshift(newEv);
-    // notify participants only for non-cumulative events
+    // notify participants only for non-cumulative events (personalized per family)
     (()=>{
       if(newEv.cumulative) return;
-      const parts=newEv.participants;
-      const recips=parts.map(fid=>getFam(fid)).filter(x=>x&&x.email).map(x=>({email:x.email,email2:x.email2,name:x.name.replace('משפחת','').trim()}));
-      sendEmailNotif(recips,'📅 אירוע חדש · ינקלביץ',`נוסף אירוע: "${newEv.name}". אתה/את רשומ/ה כמשתתפ/ת.`);
+      const cost=evCost(newEv);
+      const shares=evShares(newEv);
+      newEv.participants.forEach(fid=>{
+        const f=getFam(fid);if(!f||((!f.email)&&(!f.email2)))return;
+        const share=Math.round(shares[fid]||0);
+        const msg=`משפחת ${f.name.replace('משפחת','').trim()} רשומה לאירוע "${newEv.name}".\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלכם: ₪${share.toLocaleString()}`;
+        sendEmailNotif([{email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}],'📅 אירוע חדש · ינקלביץ',msg);
+      });
     })();
   }
   hideForm();save();render();
