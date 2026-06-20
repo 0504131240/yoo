@@ -905,6 +905,23 @@ function sendEmailNotif(recipients,subject,message){
     emailjs.send(svc,tpl,{to_email:r.email,to_name:r.name,subject,message}).catch(()=>{});
   });
 }
+function checkWeeklyReminders(){
+  const last=parseInt(localStorage.getItem('lastDebtReminder')||'0');
+  if(Date.now()-last<7*24*60*60*1000) return;
+  localStorage.setItem('lastDebtReminder',String(Date.now()));
+  families.forEach(f=>{
+    if(!f.email) return;
+    let totalDebt=0;
+    const debtLines=[];
+    events.filter(e=>e.open).forEach(ev=>{
+      const bal=evAdjBalance(ev)[f.id]||0;
+      if(bal<-0.5){totalDebt+=Math.abs(bal);debtLines.push(`• "${ev.name}": ₪${Math.round(Math.abs(bal)).toLocaleString()}`);}
+    });
+    if(totalDebt<1) return;
+    const name=f.name.replace('משפחת','').trim();
+    sendEmailNotif([{email:f.email,name}],'⏰ תזכורת שבועית · ינקלביץ',`שלום ${name},\n\nיתרת חוב כוללת: ₪${Math.round(totalDebt).toLocaleString()}\n\n${debtLines.join('\n')}\n\nכנס לאפליקציה לפרטים ולסידור התשלומים.`);
+  });
+}
 
 function saveLocal(){
   try{
@@ -1852,6 +1869,7 @@ function payToPot(evId,famId,amt){
     const msg=`${f.name.replace('משפחת','').trim()} הפקיד ₪${payment.toLocaleString()} לקופת האירוע "${ev.name}".`;
     const recips=ev.participants.map(fid=>getFam(fid)).filter(x=>x&&x.email&&x.id!==famId).map(x=>({email:x.email,name:x.name.replace('משפחת','').trim()}));
     sendEmailNotif(recips,'💰 הפקדה לקופה · ינקלביץ',msg);
+    if(f&&f.email) sendEmailNotif([{email:f.email,name:f.name.replace('משפחת','').trim()}],'✓ הפקדתך התקבלה · ינקלביץ',`ההפקדה שלך של ₪${payment.toLocaleString()} לקופת האירוע "${ev.name}" התקבלה.`);
   })();
 }
 function calcPotTransfers(ev){
@@ -2474,10 +2492,13 @@ function doCreate(){
     events.unshift(newEv);
     // notify participants of new event
     (()=>{
-      const evName=newEv?newEv.name:'';
-      const parts=newEv?newEv.participants:[];
+      const evName=newEv.name;
+      const isCum=!!newEv.cumulative;
+      const parts=newEv.participants;
       const recips=parts.map(fid=>getFam(fid)).filter(x=>x&&x.email).map(x=>({email:x.email,name:x.name.replace('משפחת','').trim()}));
-      sendEmailNotif(recips,'📅 אירוע חדש · ינקלביץ',`נוסף אירוע חדש: "${evName}". אתה/את רשומ/ה כמשתתפ/ת.`);
+      const subj=isCum?'📅 אירוע מתמשך חדש · ינקלביץ':'📅 אירוע חדש · ינקלביץ';
+      const body=isCum?`נפתח אירוע מתמשך חדש: "${evName}". אתה/את רשומ/ה כמשתתפ/ת — ניתן לרשום הוצאות ולהפקיד לקופה.`:`נוסף אירוע: "${evName}". אתה/את רשומ/ה כמשתתפ/ת.`;
+      sendEmailNotif(recips,subj,body);
     })();
   }
   hideForm();save();render();
@@ -2486,6 +2507,17 @@ function doCreate(){
 // Actions
 function closeEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const cost=evCost(ev);
+  const shares=evShares(ev);
+  const adjBal=evAdjBalance(ev);
+  ev.participants.forEach(fid=>{
+    const f=getFam(fid);if(!f||!f.email)return;
+    const share=Math.round(shares[fid]||0);
+    const bal=Math.round(adjBal[fid]||0);
+    const name=f.name.replace('משפחת','').trim();
+    const statusLine=Math.abs(bal)<=0.5?'✅ החשבון שלך מסודר.':bal<0?`⚠️ יתרת חוב: ₪${Math.abs(bal).toLocaleString()}.`:`💰 מגיע לך החזר: ₪${bal.toLocaleString()}.`;
+    sendEmailNotif([{email:f.email,name}],'🗂 אירוע נסגר · ינקלביץ',`האירוע "${ev.name}" נסגר.\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n${statusLine}`);
+  });
   ev.open=false;ev.closedOn='היום';save();render();
   goTab('archive',document.getElementById('nb-archive'));
 }
@@ -2838,6 +2870,10 @@ function confirmDeposit(){
     date:new Date().toLocaleDateString('he-IL')});
   closeDepositSheet();
   save();render();
+  if(isDeposit&&f&&f.email){
+    const newBal=(fund.famBalances[key]||0);
+    sendEmailNotif([{email:f.email,name}],'✓ הפקדה התקבלה · ינקלביץ',`ההפקדה שלך של ₪${amt.toLocaleString()} לקופה הראשית התקבלה.\nיתרתך: ₪${newBal.toLocaleString()}.`);
+  }
 }
 
 
@@ -3204,6 +3240,7 @@ function lockApp(){
 applyEditMode();
 load();
 loadEjsSettings();
+checkWeeklyReminders();
 </script>
 
 
