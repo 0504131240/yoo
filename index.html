@@ -890,17 +890,14 @@ function testEjsEmail(){
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
   if(!key||!svc||!tpl){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא לשמור הגדרות תחילה';st.style.color='var(--red)';}return;}
-  const params={subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'};
-  const sends=[];
-  families.forEach(f=>{
-    const name=f.name.replace('משפחת','').trim();
-    if(f.email) sends.push(emailjs.send(svc,tpl,{...params,to_email:f.email,to_name:name}));
-    if(f.email2) sends.push(emailjs.send(svc,tpl,{...params,to_email:f.email2,to_name:name}));
-  });
-  if(!sends.length){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
+  const testFam=families.find(f=>f.email);
+  if(!testFam){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
   const st=document.getElementById('ejsStatus');if(st){st.textContent='שולח...';st.style.color='var(--text2)';}
-  Promise.all(sends)
-    .then(()=>{if(st){st.textContent=`✓ נשלח ל-${sends.length} כתובות`;st.style.color='var(--green)';}})
+  const name=testFam.name.replace('משפחת','').trim();
+  emailjs.send(svc,tpl,{to_email:testFam.email,to_name:name,subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'})
+    .then(()=>{if(st){st.textContent='✓ נשלח ל-'+testFam.email;st.style.color='var(--green)';}})
+    .catch(e=>{if(st){st.textContent='שגיאה: '+(e.text||e);st.style.color='var(--red)';}});
+}
     .catch(e=>{if(st){st.textContent='שגיאה: '+(e.text||e);st.style.color='var(--red)';}});
 }
 function sendEmailNotif(recipients,subject,message){
@@ -908,10 +905,14 @@ function sendEmailNotif(recipients,subject,message){
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
   if(!key||!svc||!tpl||typeof emailjs==='undefined') return;
+  const addrs=[];
   recipients.forEach(r=>{
-    if(r.email) emailjs.send(svc,tpl,{to_email:r.email,to_name:r.name,subject,message}).catch(()=>{});
-    if(r.email2) emailjs.send(svc,tpl,{to_email:r.email2,to_name:r.name,subject,message}).catch(()=>{});
+    if(r.email) addrs.push({email:r.email,name:r.name});
+    if(r.email2) addrs.push({email:r.email2,name:r.name});
   });
+  addrs.forEach((a,i)=>setTimeout(()=>{
+    emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject,message}).catch(()=>{});
+  },i*600));
 }
 function checkWeeklyReminders(){
   const last=parseInt(localStorage.getItem('lastDebtReminder')||'0');
