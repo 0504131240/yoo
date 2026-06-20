@@ -944,19 +944,24 @@ function saveLocal(){
   }catch(e){}
 }
 
+let _retryTimer=null;
 async function save(){
   saveLocal();
   if(_saving) return;
   _saving=true;
+  if(_retryTimer){clearTimeout(_retryTimer);_retryTimer=null;}
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
     await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass,messages,calItems,birthdays});
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
-    console.warn('save failed:',e);
-    showSyncStatus('⚠ שמור מקומי בלבד',3000);
-  }finally{_saving=false;}
+    console.warn('save failed, will retry:',e);
+    showSyncStatus('⚠ שמור מקומי · מנסה שוב...');
+    _retryTimer=setTimeout(()=>{_saving=false;save();},8000);
+    return;
+  }
+  _saving=false;
 }
 
 
@@ -983,7 +988,13 @@ async function load(){
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
     nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
-    showSyncStatus('✓ מסונכרן',2000);
+    // if local data has more families/events than firebase, push local to cloud
+    const localFa=localStorage.getItem('ff');const localEv=localStorage.getItem('fe');
+    const localFams=localFa?JSON.parse(localFa):[];const localEvs=localEv?JSON.parse(localEv):[];
+    const fbFamIds=families.map(f=>f.id+f.name+(f.email||'')+(f.email2||'')).join();
+    const lcFamIds=localFams.map(f=>f.id+f.name+(f.email||'')+(f.email2||'')).join();
+    if(localFams.length&&lcFamIds!==fbFamIds){families=localFams;events=localEvs;_saving=false;save();}
+    else showSyncStatus('✓ מסונכרן',2000);
   }catch(e){
     console.warn('load failed:',e);
     try{
