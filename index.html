@@ -890,15 +890,21 @@ function testEjsEmail(){
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
   if(!key||!svc||!tpl){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא לשמור הגדרות תחילה';st.style.color='var(--red)';}return;}
-  const testFam=families.find(f=>f.email);
-  if(!testFam){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
-  const st=document.getElementById('ejsStatus');if(st){st.textContent='שולח...';st.style.color='var(--text2)';}
-  const name=testFam.name.replace('משפחת','').trim();
-  emailjs.send(svc,tpl,{to_email:testFam.email,to_name:name,subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'})
-    .then(()=>{if(st){st.textContent='✓ נשלח ל-'+testFam.email;st.style.color='var(--green)';}})
-    .catch(e=>{if(st){st.textContent='שגיאה: '+(e.text||e);st.style.color='var(--red)';}});
-}
-    .catch(e=>{if(st){st.textContent='שגיאה: '+(e.text||e);st.style.color='var(--red)';}});
+  const addrs=[];
+  families.forEach(f=>{
+    const name=f.name.replace('משפחת','').trim();
+    if(f.email) addrs.push({email:f.email,name});
+    if(f.email2) addrs.push({email:f.email2,name});
+  });
+  if(!addrs.length){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
+  const st=document.getElementById('ejsStatus');if(st){st.textContent=`שולח ל-${addrs.length} כתובות...`;st.style.color='var(--text2)';}
+  let done=0,failed=0;
+  addrs.forEach((a,i)=>setTimeout(()=>{
+    emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'})
+      .then(()=>{done++;if(done+failed===addrs.length&&st){st.textContent=`✓ נשלח ל-${done} כתובות${failed?` (${failed} נכשלו)`:''}`;st.style.color=failed?'var(--red)':'var(--green)';}})
+      .catch(()=>{failed++;if(done+failed===addrs.length&&st){st.textContent=`✓ נשלח ל-${done} כתובות (${failed} נכשלו)`;st.style.color='var(--red)';}});
+  },i*600));
+};
 }
 function sendEmailNotif(recipients,subject,message){
   const key=localStorage.getItem('ejsPublicKey');
