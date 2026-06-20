@@ -904,7 +904,6 @@ function testEjsEmail(){
       .then(()=>{done++;if(done+failed===addrs.length&&st){st.textContent=`✓ נשלח ל-${done} כתובות${failed?` (${failed} נכשלו)`:''}`;st.style.color=failed?'var(--red)':'var(--green)';}})
       .catch(()=>{failed++;if(done+failed===addrs.length&&st){st.textContent=`✓ נשלח ל-${done} כתובות (${failed} נכשלו)`;st.style.color='var(--red)';}});
   },i*600));
-};
 }
 function sendEmailNotif(recipients,subject,message){
   const key=localStorage.getItem('ejsPublicKey');
