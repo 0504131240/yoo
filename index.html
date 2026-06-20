@@ -294,6 +294,7 @@ body:not(.at-home){padding-bottom:140px}
 .fh-cal-add-row{padding:0 14px 14px;display:flex;gap:7px}
 .fh-cal-add-row input{border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 11px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body class="at-home">
 
@@ -570,6 +571,20 @@ body:not(.at-home){padding-bottom:140px}
       <button class="action-btn blue" onclick="addFam()">הוסף</button>
     </div>
     <div id="famList"></div>
+    <div class="sec-ttl edit-only" style="margin-top:20px">⚙️ הגדרות התראות מייל</div>
+    <div class="edit-only" id="emailjsSettings" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
+        כדי לשלוח מיילים: צור חשבון ב-<b>emailjs.com</b> → צור שירות + תבנית עם משתנים <b>to_email, to_name, subject, message</b> → הדבק כאן את הפרטים.
+      </div>
+      <input type="text" id="ejsPublicKey" placeholder="Public Key" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
+      <input type="text" id="ejsServiceId" placeholder="Service ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
+      <input type="text" id="ejsTemplateId" placeholder="Template ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;direction:ltr">
+      <div style="display:flex;gap:8px">
+        <button onclick="saveEjsSettings()" style="flex:1;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור הגדרות</button>
+        <button onclick="testEjsEmail()" style="padding:9px 12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📧 בדוק</button>
+      </div>
+      <div id="ejsStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
+    </div>
     <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">
       <div id="famEditSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px">עריכת משפחה</div>
@@ -586,6 +601,8 @@ body:not(.at-home){padding-bottom:140px}
         </div>
         <input type="text" id="famEditName" placeholder="שם המשפחה"
           style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
+        <input type="email" id="famEditEmail" placeholder="כתובת מייל (לקבלת התראות)"
+          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box;direction:ltr;text-align:right">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <span style="font-size:13px;font-weight:600;color:var(--text2)">ילדים</span>
           <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
@@ -843,6 +860,51 @@ async function fbInit(){
 }
 
 let _saving=false;
+
+// EmailJS settings
+function loadEjsSettings(){
+  const keyEl=document.getElementById('ejsPublicKey');
+  const svcEl=document.getElementById('ejsServiceId');
+  const tplEl=document.getElementById('ejsTemplateId');
+  if(keyEl) keyEl.value=localStorage.getItem('ejsPublicKey')||'';
+  if(svcEl) svcEl.value=localStorage.getItem('ejsServiceId')||'';
+  if(tplEl) tplEl.value=localStorage.getItem('ejsTemplateId')||'';
+  const key=localStorage.getItem('ejsPublicKey');
+  if(key&&typeof emailjs!=='undefined') emailjs.init(key);
+}
+function saveEjsSettings(){
+  const key=document.getElementById('ejsPublicKey').value.trim();
+  const svc=document.getElementById('ejsServiceId').value.trim();
+  const tpl=document.getElementById('ejsTemplateId').value.trim();
+  localStorage.setItem('ejsPublicKey',key);
+  localStorage.setItem('ejsServiceId',svc);
+  localStorage.setItem('ejsTemplateId',tpl);
+  if(key&&typeof emailjs!=='undefined') emailjs.init(key);
+  const st=document.getElementById('ejsStatus');
+  if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
+}
+function testEjsEmail(){
+  const key=localStorage.getItem('ejsPublicKey');
+  const svc=localStorage.getItem('ejsServiceId');
+  const tpl=localStorage.getItem('ejsTemplateId');
+  const testEmail=families[0]?.email;
+  if(!key||!svc||!tpl){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא לשמור הגדרות תחילה';st.style.color='var(--red)';}return;}
+  if(!testEmail){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
+  const st=document.getElementById('ejsStatus');if(st){st.textContent='שולח...';st.style.color='var(--text2)';}
+  emailjs.send(svc,tpl,{to_email:testEmail,to_name:families[0].name.replace('משפחת','').trim(),subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'})
+    .then(()=>{if(st){st.textContent='✓ נשלח! בדוק את תיבת הדואר';st.style.color='var(--green)';}})
+    .catch(e=>{if(st){st.textContent='שגיאה: '+e.text;st.style.color='var(--red)';}});
+}
+function sendEmailNotif(recipients,subject,message){
+  const key=localStorage.getItem('ejsPublicKey');
+  const svc=localStorage.getItem('ejsServiceId');
+  const tpl=localStorage.getItem('ejsTemplateId');
+  if(!key||!svc||!tpl||typeof emailjs==='undefined') return;
+  recipients.forEach(r=>{
+    if(!r.email) return;
+    emailjs.send(svc,tpl,{to_email:r.email,to_name:r.name,subject,message}).catch(()=>{});
+  });
+}
 
 function saveLocal(){
   try{
@@ -1540,6 +1602,16 @@ function confirmPartPay(){
     save();render();
   }
   if(_ppSettle){const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
+  // email notification
+  (()=>{
+    const fromFam=getFam(_ppFromFid);
+    const toFam=getFam(_ppToFid);
+    const msg=`${fromFam?fromFam.name.replace('משפחת','').trim():'?'} שילם ₪${paid.toLocaleString()} ל${toFam?toFam.name.replace('משפחת','').trim():'?'}.`;
+    const recips=[];
+    if(fromFam&&fromFam.email) recips.push({email:fromFam.email,name:fromFam.name.replace('משפחת','').trim()});
+    if(toFam&&toFam.email) recips.push({email:toFam.email,name:toFam.name.replace('משפחת','').trim()});
+    sendEmailNotif(recips,'✓ תשלום נרשם · ינקלביץ',msg);
+  })();
   closePartPayModal();
 }
 function openPotPayModal(evId,famId){
@@ -1772,6 +1844,15 @@ function payToPot(evId,famId,amt){
   if(!ev.potPayments)ev.potPayments=[];
   ev.potPayments.push({famId,amt:payment});
   save();render();
+  // email notification for pot deposit
+  (()=>{
+    const ev=events.find(e=>e.id===evId);
+    const f=getFam(famId);
+    if(!ev||!f) return;
+    const msg=`${f.name.replace('משפחת','').trim()} הפקיד ₪${payment.toLocaleString()} לקופת האירוע "${ev.name}".`;
+    const recips=ev.participants.map(fid=>getFam(fid)).filter(x=>x&&x.email&&x.id!==famId).map(x=>({email:x.email,name:x.name.replace('משפחת','').trim()}));
+    sendEmailNotif(recips,'💰 הפקדה לקופה · ינקלביץ',msg);
+  })();
 }
 function calcPotTransfers(ev){
   const pots=ev.potPayments||[];if(!pots.length)return[];
@@ -2121,6 +2202,7 @@ function openFamEditSheet(fid){
   }
   if(clearBtn) clearBtn.style.display=f.photo?'inline-block':'none';
   document.getElementById('famEditChildren').value=f.children||0;
+  document.getElementById('famEditEmail').value=f.email||'';
   document.getElementById('famEditOverlay').style.display='flex';
 }
 function closeFamEditSheet(){
@@ -2135,6 +2217,7 @@ function saveFamEdit(){
   if(!name.startsWith('משפחת'))name='משפחת '+name;
   f.name=name;
   f.children=Math.max(0,parseInt(document.getElementById('famEditChildren').value)||0);
+  f.email=(document.getElementById('famEditEmail').value||'').trim()||undefined;
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
   closeFamEditSheet();
@@ -2389,6 +2472,13 @@ function doCreate(){
     const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides};
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
     events.unshift(newEv);
+    // notify participants of new event
+    (()=>{
+      const evName=newEv?newEv.name:'';
+      const parts=newEv?newEv.participants:[];
+      const recips=parts.map(fid=>getFam(fid)).filter(x=>x&&x.email).map(x=>({email:x.email,name:x.name.replace('משפחת','').trim()}));
+      sendEmailNotif(recips,'📅 אירוע חדש · ינקלביץ',`נוסף אירוע חדש: "${evName}". אתה/את רשומ/ה כמשתתפ/ת.`);
+    })();
   }
   hideForm();save();render();
 }
@@ -2424,6 +2514,7 @@ function goTab(tab,el){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+tab).classList.add('active');
   if(el)el.classList.add('active');
+  if(tab==='families') loadEjsSettings();
 }
 
 function renderFund(){
@@ -3112,6 +3203,7 @@ function lockApp(){
 
 applyEditMode();
 load();
+loadEjsSettings();
 </script>
 
 
