@@ -889,7 +889,7 @@ function testEjsEmail(){
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
-  const testFam=families.find(f=>f.email);
+  const testFam=families.find(f=>f.email&&f.email2)||families.find(f=>f.email);
   const testEmail=testFam?.email;
   if(!key||!svc||!tpl){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא לשמור הגדרות תחילה';st.style.color='var(--red)';}return;}
   if(!testEmail){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
