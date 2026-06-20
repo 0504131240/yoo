@@ -890,19 +890,20 @@ function testEjsEmail(){
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
   if(!key||!svc||!tpl){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא לשמור הגדרות תחילה';st.style.color='var(--red)';}return;}
+  const verified=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));
   const addrs=[];
   families.forEach(f=>{
     const name=f.name.replace('משפחת','').trim();
-    if(_validEmail(f.email)) addrs.push({email:f.email.trim(),name});
-    if(_validEmail(f.email2)) addrs.push({email:f.email2.trim(),name});
+    if(_validEmail(f.email)&&!verified.has(f.email.trim())) addrs.push({email:f.email.trim(),name});
+    if(_validEmail(f.email2)&&!verified.has(f.email2.trim())) addrs.push({email:f.email2.trim(),name});
   });
-  if(!addrs.length){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל תקין לאחת המשפחות';st.style.color='var(--red)';}return;}
-  const st=document.getElementById('ejsStatus');if(st){st.textContent=`שולח ל-${addrs.length} כתובות...`;st.style.color='var(--text2)';}
+  if(!addrs.length){const st=document.getElementById('ejsStatus');if(st){st.textContent='✓ כל הכתובות כבר מאומתות';st.style.color='var(--green)';}return;}
+  const st=document.getElementById('ejsStatus');if(st){st.textContent=`שולח ל-${addrs.length} כתובות חדשות...`;st.style.color='var(--text2)';}
   let done=0,failed=0;
   addrs.forEach((a,i)=>setTimeout(()=>{
     emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'})
-      .then(()=>{done++;if(done+failed===addrs.length&&st){st.textContent=`✓ נשלח ל-${done} כתובות${failed?` (${failed} נכשלו)`:''}`;st.style.color=failed?'var(--red)':'var(--green)';}})
-      .catch(()=>{failed++;if(done+failed===addrs.length&&st){st.textContent=`✓ נשלח ל-${done} כתובות (${failed} נכשלו)`;st.style.color='var(--red)';}});
+      .then(()=>{done++;verified.add(a.email);localStorage.setItem('verifiedEmails',JSON.stringify([...verified]));if(done+failed===addrs.length&&st){st.textContent=`✓ נשלח ל-${done} כתובות${failed?` · ${failed} נכשלו`:''}`;st.style.color=failed?'var(--red)':'var(--green)';renderFamList();}})
+      .catch(()=>{failed++;if(done+failed===addrs.length&&st){st.textContent=`נשלח ל-${done} · ${failed} נכשלו`;st.style.color='var(--red)';}});
   },i*600));
 }
 const _validEmail=e=>!!e&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
@@ -2106,7 +2107,7 @@ function renderFamilies(){
     const cl=col(f.id);const cnt=events.filter(e=>e.participants.includes(f.id)).length;
     return`<div class="fcard">
       ${famAva(f, 38)}
-      <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}${f.email?' · 📧':''}</div></div>
+      <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}${(()=>{const v=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));const hasEmail=f.email||f.email2;const allOk=(f.email?v.has(f.email):true)&&(f.email2?v.has(f.email2):true);return hasEmail?(allOk?' · ✅':'· 📧'):'';})()}</div></div>
       <button class="action-btn edit-only" onclick="openFamEditSheet(${f.id})">✏️ ערוך</button>
     </div>`;
   }).join('');
@@ -2270,8 +2271,13 @@ function saveFamEdit(){
   if(!name.startsWith('משפחת'))name='משפחת '+name;
   f.name=name;
   f.children=Math.max(0,parseInt(document.getElementById('famEditChildren').value)||0);
+  const prevEmail=f.email,prevEmail2=f.email2;
   f.email=(document.getElementById('famEditEmail').value||'').trim().toLowerCase()||'';
   f.email2=(document.getElementById('famEditEmail2').value||'').trim().toLowerCase()||'';
+  const verified=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));
+  if(prevEmail&&prevEmail!==f.email) verified.delete(prevEmail);
+  if(prevEmail2&&prevEmail2!==f.email2) verified.delete(prevEmail2);
+  localStorage.setItem('verifiedEmails',JSON.stringify([...verified]));
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
   closeFamEditSheet();
