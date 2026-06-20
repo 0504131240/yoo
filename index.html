@@ -889,17 +889,18 @@ function testEjsEmail(){
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
-  const testFam=families.find(f=>f.email&&f.email2)||families.find(f=>f.email);
-  const testEmail=testFam?.email;
   if(!key||!svc||!tpl){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא לשמור הגדרות תחילה';st.style.color='var(--red)';}return;}
-  if(!testEmail){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
-  const st=document.getElementById('ejsStatus');if(st){st.textContent='שולח...';st.style.color='var(--text2)';}
-  const tName=testFam.name.replace('משפחת','').trim();
   const params={subject:'בדיקת התראות · ינקלביץ',message:'מייל זה אישר שהתראות מוגדרות בהצלחה באפליקציית ינקלביץ.'};
-  const sends=[emailjs.send(svc,tpl,{...params,to_email:testEmail,to_name:tName})];
-  if(testFam.email2) sends.push(emailjs.send(svc,tpl,{...params,to_email:testFam.email2,to_name:tName}));
+  const sends=[];
+  families.forEach(f=>{
+    const name=f.name.replace('משפחת','').trim();
+    if(f.email) sends.push(emailjs.send(svc,tpl,{...params,to_email:f.email,to_name:name}));
+    if(f.email2) sends.push(emailjs.send(svc,tpl,{...params,to_email:f.email2,to_name:name}));
+  });
+  if(!sends.length){const st=document.getElementById('ejsStatus');if(st){st.textContent='נא להוסיף מייל לאחת המשפחות';st.style.color='var(--red)';}return;}
+  const st=document.getElementById('ejsStatus');if(st){st.textContent='שולח...';st.style.color='var(--text2)';}
   Promise.all(sends)
-    .then(()=>{if(st){st.textContent='✓ נשלח! בדוק את תיבת הדואר';st.style.color='var(--green)';}})
+    .then(()=>{if(st){st.textContent=`✓ נשלח ל-${sends.length} כתובות`;st.style.color='var(--green)';}})
     .catch(e=>{if(st){st.textContent='שגיאה: '+(e.text||e);st.style.color='var(--red)';}});
 }
 function sendEmailNotif(recipients,subject,message){
