@@ -2098,7 +2098,7 @@ function renderFamilies(){
     const cl=col(f.id);const cnt=events.filter(e=>e.participants.includes(f.id)).length;
     return`<div class="fcard">
       ${famAva(f, 38)}
-      <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}</div></div>
+      <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}${f.email?' · 📧':''}</div></div>
       <button class="action-btn edit-only" onclick="openFamEditSheet(${f.id})">✏️ ערוך</button>
     </div>`;
   }).join('');
@@ -2262,8 +2262,8 @@ function saveFamEdit(){
   if(!name.startsWith('משפחת'))name='משפחת '+name;
   f.name=name;
   f.children=Math.max(0,parseInt(document.getElementById('famEditChildren').value)||0);
-  f.email=(document.getElementById('famEditEmail').value||'').trim()||undefined;
-  f.email2=(document.getElementById('famEditEmail2').value||'').trim()||undefined;
+  f.email=(document.getElementById('famEditEmail').value||'').trim()||'';
+  f.email2=(document.getElementById('famEditEmail2').value||'').trim()||'';
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
   closeFamEditSheet();
