@@ -2981,6 +2981,10 @@ function confirmDeposit(){
     date:new Date().toLocaleDateString('he-IL')});
   closeDepositSheet();
   save();render();
+  if(isDeposit&&f&&(f.email||f.email2)){
+    const newBal=Math.round(fund.famBalances[key]||0);
+    sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏦 הפקדה לקופה הראשית · ינקלביץ',`הפקדה של ₪${amt.toLocaleString()} לקופה הראשית נרשמה.\nיתרתך: ₪${newBal.toLocaleString()}`);
+  }
 }
 
 
@@ -3272,9 +3276,23 @@ function doDepositToCumPot(){
   if(errEl)errEl.style.display='none';
   const ev=events.find(e=>e.id===cumPotEvId);if(!ev)return;
   if(!ev.potPayments)ev.potPayments=[];
-  ev.potPayments.push({famId:cumPotFamId,amt:Math.round(amt)});
+  const roundAmt=Math.round(amt);
+  ev.potPayments.push({famId:cumPotFamId,amt:roundAmt});
   closeCumPot();
   save();render();
+  // notify depositor — only if this is NOT a settling payment
+  const newBal=evAdjBalance(ev)[cumPotFamId]||0;
+  if(newBal>=-0.5){
+    sendSettledEmail(ev,cumPotFamId);
+  } else {
+    const f=getFam(cumPotFamId);
+    if(f&&(f.email||f.email2)){
+      const totalPot=(ev.potPayments||[]).filter(p=>p.famId===cumPotFamId).reduce((s,p)=>s+p.amt,0);
+      sendEmailNotif([{email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}],
+        '💰 הפקדה לקופת האירוע · ינקלביץ',
+        `הפקדה של ₪${roundAmt.toLocaleString()} לקופת האירוע "${ev.name}" נרשמה.\nסה"כ הפקדת לקופה זו: ₪${totalPot.toLocaleString()}`);
+    }
+  }
 }
 
 function applyEditMode(){
