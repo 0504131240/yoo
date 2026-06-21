@@ -1945,15 +1945,14 @@ function payToPot(evId,famId,amt){
   if(!ev.potPayments)ev.potPayments=[];
   ev.potPayments.push({famId,amt:payment});
   save();render();
-  // email notification for pot deposit
+  // email confirmation to depositor only
   (()=>{
     const ev=events.find(e=>e.id===evId);
     const f=getFam(famId);
-    if(!ev||!f) return;
-    const msg=`${f.name.replace('משפחת','').trim()} הפקיד ₪${payment.toLocaleString()} לקופת האירוע "${ev.name}".`;
-    const recips=ev.participants.map(fid=>getFam(fid)).filter(x=>x&&x.email&&x.id!==famId).map(x=>({email:x.email,email2:x.email2,name:x.name.replace('משפחת','').trim()}));
-    sendEmailNotif(recips,'💰 הפקדה לקופה · ינקלביץ',msg);
-    if(f&&f.email) sendEmailNotif([{email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}],'✓ הפקדתך התקבלה · ינקלביץ',`ההפקדה שלך של ₪${payment.toLocaleString()} לקופת האירוע "${ev.name}" התקבלה.`);
+    if(!ev||!f||(!f.email&&!f.email2)) return;
+    const totalPot=(ev.potPayments||[]).filter(p=>p.famId===famId).reduce((s,p)=>s+p.amt,0);
+    const name=f.name.replace('משפחת','').trim();
+    sendEmailNotif([{email:f.email,email2:f.email2,name}],'✓ הפקדה התקבלה · ינקלביץ',`ההפקדה שלך של ₪${payment.toLocaleString()} לקופת האירוע "${ev.name}" התקבלה.\nסה"כ הפקדת לקופה זו: ₪${totalPot.toLocaleString()}`);
   })();
 }
 function calcPotTransfers(ev){
