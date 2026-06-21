@@ -932,6 +932,32 @@ function testEjsEmail(){
 }
 const _cleanEmail=e=>(e||'').replace(/[​-‏‪-‮⁠﻿ ]/g,'').trim().toLowerCase();
 const _validEmail=e=>!!e&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_cleanEmail(e));
+function sendSettledEmail(ev,famId){
+  const f=getFam(famId);
+  if(!f||(!f.email&&!f.email2)) return;
+  const notifKey='settled-'+ev.id+'-'+famId;
+  if(localStorage.getItem(notifKey)) return;
+  localStorage.setItem(notifKey,'1');
+  const name=f.name.replace('משפחת','').trim();
+  const cost=evCost(ev);
+  const shares=evShares(ev);
+  const share=Math.round(shares[famId]||0);
+  const spent=Math.round(ev.expenses?(ev.expenses[famId]||0):(ev.expenseItems||[]).filter(it=>it.famId===famId).reduce((s,it)=>s+it.amt,0));
+  const lines=[];
+  (ev.potPayments||[]).filter(p=>p.famId===famId).forEach(p=>{
+    lines.push(`• הפקדה של ₪${p.amt.toLocaleString()} לקופת האירוע`);
+  });
+  (ev.settled||[]).filter(s=>{const sf=families.find(x=>x.name===s.from);return sf&&sf.id===famId;}).forEach(s=>{
+    if(s.method==='fund') lines.push(`• ₪${s.amt.toLocaleString()} שולמו מהקופה הראשית ל${s.to}`);
+    else lines.push(`• העברה ישירה של ₪${s.amt.toLocaleString()} ל${s.to}`);
+  });
+  const fundBal=Math.round(fund.famBalances[String(famId)]||0);
+  let msg=`האירוע "${ev.name}" – הסיכום שלך:\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
+  if(spent>0) msg+=`הוצאת: ₪${spent.toLocaleString()}\n`;
+  if(lines.length) msg+=`\nאיך סודר:\n${lines.join('\n')}`;
+  if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
+  sendEmailNotif([{email:f.email,email2:f.email2,name}],`✅ סידרת את חלקך ב"${ev.name}" · ינקלביץ`,msg);
+}
 function testSingleEmail(inputId,btnId){
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
@@ -1685,7 +1711,6 @@ function confirmPartPay(){
   if(_ppPot) payToPot(_ppEvId,_ppFromFid,paid);
   else if(_ppFund) markTransferFromFund(_ppEvId,_ppFrom,_ppFromFid,_ppTo,_ppToFid,paid);
   else {
-    // Fund-first: automatically use debtor's family fund balance before direct transfer
     const ev=events.find(e=>e.id===_ppEvId);if(!ev)return;
     const key=String(_ppFromFid);
     const fundBal=fund.famBalances[key]||0;
@@ -1701,18 +1726,11 @@ function confirmPartPay(){
     }
     if(fromDirect>0) ev.settled.push({from:_ppFrom,to:_ppTo,amt:fromDirect,method:'direct'});
     save();render();
+    // check if now settled → send summary email
+    const newBal=evAdjBalance(ev)[_ppFromFid]||0;
+    if(newBal>=-0.5) sendSettledEmail(ev,_ppFromFid);
   }
   if(_ppSettle){const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
-  // email notification
-  (()=>{
-    const fromFam=getFam(_ppFromFid);
-    const toFam=getFam(_ppToFid);
-    const msg=`${fromFam?fromFam.name.replace('משפחת','').trim():'?'} שילם ₪${paid.toLocaleString()} ל${toFam?toFam.name.replace('משפחת','').trim():'?'}.`;
-    const recips=[];
-    if(fromFam&&fromFam.email) recips.push({email:fromFam.email,email2:fromFam.email2,name:fromFam.name.replace('משפחת','').trim()});
-    if(toFam&&toFam.email) recips.push({email:toFam.email,email2:toFam.email2,name:toFam.name.replace('משפחת','').trim()});
-    sendEmailNotif(recips,'✓ תשלום נרשם · ינקלביץ',msg);
-  })();
   closePartPayModal();
 }
 function openPotPayModal(evId,famId){
@@ -1945,15 +1963,9 @@ function payToPot(evId,famId,amt){
   if(!ev.potPayments)ev.potPayments=[];
   ev.potPayments.push({famId,amt:payment});
   save();render();
-  // email confirmation to depositor only
-  (()=>{
-    const ev=events.find(e=>e.id===evId);
-    const f=getFam(famId);
-    if(!ev||!f||(!f.email&&!f.email2)) return;
-    const totalPot=(ev.potPayments||[]).filter(p=>p.famId===famId).reduce((s,p)=>s+p.amt,0);
-    const name=f.name.replace('משפחת','').trim();
-    sendEmailNotif([{email:f.email,email2:f.email2,name}],'✓ הפקדה התקבלה · ינקלביץ',`ההפקדה שלך של ₪${payment.toLocaleString()} לקופת האירוע "${ev.name}" התקבלה.\nסה"כ הפקדת לקופה זו: ₪${totalPot.toLocaleString()}`);
-  })();
+  // check if now settled → send summary email
+  const newBal=evAdjBalance(ev)[famId]||0;
+  if(newBal>=-0.5) sendSettledEmail(ev,famId);
 }
 function calcPotTransfers(ev){
   const pots=ev.potPayments||[];if(!pots.length)return[];
@@ -2969,10 +2981,6 @@ function confirmDeposit(){
     date:new Date().toLocaleDateString('he-IL')});
   closeDepositSheet();
   save();render();
-  if(isDeposit&&f&&f.email){
-    const newBal=(fund.famBalances[key]||0);
-    sendEmailNotif([{email:f.email,email2:f.email2,name}],'✓ הפקדה התקבלה · ינקלביץ',`ההפקדה שלך של ₪${amt.toLocaleString()} לקופה הראשית התקבלה.\nיתרתך: ₪${newBal.toLocaleString()}.`);
-  }
 }
 
 
