@@ -579,6 +579,18 @@ body:not(.at-home){padding-bottom:140px}
       <input type="text" id="ejsPublicKey" placeholder="Public Key" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
       <input type="text" id="ejsServiceId" placeholder="Service ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
       <input type="text" id="ejsTemplateId" placeholder="Template ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;direction:ltr">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:600;color:var(--text2)">תזכורת חוב שבועית</span>
+        <select id="ejsReminderDay" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:6px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text)">
+          <option value="0">ראשון</option>
+          <option value="1">שני</option>
+          <option value="2">שלישי</option>
+          <option value="3">רביעי</option>
+          <option value="4">חמישי</option>
+          <option value="5">שישי</option>
+          <option value="6">שבת</option>
+        </select>
+      </div>
       <div style="display:flex;gap:8px">
         <button onclick="saveEjsSettings()" style="flex:1;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור הגדרות</button>
         <button onclick="testEjsEmail()" style="padding:9px 12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📧 בדוק</button>
@@ -876,9 +888,11 @@ function loadEjsSettings(){
   const keyEl=document.getElementById('ejsPublicKey');
   const svcEl=document.getElementById('ejsServiceId');
   const tplEl=document.getElementById('ejsTemplateId');
+  const dayEl=document.getElementById('ejsReminderDay');
   if(keyEl) keyEl.value=localStorage.getItem('ejsPublicKey')||'';
   if(svcEl) svcEl.value=localStorage.getItem('ejsServiceId')||'';
   if(tplEl) tplEl.value=localStorage.getItem('ejsTemplateId')||'';
+  if(dayEl) dayEl.value=localStorage.getItem('reminderDay')||'0';
   const key=localStorage.getItem('ejsPublicKey');
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
 }
@@ -886,9 +900,11 @@ function saveEjsSettings(){
   const key=document.getElementById('ejsPublicKey').value.trim();
   const svc=document.getElementById('ejsServiceId').value.trim();
   const tpl=document.getElementById('ejsTemplateId').value.trim();
+  const day=document.getElementById('ejsReminderDay').value;
   localStorage.setItem('ejsPublicKey',key);
   localStorage.setItem('ejsServiceId',svc);
   localStorage.setItem('ejsTemplateId',tpl);
+  localStorage.setItem('reminderDay',day);
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
   const st=document.getElementById('ejsStatus');
   if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
@@ -949,8 +965,14 @@ function sendEmailNotif(recipients,subject,message){
   },i*600));
 }
 function checkWeeklyReminders(){
+  const reminderDay=parseInt(localStorage.getItem('reminderDay')||'0');
+  const now=new Date();
+  const daysSince=(now.getDay()-reminderDay+7)%7;
+  const lastReminderDate=new Date(now);
+  lastReminderDate.setDate(now.getDate()-daysSince);
+  lastReminderDate.setHours(0,0,0,0);
   const last=parseInt(localStorage.getItem('lastDebtReminder')||'0');
-  if(Date.now()-last<7*24*60*60*1000) return;
+  if(last>=lastReminderDate.getTime()) return;
   localStorage.setItem('lastDebtReminder',String(Date.now()));
   families.forEach(f=>{
     if(!f.email) return;
