@@ -1726,9 +1726,17 @@ function confirmPartPay(){
     }
     if(fromDirect>0) ev.settled.push({from:_ppFrom,to:_ppTo,amt:fromDirect,method:'direct'});
     save();render();
-    // check if now settled → send summary email
+    // notify debtor if now settled
     const newBal=evAdjBalance(ev)[_ppFromFid]||0;
     if(newBal>=-0.5) sendSettledEmail(ev,_ppFromFid);
+    // notify creditor that they received payment
+    const toF=getFam(_ppToFid);
+    if(toF&&(toF.email||toF.email2)){
+      const toName=toF.name.replace('משפחת','').trim();
+      sendEmailNotif([{email:toF.email,email2:toF.email2,name:toName}],
+        '💸 קיבלת תשלום · ינקלביץ',
+        `קיבלת ₪${paid.toLocaleString()} מ${_ppFrom} עבור האירוע "${ev.name}".`);
+    }
   }
   if(_ppSettle){const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
   closePartPayModal();
