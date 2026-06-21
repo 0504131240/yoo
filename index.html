@@ -1726,16 +1726,28 @@ function confirmPartPay(){
     }
     if(fromDirect>0) ev.settled.push({from:_ppFrom,to:_ppTo,amt:fromDirect,method:'direct'});
     save();render();
-    // notify debtor if now settled
-    const newBal=evAdjBalance(ev)[_ppFromFid]||0;
-    if(newBal>=-0.5) sendSettledEmail(ev,_ppFromFid);
-    // notify creditor that they received payment
-    const toF=getFam(_ppToFid);
-    if(toF&&(toF.email||toF.email2)){
-      const toName=toF.name.replace('משפחת','').trim();
-      sendEmailNotif([{email:toF.email,email2:toF.email2,name:toName}],
-        '💸 קיבלת תשלום · ינקלביץ',
-        `קיבלת ₪${paid.toLocaleString()} מ${_ppFrom} עבור האירוע "${ev.name}".`);
+    const adjAfter=evAdjBalance(ev);
+    // notify debtor if now fully settled
+    if((adjAfter[_ppFromFid]||0)>=-0.5) sendSettledEmail(ev,_ppFromFid);
+    // notify creditor only when their full amount has been received
+    if((adjAfter[_ppToFid]||0)<=0.5){
+      const toF=getFam(_ppToFid);
+      if(toF&&(toF.email||toF.email2)){
+        const notifKey='settled-'+ev.id+'-'+_ppToFid;
+        if(!localStorage.getItem(notifKey)){
+          localStorage.setItem(notifKey,'1');
+          const toName=toF.name.replace('משפחת','').trim();
+          const cost=evCost(ev);
+          const share=Math.round(evShares(ev)[_ppToFid]||0);
+          const spent=Math.round(ev.expenses[_ppToFid]||0);
+          const received=(ev.settled||[]).filter(s=>{const tf=families.find(x=>x.name.replace('משפחת','').trim()===s.to.replace('משפחת','').trim());return tf&&tf.id===_ppToFid;});
+          const recLines=received.map(s=>s.method==='fund'?`• ₪${s.amt.toLocaleString()} מ${s.from} (מהקופה הראשית)`:`• ₪${s.amt.toLocaleString()} מ${s.from}`);
+          let msg=`האירוע "${ev.name}" – הסיכום שלך:\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
+          if(spent>0) msg+=`שילמת: ₪${spent.toLocaleString()}\n`;
+          if(recLines.length) msg+=`\nמה קיבלת:\n${recLines.join('\n')}`;
+          sendEmailNotif([{email:toF.email,email2:toF.email2,name:toName}],`✅ קיבלת את חלקך ב"${ev.name}" · ינקלביץ`,msg);
+        }
+      }
     }
   }
   if(_ppSettle){const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
@@ -2628,14 +2640,6 @@ function closeEv(evId){
     const cost=evCost(ev);
     const shares=evShares(ev);
     const adjBal=evAdjBalance(ev);
-    // global expenses table for all participants
-    const allExpLines=ev.participants.map(fid=>{
-      const pf=getFam(fid);if(!pf)return'';
-      const pname=pf.name.replace('משפחת','').trim();
-      const pSpent=Math.round((ev.expenseItems||[]).filter(it=>it.famId===fid).reduce((s,it)=>s+it.amt,0));
-      const pShare=Math.round(shares[fid]||0);
-      return`• ${pname}: הוציא ₪${pSpent.toLocaleString()} · חלק: ₪${pShare.toLocaleString()}`;
-    }).filter(Boolean).join('\n');
     ev.participants.forEach(fid=>{
       const f=getFam(fid);if(!f||(!f.email&&!f.email2))return;
       if(Math.abs(adjBal[fid]||0)>0.5) return; // only settled families get the email
@@ -2645,10 +2649,9 @@ function closeEv(evId){
       const mySpent=Math.round(myItems.reduce((s,it)=>s+it.amt,0));
       const myPot=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0));
       let msg=`האירוע "${ev.name}" הסתיים!\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
-      msg+=`\n📋 הוצאות כלל המשפחות:\n${allExpLines}`;
       if(mySpent>0){
         const itemLines=myItems.map(it=>`  - ${it.name}: ₪${it.amt.toLocaleString()}`).join('\n');
-        msg+=`\n\n💳 ההוצאות שלך (${name}):\n${itemLines}\n  סה"כ: ₪${mySpent.toLocaleString()}`;
+        msg+=`\n💳 ההוצאות שלך (${name}):\n${itemLines}\n  סה"כ: ₪${mySpent.toLocaleString()}`;
       }
       if(myPot>0) msg+=`\n\n💰 הפקדת לקופת האירוע: ₪${myPot.toLocaleString()}`;
       msg+=`\n\n✅ החשבון שלך מסודר.`;
