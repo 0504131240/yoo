@@ -2646,6 +2646,28 @@ function closeEv(evId){
       msg+=`\n\n✅ החשבון שלך מסודר.`;
       sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏁 האירוע הסתיים · ינקלביץ',msg);
     });
+  } else {
+    // regular event: send closing summary only to families that didn't get a settled email yet (i.e. creditors)
+    const cost=evCost(ev);
+    const shares=evShares(ev);
+    const adjBal=evAdjBalance(ev);
+    ev.participants.forEach(fid=>{
+      const f=getFam(fid);if(!f||(!f.email&&!f.email2))return;
+      if(localStorage.getItem('settled-'+ev.id+'-'+fid)) return; // debtor already got settled email
+      const name=f.name.replace('משפחת','').trim();
+      const share=Math.round(shares[fid]||0);
+      const spent=Math.round(ev.expenses[fid]||0);
+      const bal=Math.round(adjBal[fid]||0);
+      // what this family received from others
+      const received=(ev.settled||[]).filter(s=>{const tf=families.find(x=>x.name.replace('משפחת','').trim()===s.to.replace('משפחת','').trim());return tf&&tf.id===fid;});
+      let msg=`האירוע "${ev.name}" נסגר.\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}`;
+      if(received.length){
+        const recLines=received.map(s=>`• קיבלת ₪${s.amt.toLocaleString()} מ${s.from}`).join('\n');
+        msg+=`\n\n${recLines}`;
+      }
+      msg+=`\n\n${Math.abs(bal)<=0.5?'✅ החשבון שלך מסודר.':bal>0.5?`💰 מגיע לך עוד ₪${bal.toLocaleString()}.`:`⚠️ יתרת חוב: ₪${Math.abs(bal).toLocaleString()}.`}`;
+      sendEmailNotif([{email:f.email,email2:f.email2,name}],'🗂 האירוע נסגר · ינקלביץ',msg);
+    });
   }
   ev.open=false;ev.closedOn='היום';save();render();
   goTab('archive',document.getElementById('nb-archive'));
