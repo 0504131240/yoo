@@ -1699,6 +1699,12 @@ function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
   fund.transactions.push({id:nxtTx++,type:'payout',famId:fromFid,amount:amt,
     desc:'תשלום של '+from+' ל'+to+' · '+ev.name,
     date:new Date().toLocaleDateString('he-IL')});
+  // credit the creditor's fund balance
+  const toKey2=String(toFid);
+  fund.famBalances[toKey2]=(fund.famBalances[toKey2]||0)+amt;
+  fund.transactions.push({id:nxtTx++,type:'deposit',famId:toFid,amount:amt,
+    desc:'קיבלת מ'+from+' עבור "'+ev.name+'" (מהקופה)',
+    date:new Date().toLocaleDateString('he-IL')});
   save();render();
 }
 function openPartPayModal(evId,from,fromFid,to,toFid,amt,isFund,fromSettle){
@@ -1759,7 +1765,13 @@ function confirmPartPay(){
       ev.settled.push({from:_ppFrom,to:_ppTo,amt:fromFund,method:'fund'});
       fund.famBalances[key]=fundBal-fromFund;
       fund.transactions.push({id:nxtTx++,type:'payout',famId:_ppFromFid,amount:fromFund,
-        desc:'תשלום של '+_ppFrom+' ל'+_ppTo+' (מהקופה)',
+        desc:'תשלום של '+_ppFrom+' ל'+_ppTo+' (מהקופה) · '+ev.name,
+        date:new Date().toLocaleDateString('he-IL')});
+      // credit the creditor's fund balance
+      const toKey=String(_ppToFid);
+      fund.famBalances[toKey]=(fund.famBalances[toKey]||0)+fromFund;
+      fund.transactions.push({id:nxtTx++,type:'deposit',famId:_ppToFid,amount:fromFund,
+        desc:'קיבלת מ'+_ppFrom+' עבור "'+ev.name+'" (מהקופה)',
         date:new Date().toLocaleDateString('he-IL')});
     }
     if(fromDirect>0) ev.settled.push({from:_ppFrom,to:_ppTo,amt:fromDirect,method:'direct'});
@@ -1779,16 +1791,19 @@ function confirmPartPay(){
           const share=Math.round(evShares(ev)[_ppToFid]||0);
           const spent=Math.round(ev.expenses[_ppToFid]||0);
           const received=(ev.settled||[]).filter(s=>{const tf=families.find(x=>x.name.replace('משפחת','').trim()===s.to.replace('משפחת','').trim());return tf&&tf.id===_ppToFid;});
-          const recLines=received.map(s=>s.method==='fund'?`• ₪${s.amt.toLocaleString()} מ${s.from} (מהקופה הראשית)`:`• ₪${s.amt.toLocaleString()} מ${s.from}`);
+          const recLines=received.map(s=>s.method==='fund'?`• ₪${s.amt.toLocaleString()} מ${s.from} – הועבר לקופה הראשית שלך`:`• ₪${s.amt.toLocaleString()} מ${s.from} – העברה ישירה`);
+          const toFundBal=Math.round(fund.famBalances[String(_ppToFid)]||0);
           let msg=`האירוע "${ev.name}" – הסיכום שלך:\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
           if(spent>0) msg+=`שילמת: ₪${spent.toLocaleString()}\n`;
           if(recLines.length) msg+=`\nמה קיבלת:\n${recLines.join('\n')}`;
+          if(toFundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${toFundBal.toLocaleString()}`;
           const crCardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
           if(spent>0) crCardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
           let crBodyHtml=_eCard(crCardRows);
           if(recLines.length){
             crBodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">מה קיבלת:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${recLines.map(l=>`<li style="margin-bottom:4px">${_esc(l.replace(/^•\s*/,''))}</li>`).join('')}</ul>`;
           }
+          if(toFundBal>0) crBodyHtml+=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 יתרתך בקופה הראשית: <strong>₪${toFundBal.toLocaleString()}</strong></div>`;
           crBodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
           const crHtml=_emailWrap(crBodyHtml,`האירוע "${ev.name}"`, '✅',_ejsUrl()+'#event-'+ev.id);
           sendEmailNotif([{email:toF.email,email2:toF.email2,name:toName}],`✅ קיבלת את חלקך ב"${ev.name}" · ינקלביץ`,msg,crHtml);
