@@ -1213,6 +1213,7 @@ function switchShell(s){
   document.getElementById('mn-home').classList.toggle('mn-active',s==='home');
   document.getElementById('mn-pay').classList.toggle('mn-active',s==='pay');
   if(s==='home')renderFamilyHome();
+  if(s==='pay')goTab('home',document.getElementById('nb-home'));
 }
 
 const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
