@@ -224,9 +224,9 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
 .home-bstat+.home-bstat { border-right:1px solid rgba(255,255,255,.15); }
 .home-bstat-val { font-size:18px; font-weight:800; }
 .home-bstat-lbl { font-size:10px; opacity:.55; margin-top:3px; }
-.home-fam-strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:16px; scrollbar-width:none; }
+.home-fam-strip { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
 .home-fam-strip::-webkit-scrollbar { display:none; }
-.home-fam-pill { display:flex; flex-direction:column; align-items:center; gap:5px; background:var(--surface); border-radius:14px; border:1.5px solid var(--border); padding:10px 14px; flex-shrink:0; min-width:70px; }
+.home-fam-pill { display:flex; flex-direction:column; align-items:center; gap:5px; background:var(--surface); border-radius:14px; border:1.5px solid var(--border); padding:10px 14px; flex:1 1 calc(33% - 8px); min-width:80px; }
 .home-fam-pill.pill-owe { border-color:var(--red-mid); background:var(--red-bg); }
 .home-fam-pill.pill-get { border-color:var(--green-mid); background:var(--green-bg); }
 .hev { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); margin-bottom:10px; overflow:hidden; cursor:pointer; }
