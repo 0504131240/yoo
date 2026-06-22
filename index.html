@@ -3569,15 +3569,16 @@ window.addEventListener('hashchange',handleHash);
       if(dx>0){switchShell('pay');goTab('events',document.getElementById('nb-events'));}
       return;
     }
-    if(currentShell==='pay'&&dx<0&&document.getElementById('view-home')?.classList.contains('active')){
-      switchShell('home');return;
-    }
     // Swipe between tabs
     const cur=TABS.findIndex(t=>document.getElementById('view-'+t)?.classList.contains('active'));
     if(cur<0)return;
-    // swipe left → next tab (higher index), swipe right → previous tab (lower index)
-    const next=dx<0?Math.min(cur+1,TABS.length-1):Math.max(cur-1,0);
-    if(next===cur)return;
+    // swipe right → next tab (higher index), swipe left → previous tab (lower index)
+    const next=dx>0?Math.min(cur+1,TABS.length-1):Math.max(cur-1,0);
+    if(next===cur){
+      // At left boundary of home tab → back to home shell
+      if(dx<0&&cur===0)switchShell('home');
+      return;
+    }
     goTab(TABS[next],document.getElementById(NAV[TABS[next]]),false,dx<0?'left':'right');
   },{passive:true});
 })();
