@@ -255,9 +255,10 @@ body:not(.at-home){padding-bottom:140px}
 /* Desktop: phone-frame layout */
 @media(min-width:600px){
   html{background:#d4d7e3}
-  body{max-width:430px;margin:0 auto;box-shadow:0 0 48px rgba(0,0,0,.22);border-left:1px solid var(--border);border-right:1px solid var(--border)}
-  .bottom-nav,#main-nav{left:50%;right:auto;transform:translateX(-50%);width:430px}
-  #shell-home{max-width:430px;margin:0 auto}
+  body{max-width:min(720px,92vw);margin:0 auto;box-shadow:0 0 48px rgba(0,0,0,.22);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  .bottom-nav,#main-nav{left:50%;right:auto;transform:translateX(-50%);width:min(720px,92vw)}
+  #shell-home{max-width:min(720px,92vw);margin:0 auto}
+  .main{max-width:100%}
 }
 /* Hero */
 .fh-hero{position:relative;min-height:210px;display:flex;align-items:flex-end;overflow:hidden;flex-shrink:0}
