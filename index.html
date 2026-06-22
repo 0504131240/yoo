@@ -3566,7 +3566,7 @@ window.addEventListener('hashchange',handleHash);
     if(OVERLAYS.some(id=>{const o=document.getElementById(id);return o&&o.style.display==='flex';}))return;
     // Home shell ↔ pay shell
     if(document.body.classList.contains('at-home')){
-      if(dx>0){switchShell('pay');goTab('events',document.getElementById('nb-events'));}
+      if(dx>0){switchShell('pay');goTab('home',document.getElementById('nb-home'));}
       return;
     }
     // Swipe between tabs
