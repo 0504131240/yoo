@@ -2716,35 +2716,39 @@ function closeEv(evId){
       }
       if(myPot>0) msg+=`\n\n💰 הפקדת לקופת האירוע: ₪${myPot.toLocaleString()}`;
       msg+=`\n\n✅ החשבון שלך מסודר.`;
-      // HTML – families spending table + this family's expense items
-      const famTableRows=ev.participants.map(fid2=>{
-        const pf=getFam(fid2);if(!pf)return null;
-        const pname=pf.name.replace('משפחת','').trim();
-        const pSpent=Math.round((ev.expenseItems||[]).filter(it=>it.famId===fid2).reduce((s,it)=>s+it.amt,0));
-        const pShare=Math.round(shares[fid2]||0);
-        return[_esc(pname),`₪${pSpent.toLocaleString()}`,`₪${pShare.toLocaleString()}`];
-      }).filter(Boolean);
+      // HTML – expense items grouped by family with subtotals
       let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]]);
-      bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">📋 הוצאות כלל המשפחות:</p>`;
-      bodyHtml+=_eTable(['משפחה','הוציא','חלק'],famTableRows);
-      // all expense items table, highlighting this family's rows
       const allItems=ev.expenseItems||[];
       if(allItems.length){
         bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 פירוט כל ההוצאות:</p>`;
-        const itemRows=allItems.map(it=>{
-          const pf=getFam(it.famId);
+        // group items by family in participant order
+        const itemsByFam={};
+        ev.participants.forEach(fid2=>{itemsByFam[fid2]=[];});
+        allItems.forEach(it=>{if(itemsByFam[it.famId])itemsByFam[it.famId].push(it);});
+        let itemRows='';
+        ev.participants.forEach(fid2=>{
+          const its=itemsByFam[fid2];if(!its||!its.length)return;
+          const pf=getFam(fid2);
           const pname=pf?pf.name.replace('משפחת','').trim():'?';
-          const isMine=it.famId===fid;
-          const sharedLine=it.sharedWith&&it.sharedWith.length<ev.participants.length
-            ?` <span style="font-size:11px;color:#888">(חלק)</span>`:'';
-          return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#f0f0ff':''}">
-            <td style="padding:7px 10px">${_esc(it.name)}${sharedLine}</td>
-            <td style="padding:7px 10px;font-size:12px;color:#666">${_esc(pname)}</td>
-            <td style="padding:7px 10px;font-weight:600;${isMine?'color:#5b4fcf':''}">₪${it.amt.toLocaleString()}</td>
-          </tr>`;
-        }).join('');
-        bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#edeeff"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">פריט</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">שילם</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">סכום</th></tr>${itemRows}</table>`;
-        if(mySpent>0) bodyHtml+=`<p style="font-size:12px;color:#666;margin:0 0 12px;text-align:center">שורות בסגול = הוצאות שלך</p>`;
+          const isMine=fid2===fid;
+          const famTotal=its.reduce((s,it)=>s+it.amt,0);
+          its.forEach(it=>{
+            const sharedLabel=it.sharedWith&&it.sharedWith.length<ev.participants.length?` <span style="font-size:11px;color:#888">(חלק)</span>`:'';
+            itemRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#f0f0ff':''}">
+              <td style="padding:7px 10px">${_esc(it.name)}${sharedLabel}</td>
+              <td style="padding:7px 10px;font-size:12px;color:#666">${_esc(pname)}</td>
+              <td style="padding:7px 10px;font-weight:600;${isMine?'color:#5b4fcf':''}">₪${it.amt.toLocaleString()}</td>
+            </tr>`;
+          });
+          if(its.length>1){
+            itemRows+=`<tr style="border-bottom:2px solid #e0e2ff${isMine?';background:#e8e8ff':''}">
+              <td colspan="2" style="padding:4px 10px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
+              <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${famTotal.toLocaleString()}</td>
+            </tr>`;
+          }
+        });
+        bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px"><tr style="background:#edeeff"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">פריט</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">שילם</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">סכום</th></tr>${itemRows}</table>`;
+        if(mySpent>0) bodyHtml+=`<p style="font-size:11px;color:#888;margin:0 0 12px;text-align:center">שורות בסגול = הוצאות שלך</p>`;
       }
       if(myPot>0) bodyHtml+=`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 הפקדת לקופת האירוע: <strong>₪${myPot.toLocaleString()}</strong></div>`;
       bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
