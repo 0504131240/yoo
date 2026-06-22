@@ -1945,14 +1945,15 @@ function evCard(ev){
     const multi=payments.length>1;
     const key=ev.id+'-pot-'+fid;
     const isExp=expandedPotFamilies.has(key);
+    const delBtn=(i)=>`<button class="edit-only" onclick="deletePotDeposit(${ev.id},${fid},${i})" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:11px;padding:0 2px;font-family:var(--font)" title="מחק הפקדה">🗑</button>`;
     const details=multi&&isExp?'<div style="padding:4px 0 2px 14px;border-top:1px solid rgba(180,130,0,.15);margin-top:3px">'
-      +payments.map((p,i)=>`<div style="font-size:10px;color:var(--text2);padding:1px 0">תשלום ${i+1}: ₪${p.amt.toLocaleString()}</div>`).join('')
+      +payments.map((p,i)=>`<div style="font-size:10px;color:var(--text2);padding:1px 0;display:flex;align-items:center;justify-content:space-between"><span>תשלום ${i+1}: ₪${p.amt.toLocaleString()}</span>${delBtn(i)}</div>`).join('')
       +'</div>':'';
     return`<div style="margin-bottom:${multi?'1':'0'}px">
       <div style="display:flex;align-items:center;gap:4px;font-size:11px">
         <span style="color:var(--green-mid)">✓</span>
         <span style="flex:1;color:var(--text2)"><b style="color:var(--text)">${esc(name)}</b> שילם ₪${total.toLocaleString()}</span>
-        ${multi?`<button onclick="togglePotFamily(${ev.id},${fid})" style="background:none;border:none;font-size:10px;color:var(--amber);cursor:pointer;padding:0 3px;font-weight:700;font-family:var(--font)">${isExp?'▲':'▼ '+payments.length}</button>`:''}
+        ${multi?`<button onclick="togglePotFamily(${ev.id},${fid})" style="background:none;border:none;font-size:10px;color:var(--amber);cursor:pointer;padding:0 3px;font-weight:700;font-family:var(--font)">${isExp?'▲':'▼ '+payments.length}</button>`:delBtn(0)}
       </div>${details}
     </div>`;
   }).join('');
@@ -3425,6 +3426,17 @@ function releasePotExcessToOneM(evId,famId,toFund){
   releasePotExcessToOne(evId,famId,toFund);
   const ev=events.find(e=>e.id===evId);
   if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+}
+function deletePotDeposit(evId,famId,localIdx){
+  const ev=events.find(e=>e.id===evId);if(!ev||!ev.potPayments)return;
+  let count=0;
+  const gi=ev.potPayments.findIndex(p=>{
+    if(p.famId===famId){if(count===localIdx)return true;count++;}
+    return false;
+  });
+  if(gi<0)return;
+  ev.potPayments.splice(gi,1);
+  save();render();
 }
 // ──────────────────────────────────────────
 function openCumPot(evId){
