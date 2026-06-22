@@ -45,6 +45,10 @@ body.edit-mode .view-only { display: none !important; }
 body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default; }
 .view { display: none; }
 .view.active { display: block; }
+@keyframes _svR{from{transform:translateX(100%);opacity:.8}to{transform:translateX(0);opacity:1}}
+@keyframes _svL{from{transform:translateX(-100%);opacity:.8}to{transform:translateX(0);opacity:1}}
+.view.active.sv-r{animation:_svR .22s ease-out}
+.view.active.sv-l{animation:_svL .22s ease-out}
 
 /* New event form */
 .new-form { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 16px; margin-bottom: 14px; }
@@ -2810,10 +2814,12 @@ function addFam(){
   if(!name.startsWith('משפחת'))name='משפחת '+name;
   families.push({id:nxtFam++,name,children:0});inp.value='';save();render();
 }
-function goTab(tab,el,skipHash){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+function goTab(tab,el,skipHash,swipeDir){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active','sv-r','sv-l'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('view-'+tab).classList.add('active');
+  const vEl=document.getElementById('view-'+tab);
+  vEl.classList.add('active');
+  if(swipeDir)vEl.classList.add(swipeDir==='left'?'sv-r':'sv-l');
   if(el)el.classList.add('active');
   if(tab==='families') loadEjsSettings();
   if(!skipHash) history.replaceState(null,'','#'+tab);
@@ -3541,6 +3547,32 @@ load();
 loadEjsSettings();
 checkWeeklyReminders();
 window.addEventListener('hashchange',handleHash);
+
+// Swipe between tabs
+(function(){
+  const TABS=['home','events','archive','debts','fund'];
+  const NAV={home:'nb-home',events:'nb-events',archive:'nb-archive',debts:'nb-debts',fund:'nb-fund'};
+  const OVERLAYS=['newFormOverlay','famPickOverlay','childOverrideOverlay','expenseOverlay','famEditOverlay','depositOverlay','goalFormOverlay','goalDepositOverlay','addExpItemOverlay','cumPotOverlay'];
+  let sx=0,sy=0,st=0;
+  document.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1)return;
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=Date.now();
+  },{passive:true});
+  document.addEventListener('touchend',e=>{
+    if(e.changedTouches.length!==1)return;
+    if(document.body.classList.contains('at-home'))return;
+    if(OVERLAYS.some(id=>{const o=document.getElementById(id);return o&&o.style.display==='flex';}))return;
+    const dx=e.changedTouches[0].clientX-sx;
+    const dy=e.changedTouches[0].clientY-sy;
+    if(Date.now()-st>600||Math.abs(dx)<50||Math.abs(dx)<Math.abs(dy)*1.3)return;
+    const cur=TABS.findIndex(t=>document.getElementById('view-'+t)?.classList.contains('active'));
+    if(cur<0)return;
+    // swipe left → next tab (higher index), swipe right → previous tab (lower index)
+    const next=dx<0?Math.min(cur+1,TABS.length-1):Math.max(cur-1,0);
+    if(next===cur)return;
+    goTab(TABS[next],document.getElementById(NAV[TABS[next]]),false,dx<0?'left':'right');
+  },{passive:true});
+})();
 </script>
 
 
