@@ -39,16 +39,13 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); dire
 .nav-icon { font-size: 20px; line-height: 1; }
 
 /* Main */
-.main { padding: 14px; max-width: 600px; margin: 0 auto; }
+.main { padding: 14px; max-width: 600px; margin: 0 auto; position: relative; overflow: hidden; }
 body:not(.edit-mode) .edit-only { display: none !important; }
 body.edit-mode .view-only { display: none !important; }
 body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default; }
 .view { display: none; }
 .view.active { display: block; }
-@keyframes _svR{from{transform:translateX(100%);opacity:.8}to{transform:translateX(0);opacity:1}}
-@keyframes _svL{from{transform:translateX(-100%);opacity:.8}to{transform:translateX(0);opacity:1}}
-.view.active.sv-r{animation:_svR .22s ease-out}
-.view.active.sv-l{animation:_svL .22s ease-out}
+.view.sv-out { display: block !important; position: absolute; inset: 0; padding: 14px; background: var(--bg); z-index: 1; pointer-events: none; }
 
 /* New event form */
 .new-form { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); padding: 16px; margin-bottom: 14px; }
@@ -2829,14 +2826,30 @@ function addFam(){
   families.push({id:nxtFam++,name,children:0});inp.value='';save();render();
 }
 function goTab(tab,el,skipHash,swipeDir){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active','sv-r','sv-l'));
+  const next=document.getElementById('view-'+tab);if(!next)return;
+  const prev=document.querySelector('.view.active');
+  // abort any in-progress transition
+  document.querySelectorAll('.view.sv-out').forEach(v=>{v.classList.remove('sv-out');v.style.cssText='';});
+  document.querySelectorAll('.view').forEach(v=>{v.classList.remove('active');v.style.cssText='';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const vEl=document.getElementById('view-'+tab);
-  vEl.classList.add('active');
-  if(swipeDir)vEl.classList.add(swipeDir==='left'?'sv-r':'sv-l');
   if(el)el.classList.add('active');
   if(tab==='families') loadEjsSettings();
   if(!skipHash) history.replaceState(null,'','#'+tab);
+  if(!swipeDir||!prev||prev===next){next.classList.add('active');return;}
+  const DUR=260,EASE='cubic-bezier(0.4,0,0.2,1)';
+  const right=swipeDir==='right'; // finger went right → new view from left
+  // outgoing: stays in flow position → slide out
+  prev.classList.add('sv-out');
+  prev.style.willChange='transform';
+  // incoming: starts off-screen
+  next.style.transform=`translateX(${right?'-100%':'100%'})`;
+  next.style.willChange='transform';
+  next.classList.add('active');
+  next.getBoundingClientRect(); // force reflow
+  const tr=`transform ${DUR}ms ${EASE}`;
+  prev.style.transition=tr;prev.style.transform=`translateX(${right?'100%':'-100%'})`;
+  next.style.transition=tr;next.style.transform='translateX(0)';
+  setTimeout(()=>{prev.classList.remove('sv-out');prev.style.cssText='';next.style.cssText='';},DUR+20);
 }
 function handleHash(){
   const h=(window.location.hash||'').replace('#','');
