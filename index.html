@@ -917,14 +917,21 @@ function saveEjsSettings(){
   const key=document.getElementById('ejsPublicKey').value.trim();
   const svc=document.getElementById('ejsServiceId').value.trim();
   const tpl=document.getElementById('ejsTemplateId').value.trim();
-  const day=document.getElementById('ejsReminderDay').value;
+  const day=parseInt(document.getElementById('ejsReminderDay').value)||0;
   const url=document.getElementById('ejsAppUrl').value.trim();
   localStorage.setItem('ejsPublicKey',key);
   localStorage.setItem('ejsServiceId',svc);
   localStorage.setItem('ejsTemplateId',tpl);
-  localStorage.setItem('reminderDay',day);
+  localStorage.setItem('reminderDay',String(day));
   localStorage.setItem('ejsAppUrl',url);
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
+  // Sync to Firestore so Cloud Function can read settings
+  fbInit().then(({db,doc,setDoc})=>{
+    setDoc(doc(db,'appData','emailConfig'),{
+      ejsPublicKey:key,ejsServiceId:svc,ejsTemplateId:tpl,
+      reminderDay:day,ejsAppUrl:url||window.location.origin+window.location.pathname
+    },{merge:true}).catch(()=>{});
+  });
   const st=document.getElementById('ejsStatus');
   if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
 }
@@ -1043,6 +1050,11 @@ function checkWeeklyReminders(){
   lastReminderDate.setHours(0,0,0,0);
   const last=parseInt(localStorage.getItem('lastDebtReminder')||'0');
   if(last>=lastReminderDate.getTime()) return;
+  // Don't mark as sent unless EmailJS is actually configured
+  const ejsKey=localStorage.getItem('ejsPublicKey');
+  const ejsSvc=localStorage.getItem('ejsServiceId');
+  const ejsTpl=localStorage.getItem('ejsTemplateId');
+  if(!ejsKey||!ejsSvc||!ejsTpl||typeof emailjs==='undefined') return;
   localStorage.setItem('lastDebtReminder',String(Date.now()));
   families.forEach(f=>{
     if(!f.email) return;
