@@ -1043,6 +1043,11 @@ function checkWeeklyReminders(){
   lastReminderDate.setHours(0,0,0,0);
   const last=parseInt(localStorage.getItem('lastDebtReminder')||'0');
   if(last>=lastReminderDate.getTime()) return;
+  // Don't mark as sent unless EmailJS is actually configured
+  const ejsKey=localStorage.getItem('ejsPublicKey');
+  const ejsSvc=localStorage.getItem('ejsServiceId');
+  const ejsTpl=localStorage.getItem('ejsTemplateId');
+  if(!ejsKey||!ejsSvc||!ejsTpl||typeof emailjs==='undefined') return;
   localStorage.setItem('lastDebtReminder',String(Date.now()));
   families.forEach(f=>{
     if(!f.email) return;
