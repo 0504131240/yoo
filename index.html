@@ -440,7 +440,7 @@ body:not(.at-home){padding-bottom:140px}
   </div>
   <div style="display:flex;gap:8px;flex-shrink:0">
     <button class="btn-add" id="nb-families" onclick="goTab('families',this)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">👥</button>
-    <button class="btn-add view-only" onclick="openLockModal()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:16px"><span id="lockIcon">🔒</span></button>
+    <button class="btn-add" onclick="openLockModal()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:16px"><span id="lockIcon">🔒</span></button>
     <button class="btn-add edit-only" onclick="showForm()">+ אירוע חדש</button>
   </div>
 </div>
@@ -3542,17 +3542,21 @@ function applyEditMode(){
 function openLockModal(){
   renderLockModal(editMode?'lock':adminPass?'unlock':'set');
   document.getElementById('lockModal').style.display='flex';
-  if(!editMode&&adminPass)setTimeout(()=>{const i=document.getElementById('unlockInp');if(i)i.focus();},50);
 }
 function closeLockModal(){document.getElementById('lockModal').style.display='none';}
 function renderLockModal(mode){
   const el=document.getElementById('lockModalContent');if(!el)return;
   if(mode==='lock'){
+    const hasBio=!!localStorage.getItem('biometricCredId');
     el.innerHTML=`<div style="font-size:15px;font-weight:700;margin-bottom:12px;text-align:center">🔓 מצב עריכה פעיל</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:16px;text-align:center">רוצה לנעול את האפליקציה?</div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
         <button onclick="lockApp()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--text);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">🔒 נעל</button>
         <button onclick="closeLockModal()" style="flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:12px">
+        <button id="biometricToggleBtn" onclick="${hasBio?'disableBiometric':'enableBiometric'}()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${hasBio?'🗑️ בטל טביעת אצבע':'👆 הפעל טביעת אצבע'}</button>
+        <div id="biometricStatus" style="font-size:11px;color:var(--green);text-align:center;margin-top:5px">${hasBio?'✓ טביעת אצבע פעילה':''}</div>
       </div>`;
   } else if(mode==='set'){
     el.innerHTML=`<div style="font-size:15px;font-weight:700;margin-bottom:8px;text-align:center">🔐 הגדר סיסמה</div>
@@ -3566,13 +3570,17 @@ function renderLockModal(mode){
       </div>`;
     setTimeout(()=>{const i=document.getElementById('newPassInp');if(i)i.focus();},50);
   } else {
+    const hasBio=!!localStorage.getItem('biometricCredId');
     el.innerHTML=`<div style="font-size:15px;font-weight:700;margin-bottom:14px;text-align:center">🔒 הזן סיסמה</div>
+      ${hasBio?`<button id="biometricBtn" onclick="doBiometricUnlock()" style="width:100%;padding:14px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:10px">👆 כניסה עם טביעת אצבע</button><div style="text-align:center;font-size:11px;color:var(--text2);margin-bottom:10px">— או עם סיסמה —</div>`:''}
       <input id="unlockInp" type="password" placeholder="סיסמה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box;direction:ltr;text-align:center" onkeydown="if(event.key==='Enter')submitUnlock()">
       <div id="passErr" style="font-size:12px;color:var(--red-mid);margin-bottom:8px;display:none;text-align:center">סיסמה שגויה ❌</div>
       <div style="display:flex;gap:8px">
         <button onclick="submitUnlock()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--text);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">כניסה</button>
         <button onclick="closeLockModal()" style="flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
       </div>`;
+    if(hasBio) setTimeout(()=>doBiometricUnlock(),300);
+    else setTimeout(()=>{const i=document.getElementById('unlockInp');if(i)i.focus();},50);
   }
 }
 function setAdminPass(){
@@ -3598,6 +3606,61 @@ function submitUnlock(){
 function lockApp(){
   editMode=false;
   applyEditMode();closeLockModal();
+}
+function _ab2b64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf)));}
+function _b642ab(b64){const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr.buffer;}
+async function registerBiometric(){
+  try{
+    const cred=await navigator.credentials.create({publicKey:{
+      challenge:crypto.getRandomValues(new Uint8Array(32)),
+      rp:{name:'ינקלביץ',id:location.hostname},
+      user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'admin',displayName:'מנהל'},
+      pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},
+      timeout:60000
+    }});
+    localStorage.setItem('biometricCredId',_ab2b64(cred.rawId));
+    return true;
+  }catch(e){return false;}
+}
+async function enableBiometric(){
+  if(!window.PublicKeyCredential){alert('הדפדפן שלך לא תומך באימות ביומטרי');return;}
+  const btn=document.getElementById('biometricToggleBtn');
+  if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  const ok=await registerBiometric();
+  if(btn){btn.disabled=false;}
+  if(ok){
+    if(btn){btn.textContent='🗑️ בטל טביעת אצבע';btn.onclick=disableBiometric;}
+    const st=document.getElementById('biometricStatus');if(st){st.textContent='✓ טביעת אצבע פעילה';st.style.color='var(--green)';}
+  } else {
+    if(btn){btn.textContent='👆 הפעל טביעת אצבע';btn.onclick=enableBiometric;}
+  }
+}
+function disableBiometric(){
+  localStorage.removeItem('biometricCredId');
+  const btn=document.getElementById('biometricToggleBtn');
+  if(btn){btn.textContent='👆 הפעל טביעת אצבע';btn.onclick=enableBiometric;}
+  const st=document.getElementById('biometricStatus');if(st)st.textContent='';
+}
+async function tryBiometric(){
+  const b64=localStorage.getItem('biometricCredId');
+  if(!b64||!window.PublicKeyCredential)return false;
+  try{
+    await navigator.credentials.get({publicKey:{
+      challenge:crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials:[{id:_b642ab(b64),type:'public-key'}],
+      userVerification:'required',
+      timeout:60000
+    }});
+    return true;
+  }catch(e){return false;}
+}
+async function doBiometricUnlock(){
+  const btn=document.getElementById('biometricBtn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ מאמת...';}
+  const ok=await tryBiometric();
+  if(ok){editMode=true;applyEditMode();closeLockModal();}
+  else if(btn){btn.disabled=false;btn.textContent='👆 כניסה עם טביעת אצבע';}
 }
 
 applyEditMode();
