@@ -3662,9 +3662,14 @@ async function doBiometricUnlock(){
   if(ok){editMode=true;applyEditMode();closeLockModal();}
   else if(btn){btn.disabled=false;btn.textContent='👆 כניסה עם טביעת אצבע';}
 }
+async function autoUnlockBiometric(){
+  if(!adminPass||editMode||!localStorage.getItem('biometricCredId'))return;
+  const ok=await tryBiometric();
+  if(ok){editMode=true;applyEditMode();}
+}
 
 applyEditMode();
-load();
+load().then(()=>autoUnlockBiometric());
 loadEjsSettings();
 checkWeeklyReminders();
 window.addEventListener('hashchange',handleHash);
