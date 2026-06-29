@@ -503,10 +503,14 @@ body:not(.at-home){padding-bottom:140px}
         <div id="cumulativeModeDiv" style="display:none;text-align:center;font-size:13px;color:var(--text2);padding:10px 0;background:var(--blue-bg);border-radius:var(--r2)">הוצאות יוזנו ישירות באירוע לאחר יצירתו</div>
         <!-- Total mode -->
         <div id="totalModeDiv">
-          <input type="number" min="0" inputmode="numeric" id="f-total" placeholder="סכום כולל (₪)"
-            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center"
-            oninput="updateTotalPreview()">
-          <div id="totalPreview" style="margin-top:10px"></div>
+          <div style="display:flex;gap:6px">
+            <input type="number" min="0" inputmode="numeric" id="f-total" placeholder="סכום כולל"
+              style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center"
+              oninput="updateTotalPreview();_updateCurHint('f-total','fTotalHint','fTotalCur')">
+            <select id="fTotalCur" onchange="updateTotalPreview();_updateCurHint('f-total','fTotalHint','fTotalCur')" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:0 8px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);cursor:pointer"><option>₪</option><option>$</option><option>€</option><option>£</option></select>
+          </div>
+          <div id="fTotalHint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:4px;min-height:14px"></div>
+          <div id="totalPreview" style="margin-top:6px"></div>
         </div>
         <!-- Custom mode -->
         <div id="customModeDiv" style="display:none">
@@ -546,7 +550,10 @@ body:not(.at-home){padding-bottom:140px}
     <!-- Expense picker modal -->
     <div id="expenseOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeExpensePicker()">
       <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
-        <div style="font-size:14px;font-weight:700;margin-bottom:12px">כמה כל משפחה שילמה</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:14px;font-weight:700">כמה כל משפחה שילמה</div>
+          <select id="customCur" onchange="_updateCustomTotal()" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:6px 8px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);cursor:pointer"><option>₪</option><option>$</option><option>€</option><option>£</option></select>
+        </div>
         <div id="expenseInputs"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:8px 0;border-top:1px solid var(--border)">
           <span style="font-size:12px;font-weight:700;color:var(--text2)">סה"כ</span>
@@ -2643,18 +2650,13 @@ function updateExpenseInputs(){
     return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       ${famAva(f, 30, 'flex-shrink:0')}
       <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
-      <input class="exp-inp" type="number" min="0" inputmode="numeric" placeholder="₪0" id="fexp-${f.id}" oninput="updateFormTotal()">
+      <input class="exp-inp" type="number" min="0" inputmode="numeric" placeholder="0" id="fexp-${f.id}" oninput="_updateCustomTotal()">
     </div>`;
   }).join('');
   updateFormTotal();
 }
-function updateFormTotal(){
-  let total=0;
-  families.forEach(f=>{ const inp=document.getElementById('fexp-'+f.id); if(inp) total+=parseFloat(inp.value)||0; });
-  document.getElementById('formTotalCost').textContent='₪'+total.toLocaleString();
-  updateExpensePickSummary();
-}
-function doCreate(){
+function updateFormTotal(){_updateCustomTotal();}
+async function doCreate(){
   const name=document.getElementById('f-name').value.trim();
   const date=document.getElementById('f-date').value.trim()||'';
   let ok=true;
@@ -2674,9 +2676,6 @@ function doCreate(){
     if(!total){document.getElementById('e-cost').classList.add('show');ok=false;}
     else{
       document.getElementById('e-cost').classList.remove('show');
-      const share=Math.round(total/participants.length);
-      // in total mode: one family "paid" the total, rest owe their share
-      // we store as expenses: everyone owes share, total recorded as cost
       participants.forEach(fid=>{ expenses[fid]=0; });
       anyExpense=true;
     }
@@ -2685,12 +2684,14 @@ function doCreate(){
     document.getElementById('e-cost').classList.remove('show');
     anyExpense=true;
   } else {
-    participants.forEach(fid=>{ const inp=document.getElementById('fexp-'+fid); const v=parseFloat(inp&&inp.value)||0; expenses[fid]=v; if(v>0)anyExpense=true; });
+    const _cSym=document.getElementById('customCur')?.value||'₪';
+    const _cRate=_cSym==='₪'?1:((await _getRate(_cSym))||1);
+    for(const fid of participants){const inp=document.getElementById('fexp-'+fid);const v=Math.round((parseFloat(inp&&inp.value)||0)*_cRate);expenses[fid]=v;if(v>0)anyExpense=true;}
     if(!anyExpense){document.getElementById('e-cost').classList.add('show');ok=false;}
     else document.getElementById('e-cost').classList.remove('show');
   }
   if(!ok)return;
-  const totalCost=expMode==='total'?(parseFloat(document.getElementById('f-total')?.value)||0):null;
+  const totalCost=expMode==='total'?(await _toILS('f-total','fTotalCur')):null;
   const isCumulative=expMode==='cumulative';
   const childOverrides={};
   if(splitMethod!=='equal') participants.forEach(fid=>{ childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0); });
@@ -3252,12 +3253,13 @@ function closeAddExpItem(){
   document.getElementById('addExpItemOverlay').style.display='none';
   addExpItemEvId=null; addExpItemFamId=null;
 }
-function doAddExpItem(){
+async function doAddExpItem(){
   const name=document.getElementById('expItemName').value.trim();
-  const amt=parseFloat(document.getElementById('expItemAmt').value)||0;
+  const rawAmt=parseFloat(document.getElementById('expItemAmt').value)||0;
   const errEl=document.getElementById('expItemErr');
-  if(!name||!addExpItemFamId||amt<=0){if(errEl)errEl.style.display='block';return;}
+  if(!name||!addExpItemFamId||rawAmt<=0){if(errEl)errEl.style.display='block';return;}
   if(errEl)errEl.style.display='none';
+  const amt=await _toILS('expItemAmt','expItemCur');
   const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
   if(!ev.expenseItems)ev.expenseItems=[];
   ev.expItemId=(ev.expItemId||0)+1;
@@ -3667,6 +3669,47 @@ async function autoUnlockBiometric(){
   const ok=await tryBiometric();
   if(ok){editMode=true;applyEditMode();}
 }
+const _CURMAP={'₪':'ILS','$':'USD','€':'EUR','£':'GBP'};
+let _rateCache={};
+async function _getRate(sym){
+  if(!sym||sym==='₪')return 1;
+  const today=new Date().toISOString().slice(0,10);
+  if(_rateCache[sym]?.date===today)return _rateCache[sym].rate;
+  try{
+    const r=await fetch('https://api.frankfurter.app/latest?from='+(_CURMAP[sym]||sym)+'&to=ILS');
+    const d=await r.json();
+    const rate=d.rates?.ILS;
+    if(rate)_rateCache[sym]={rate,date:today};
+    return rate||null;
+  }catch(e){return null;}
+}
+async function _updateCurHint(amtId,hintId,curId){
+  const amt=parseFloat(document.getElementById(amtId)?.value)||0;
+  const sym=document.getElementById(curId)?.value||'₪';
+  const hint=document.getElementById(hintId);
+  if(!hint)return;
+  if(!amt||sym==='₪'){hint.textContent='';return;}
+  hint.textContent='מחשב שער...';
+  const rate=await _getRate(sym);
+  if(!rate){hint.textContent='לא ניתן לקבל שער';return;}
+  hint.textContent=amt+sym+' = ₪'+Math.round(amt*rate).toLocaleString()+' (שער '+rate.toFixed(3)+')';
+}
+async function _toILS(amtId,curId){
+  const amt=parseFloat(document.getElementById(amtId)?.value)||0;
+  const sym=document.getElementById(curId)?.value||'₪';
+  if(sym==='₪'||!amt)return amt;
+  const rate=await _getRate(sym);
+  return rate?Math.round(amt*rate):amt;
+}
+async function _updateCustomTotal(){
+  const sym=document.getElementById('customCur')?.value||'₪';
+  const rate=sym==='₪'?1:((await _getRate(sym))||1);
+  let total=0;
+  families.forEach(f=>{const inp=document.getElementById('fexp-'+f.id);if(inp)total+=Math.round((parseFloat(inp.value)||0)*rate);});
+  const el=document.getElementById('formTotalCost');
+  if(el)el.textContent='₪'+total.toLocaleString();
+  updateExpensePickSummary();
+}
 
 applyEditMode();
 load().then(()=>autoUnlockBiometric());
@@ -3737,8 +3780,12 @@ if ('serviceWorker' in navigator) {
       <div id="expItemSharePicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
     </div>
     <div class="field" style="margin-top:12px">
-      <label class="field-lbl">סכום (₪)</label>
-      <input type="number" min="0" inputmode="numeric" id="expItemAmt" placeholder="0" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+      <label class="field-lbl">סכום</label>
+      <div style="display:flex;gap:6px">
+        <input type="number" min="0" inputmode="numeric" id="expItemAmt" placeholder="0" oninput="_updateCurHint('expItemAmt','expItemCurHint','expItemCur')" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+        <select id="expItemCur" onchange="_updateCurHint('expItemAmt','expItemCurHint','expItemCur')" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:0 8px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);cursor:pointer"><option>₪</option><option>$</option><option>€</option><option>£</option></select>
+      </div>
+      <div id="expItemCurHint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:4px;min-height:14px"></div>
     </div>
     <div id="expItemErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center">נא למלא שם, לבחור משפחה וסכום</div>
     <div style="display:flex;gap:8px;margin-top:14px">
