@@ -1914,7 +1914,7 @@ function evCard(ev){
       ${items.map(it=>{const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
         <div style="flex:1;min-width:0"><span style="color:var(--text2)">${esc(it.name)}</span>${swNames?`<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">👥 ${esc(swNames)}</span>`:''}
         </div>
-        <span style="font-weight:600;color:var(--text)">₪${it.amt.toLocaleString()}</span>
+        <span style="font-weight:600;color:var(--text)">₪${it.amt.toLocaleString()}${it.origAmt&&it.origCur?'<span style="font-size:10px;color:var(--text2);font-weight:400"> ('+it.origAmt+it.origCur+')</span>':''}</span>
         <button onclick="deleteExpItem(${ev.id},${it.id})" class="edit-only" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
       </div>`}).join('')}
     </div>`:'';
@@ -3260,12 +3260,14 @@ async function doAddExpItem(){
   if(!name||!addExpItemFamId||rawAmt<=0){if(errEl)errEl.style.display='block';return;}
   if(errEl)errEl.style.display='none';
   const amt=await _toILS('expItemAmt','expItemCur');
+  const origCur=document.getElementById('expItemCur')?.value||'₪';
   const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
   if(!ev.expenseItems)ev.expenseItems=[];
   ev.expItemId=(ev.expItemId||0)+1;
   const sw=[...(addExpItemSharedWith||new Set(ev.participants))].filter(fid=>ev.participants.includes(fid));
   const isPartial=sw.length>0&&sw.length<ev.participants.length;
   const item={id:ev.expItemId,famId:addExpItemFamId,name,amt};
+  if(origCur!=='₪'){item.origAmt=rawAmt;item.origCur=origCur;}
   if(isPartial)item.sharedWith=sw;
   ev.expenseItems.push(item);
   ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;
