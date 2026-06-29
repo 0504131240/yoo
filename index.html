@@ -3676,7 +3676,8 @@ async function _getRate(sym){
   const today=new Date().toISOString().slice(0,10);
   if(_rateCache[sym]?.date===today)return _rateCache[sym].rate;
   try{
-    const r=await fetch('https://api.frankfurter.app/latest?from='+(_CURMAP[sym]||sym)+'&to=ILS');
+    const code=_CURMAP[sym]||sym;
+    const r=await fetch('https://open.er-api.com/v6/latest/'+code);
     const d=await r.json();
     const rate=d.rates?.ILS;
     if(rate)_rateCache[sym]={rate,date:today};
