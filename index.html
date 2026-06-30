@@ -2029,7 +2029,7 @@ function evCard(ev){
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
       ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
       ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${potTotal.toLocaleString()}</button>`:''}
-      ${ev.cumulative&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🏁 סיים אירוע</button>`:balanced&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
+      ${ev.cumulative&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🏁 סיים אירוע</button>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}`:balanced&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
       ${cost>0?`<button class="action-btn edit-only" onclick="sendDebtReminderEmails(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 שלח תזכורת</button>`:''}
       <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>`}
@@ -2247,7 +2247,6 @@ function renderArchive(){
         <div class="card-actions">
           <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
           <button class="action-btn edit-only" onclick="reopenEv(${ev.id})">🔓 פתח מחדש</button>
-          ${cost>0?`<button class="action-btn edit-only" onclick="sendDebtReminderEmails(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 שלח תזכורת</button>`:''}
           <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
         </div></div>`:''}
     </div>`;
@@ -2859,7 +2858,12 @@ function closeEv(evId){
       const cHtml=_emailWrap(cBodyHtml,`האירוע "${ev.name}" נסגר`,'🗂',_ejsUrl()+'#archive-'+ev.id);
       sendEmailNotif([{email:f.email,email2:f.email2,name}],'🗂 האירוע נסגר · ינקלביץ',msg,cHtml);
     });
+    ev.open=false;ev.closedOn='היום';save();render();
+    goTab('archive',document.getElementById('nb-archive'));
   }
+}
+function archiveEv(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
   ev.open=false;ev.closedOn='היום';save();render();
   goTab('archive',document.getElementById('nb-archive'));
 }
