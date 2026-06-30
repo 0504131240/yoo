@@ -2753,6 +2753,16 @@ function closeEv(evId){
         const itemsByFam={};
         ev.participants.forEach(fid2=>{itemsByFam[fid2]=[];});
         allItems.forEach(it=>{if(itemsByFam[it.famId])itemsByFam[it.famId].push(it);});
+        const _em=ev.splitMethod||'equal';
+        let _eTotalW=0;const _eW={};
+        ev.participants.forEach(p=>{_eW[p]=famWeight(getFam(p),_em,ev.childOverrides?.[p]);_eTotalW+=_eW[p];});
+        const _itemShare=(it,rfid)=>{
+          const sw=it.sharedWith?it.sharedWith.filter(p=>ev.participants.includes(p)):ev.participants;
+          if(!sw.includes(rfid))return 0;
+          if(it.sharedWith)return Math.round(it.amt/sw.length);
+          const swW=sw.reduce((s,p)=>s+(_eW[p]||0),0);
+          return swW?Math.round(it.amt*(_eW[rfid]||0)/swW):0;
+        };
         let itemRows='';
         ev.participants.forEach(fid2=>{
           const its=itemsByFam[fid2];if(!its||!its.length)return;
@@ -2761,21 +2771,22 @@ function closeEv(evId){
           const isMine=fid2===fid;
           const famTotal=its.reduce((s,it)=>s+it.amt,0);
           its.forEach(it=>{
-            const sharedLabel=it.sharedWith&&it.sharedWith.length<ev.participants.length?` <span style="font-size:11px;color:#888">(חלק)</span>`:'';
+            const myShare=_itemShare(it,fid);
             itemRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#f0f0ff':''}">
-              <td style="padding:7px 10px">${_esc(it.name)}${sharedLabel}</td>
+              <td style="padding:7px 10px">${_esc(it.name)}</td>
               <td style="padding:7px 10px;font-size:12px;color:#666">${_esc(pname)}</td>
               <td style="padding:7px 10px;font-weight:600;${isMine?'color:#5b4fcf':''}">₪${it.amt.toLocaleString()}</td>
+              <td style="padding:7px 10px;font-weight:700;color:#5b4fcf">${myShare?'₪'+myShare.toLocaleString():'—'}</td>
             </tr>`;
           });
           if(its.length>1){
             itemRows+=`<tr style="border-bottom:2px solid #e0e2ff${isMine?';background:#e8e8ff':''}">
-              <td colspan="2" style="padding:4px 10px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
-              <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${famTotal.toLocaleString()}</td>
+              <td colspan="3" style="padding:4px 10px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
+              <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${its.reduce((s,it)=>s+_itemShare(it,fid),0).toLocaleString()}</td>
             </tr>`;
           }
         });
-        bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px"><tr style="background:#edeeff"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">פריט</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">שילם</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">סכום</th></tr>${itemRows}</table>`;
+        bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px"><tr style="background:#edeeff"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">פריט</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">שילם</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">סכום</th><th style="padding:8px 10px;text-align:right;color:#5b4fcf;font-weight:700;border-bottom:2px solid #d8d8f0">החלק שלך</th></tr>${itemRows}</table>`;
         if(mySpent>0) bodyHtml+=`<p style="font-size:11px;color:#888;margin:0 0 12px;text-align:center">שורות בסגול = הוצאות שלך</p>`;
       }
       if(myPot>0) bodyHtml+=`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 הפקדת לקופת האירוע: <strong>₪${myPot.toLocaleString()}</strong></div>`;
