@@ -2737,12 +2737,31 @@ function closeEv(evId){
       const myItems=(ev.expenseItems||[]).filter(it=>it.famId===fid);
       const mySpent=Math.round(myItems.reduce((s,it)=>s+it.amt,0));
       const myPot=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0));
+      const settleLines=[];
+      (ev.potPayments||[]).filter(p=>p.famId===fid).forEach(p=>{
+        settleLines.push(`הפקדה לקופת האירוע: ₪${p.amt.toLocaleString()}`);
+      });
+      (ev.settled||[]).forEach(s=>{
+        const fromF=families.find(x=>x.name===s.from);
+        const toF=families.find(x=>x.name===s.to);
+        const sFrom=s.from.replace('משפחת','').trim();
+        const sTo=s.to.replace('משפחת','').trim();
+        if(fromF&&fromF.id===fid){
+          if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית שלך ל${sTo}`);
+          else settleLines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${sTo}`);
+        } else if(toF&&toF.id===fid){
+          if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועבר לקופה הראשית שלך`);
+          else settleLines.push(`קיבלת ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
+        }
+      });
+      const fundBal=Math.round(fund.famBalances[String(fid)]||0);
       let msg=`האירוע "${ev.name}" הסתיים!\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
       if(mySpent>0){
         const itemLines=myItems.map(it=>`  - ${it.name}: ₪${it.amt.toLocaleString()}`).join('\n');
         msg+=`\n💳 ההוצאות שלך (${name}):\n${itemLines}\n  סה"כ: ₪${mySpent.toLocaleString()}`;
       }
-      if(myPot>0) msg+=`\n\n💰 הפקדת לקופת האירוע: ₪${myPot.toLocaleString()}`;
+      if(settleLines.length) msg+=`\n\nאיך סודר:\n${settleLines.map(l=>'• '+l).join('\n')}`;
+      if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
       msg+=`\n\n✅ החשבון שלך מסודר.`;
       // HTML – expense items grouped by family with subtotals
       let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]]);
@@ -2789,7 +2808,10 @@ function closeEv(evId){
         bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px"><tr style="background:#edeeff"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">פריט</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">שילם</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">סכום</th><th style="padding:8px 10px;text-align:right;color:#5b4fcf;font-weight:700;border-bottom:2px solid #d8d8f0">החלק שלך</th></tr>${itemRows}</table>`;
         if(mySpent>0) bodyHtml+=`<p style="font-size:11px;color:#888;margin:0 0 12px;text-align:center">שורות בסגול = הוצאות שלך</p>`;
       }
-      if(myPot>0) bodyHtml+=`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 הפקדת לקופת האירוע: <strong>₪${myPot.toLocaleString()}</strong></div>`;
+      if(settleLines.length){
+        bodyHtml+=`<p style="font-weight:700;margin:16px 0 8px;color:#333">⚖️ איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${settleLines.map(l=>`<li style="margin-bottom:5px">${_esc(l)}</li>`).join('')}</ul>`;
+      }
+      if(fundBal>0) bodyHtml+=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 יתרתך בקופה הראשית: <strong>₪${fundBal.toLocaleString()}</strong></div>`;
       bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
       const html=_emailWrap(bodyHtml,`האירוע "${ev.name}" הסתיים`,'🏁',_ejsUrl()+'#archive-'+ev.id);
       sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏁 האירוע הסתיים · ינקלביץ',msg,html);
