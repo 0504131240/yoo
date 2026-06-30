@@ -2030,6 +2030,7 @@ function evCard(ev){
       ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
       ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${potTotal.toLocaleString()}</button>`:''}
       ${ev.cumulative&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🏁 סיים אירוע</button>`:balanced&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🗂 לארכיון</button>`:''}
+      ${cost>0?`<button class="action-btn edit-only" onclick="sendDebtReminderEmails(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 שלח תזכורת</button>`:''}
       <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>`}
   </div>`;
@@ -2246,6 +2247,7 @@ function renderArchive(){
         <div class="card-actions">
           <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
           <button class="action-btn edit-only" onclick="reopenEv(${ev.id})">🔓 פתח מחדש</button>
+          ${cost>0?`<button class="action-btn edit-only" onclick="sendDebtReminderEmails(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 שלח תזכורת</button>`:''}
           <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
         </div></div>`:''}
     </div>`;
@@ -2860,6 +2862,28 @@ function closeEv(evId){
   }
   ev.open=false;ev.closedOn='היום';save();render();
   goTab('archive',document.getElementById('nb-archive'));
+}
+function sendDebtReminderEmails(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const cost=evCost(ev);
+  const shares=evShares(ev);
+  const adjBal=evAdjBalance(ev);
+  const debtors=ev.participants.filter(fid=>(adjBal[fid]||0)<-0.5);
+  const withEmail=debtors.filter(fid=>{const f=getFam(fid);return f&&(f.email||f.email2);});
+  if(!withEmail.length){alert('אין חייבים עם כתובת מייל');return;}
+  withEmail.forEach(fid=>{
+    const f=getFam(fid);if(!f)return;
+    const name=f.name.replace('משפחת','').trim();
+    const share=Math.round(shares[fid]||0);
+    const spent=Math.round(ev.expenses[fid]||0);
+    const owe=Math.round(Math.abs(adjBal[fid]||0));
+    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
+    let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]]);
+    bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+    const html=_emailWrap(bodyHtml,`תזכורת: ${ev.name}`,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id);
+    sendEmailNotif([{email:f.email,email2:f.email2,name}],`⚠️ תזכורת: חוב ב"${ev.name}" · ינקלביץ`,msg,html);
+  });
+  alert(`נשלח מייל ל-${withEmail.length} משפחות`);
 }
 function reopenEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
