@@ -939,16 +939,13 @@ function sendSettledEmail(ev,famId){
     if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית ל${s.to}`);
     else lines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${s.to}`);
   });
-  const fundBal=Math.round(fund.famBalances[String(famId)]||0);
   // plain text
   let msg=`האירוע "${ev.name}" – הסיכום שלך:\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
   if(spent>0) msg+=`הוצאת: ₪${spent.toLocaleString()}\n`;
   if(lines.length) msg+=`\nאיך סודר:\n${lines.map(l=>'• '+l).join('\n')}`;
-  if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
   // HTML
   const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
-  if(fundBal>0) cardRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(cardRows);
   if(lines.length){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${lines.map(l=>`<li style="margin-bottom:4px">${_esc(l)}</li>`).join('')}</ul>`;
@@ -990,7 +987,14 @@ function sendEmailNotif(recipients,subject,message,html){
     emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject,message,message_html}).catch(()=>{});
   },i*600));
 }
-
+function sendFundUpdateEmail(famId,changeAmt,desc){
+  const f=getFam(famId);if(!f||(!f.email&&!f.email2))return;
+  const name=f.name.replace('משפחת','').trim();
+  const newBal=Math.round(fund.famBalances[String(famId)]||0);
+  const msg=`${desc}: ₪${Math.round(changeAmt).toLocaleString()}\n\nיתרתך החדשה בקופה הראשית: ₪${newBal.toLocaleString()}`;
+  const html=_emailWrap(_eCard([[desc,`₪${Math.round(changeAmt).toLocaleString()}`],['💰 יתרה חדשה בקופה',`₪${newBal.toLocaleString()}`,true]]),'עדכון קופה הראשית','🏦',_ejsUrl()+'#fund');
+  sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏦 עדכון קופה הראשית · ינקלביץ',msg,html);
+}
 
 function saveLocal(){
   try{
@@ -2031,6 +2035,7 @@ function releasePotToOne(evId,creditorFid,toFund){
     fund.transactions.push({id:nxtTx++,type:'deposit',famId:creditorFid,amount:totalAmt,
       desc:'מקופת אירוע · '+ev.name+' → '+famName,
       date:new Date().toLocaleDateString('he-IL')});
+    sendFundUpdateEmail(creditorFid,totalAmt,'חלקך מקופת האירוע "'+ev.name+'"');
   }
   const potMap={};
   ev.potPayments.forEach(p=>{potMap[p.famId]=(potMap[p.famId]||0)+p.amt;});
@@ -3142,12 +3147,7 @@ function confirmDeposit(){
     date:new Date().toLocaleDateString('he-IL')});
   closeDepositSheet();
   save();render();
-  if(isDeposit&&f&&(f.email||f.email2)){
-    const newBal=Math.round(fund.famBalances[key]||0);
-    const dMsg=`הפקדה של ₪${amt.toLocaleString()} לקופה הראשית נרשמה.\nיתרתך: ₪${newBal.toLocaleString()}`;
-    const dHtml=_emailWrap(_eCard([['הפקדה',`<span style="color:#5b4fcf;font-weight:700">₪${amt.toLocaleString()}</span>`,false],['יתרתך בקופה',`₪${newBal.toLocaleString()}`,true]]),'הפקדה לקופה הראשית','🏦',_ejsUrl()+'#fund');
-    sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏦 הפקדה לקופה הראשית · ינקלביץ',dMsg,dHtml);
-  }
+  sendFundUpdateEmail(_depositFamId,amt,isDeposit?'הפקדה לקופה הראשית':'משיכה מהקופה הראשית');
 }
 
 
@@ -3355,6 +3355,7 @@ function releasePotExcessToOne(evId,famId,toFund){
     fund.transactions.push({id:nxtTx++,type:'deposit',famId,amount:exc,
       desc:'החזר עודף מקופת האירוע · '+ev.name,
       date:new Date().toLocaleDateString('he-IL')});
+    sendFundUpdateEmail(famId,exc,'עודף מקופת האירוע "'+ev.name+'"');
   }
   // Trim this family's potPayments to only the amount that was actually distributed to creditors
   const distributed={};
