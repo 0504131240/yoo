@@ -1827,7 +1827,7 @@ function evCard(ev){
         ${famAva(f)}
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-          ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+          ${cost>0&&share>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
         </div>
         ${spent>0?`<span style="font-size:12px;font-weight:700;color:var(--text);flex-shrink:0">₪${spent.toLocaleString()}</span>`:''}
         ${items.length?`<button onclick="toggleCumFamily(${ev.id},${fid})" style="padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer;flex-shrink:0">${isExpanded?'▲':'▼ '+items.length}</button>`:''}
