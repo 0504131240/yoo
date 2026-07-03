@@ -948,11 +948,11 @@ function sendSettledEmail(ev,famId){
   // HTML
   const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
+  if(fundBal>0) cardRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(cardRows);
   if(lines.length){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${lines.map(l=>`<li style="margin-bottom:4px">${_esc(l)}</li>`).join('')}</ul>`;
   }
-  if(fundBal>0) bodyHtml+=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 יתרתך בקופה הראשית: <strong>₪${fundBal.toLocaleString()}</strong></div>`;
   bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
   const html=_emailWrap(bodyHtml,`האירוע "${ev.name}"`, '✅',_ejsUrl()+'#event-'+ev.id);
   sendEmailNotif([{email:f.email,email2:f.email2,name}],`✅ סידרת את חלקך ב"${ev.name}" · ינקלביץ`,msg,html);
@@ -2642,7 +2642,9 @@ function closeEv(evId){
       if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
       msg+=`\n\n✅ החשבון שלך מסודר.`;
       // HTML – expense items grouped by family with subtotals
-      let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]]);
+      const _cRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
+      if(fundBal>0) _cRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
+      let bodyHtml=_eCard(_cRows);
       const allItems=ev.expenseItems||[];
       if(allItems.length){
         bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 פירוט כל ההוצאות:</p>`;
@@ -2689,7 +2691,6 @@ function closeEv(evId){
       if(settleLines.length){
         bodyHtml+=`<p style="font-weight:700;margin:16px 0 8px;color:#333">⚖️ איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${settleLines.map(l=>`<li style="margin-bottom:5px">${_esc(l)}</li>`).join('')}</ul>`;
       }
-      if(fundBal>0) bodyHtml+=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 יתרתך בקופה הראשית: <strong>₪${fundBal.toLocaleString()}</strong></div>`;
       bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
       const html=_emailWrap(bodyHtml,`האירוע "${ev.name}" הסתיים`,'🏁',_ejsUrl()+'#archive-'+ev.id);
       sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏁 האירוע הסתיים · ינקלביץ',msg,html);
