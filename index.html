@@ -599,19 +599,6 @@ body:not(.at-home){padding-bottom:140px}
       <input type="text" id="ejsPublicKey" placeholder="Public Key" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
       <input type="text" id="ejsServiceId" placeholder="Service ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
       <input type="text" id="ejsTemplateId" placeholder="Template ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
-      <input type="url" id="ejsAppUrl" placeholder="כתובת האפליקציה (לכפתור כניסה במייל)" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;direction:ltr">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:13px;font-weight:600;color:var(--text2)">תזכורת חוב שבועית</span>
-        <select id="ejsReminderDay" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:6px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text)">
-          <option value="0">ראשון</option>
-          <option value="1">שני</option>
-          <option value="2">שלישי</option>
-          <option value="3">רביעי</option>
-          <option value="4">חמישי</option>
-          <option value="5">שישי</option>
-          <option value="6">שבת</option>
-        </select>
-      </div>
       <div style="display:flex;gap:8px">
         <button onclick="saveEjsSettings()" style="flex:1;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור הגדרות</button>
         <button onclick="testEjsEmail()" style="padding:9px 12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📧 בדוק</button>
@@ -910,13 +897,9 @@ function loadEjsSettings(){
   const keyEl=document.getElementById('ejsPublicKey');
   const svcEl=document.getElementById('ejsServiceId');
   const tplEl=document.getElementById('ejsTemplateId');
-  const dayEl=document.getElementById('ejsReminderDay');
-  const urlEl=document.getElementById('ejsAppUrl');
   if(keyEl) keyEl.value=localStorage.getItem('ejsPublicKey')||'';
   if(svcEl) svcEl.value=localStorage.getItem('ejsServiceId')||'';
   if(tplEl) tplEl.value=localStorage.getItem('ejsTemplateId')||'';
-  if(dayEl) dayEl.value=localStorage.getItem('reminderDay')||'0';
-  if(urlEl) urlEl.value=localStorage.getItem('ejsAppUrl')||'';
   const key=localStorage.getItem('ejsPublicKey');
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
 }
@@ -924,21 +907,10 @@ function saveEjsSettings(){
   const key=document.getElementById('ejsPublicKey').value.trim();
   const svc=document.getElementById('ejsServiceId').value.trim();
   const tpl=document.getElementById('ejsTemplateId').value.trim();
-  const day=parseInt(document.getElementById('ejsReminderDay').value)||0;
-  const url=document.getElementById('ejsAppUrl').value.trim();
   localStorage.setItem('ejsPublicKey',key);
   localStorage.setItem('ejsServiceId',svc);
   localStorage.setItem('ejsTemplateId',tpl);
-  localStorage.setItem('reminderDay',String(day));
-  localStorage.setItem('ejsAppUrl',url);
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
-  // Sync to Firestore so Cloud Function can read settings
-  fbInit().then(({db,doc,setDoc})=>{
-    setDoc(doc(db,'appData','emailConfig'),{
-      ejsPublicKey:key,ejsServiceId:svc,ejsTemplateId:tpl,
-      reminderDay:day,ejsAppUrl:url||window.location.origin+window.location.pathname
-    },{merge:true}).catch(()=>{});
-  });
   const st=document.getElementById('ejsStatus');
   if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
 }
@@ -965,7 +937,7 @@ function testEjsEmail(){
 }
 const _cleanEmail=e=>(e||'').replace(/[​-‏‪-‮⁠﻿ ]/g,'').trim().toLowerCase();
 const _validEmail=e=>!!e&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_cleanEmail(e));
-function _ejsUrl(){return localStorage.getItem('ejsAppUrl')||(window.location.origin+window.location.pathname);}
+function _ejsUrl(){return window.location.origin+window.location.pathname;}
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function _emailWrap(bodyHtml,headerTitle,headerIcon,urlOverride){
   const url=urlOverride!=null?urlOverride:_ejsUrl();
@@ -1048,41 +1020,7 @@ function sendEmailNotif(recipients,subject,message,html){
     emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject,message,message_html}).catch(()=>{});
   },i*600));
 }
-function checkWeeklyReminders(){
-  const reminderDay=parseInt(localStorage.getItem('reminderDay')||'0');
-  const now=new Date();
-  const daysSince=(now.getDay()-reminderDay+7)%7;
-  const lastReminderDate=new Date(now);
-  lastReminderDate.setDate(now.getDate()-daysSince);
-  lastReminderDate.setHours(0,0,0,0);
-  const last=parseInt(localStorage.getItem('lastDebtReminder')||'0');
-  if(last>=lastReminderDate.getTime()) return;
-  // Don't mark as sent unless EmailJS is actually configured
-  const ejsKey=localStorage.getItem('ejsPublicKey');
-  const ejsSvc=localStorage.getItem('ejsServiceId');
-  const ejsTpl=localStorage.getItem('ejsTemplateId');
-  if(!ejsKey||!ejsSvc||!ejsTpl||typeof emailjs==='undefined') return;
-  localStorage.setItem('lastDebtReminder',String(Date.now()));
-  families.forEach(f=>{
-    if(!f.email) return;
-    let totalDebt=0;
-    const debtLines=[];
-    events.filter(e=>e.open).forEach(ev=>{
-      const bal=evAdjBalance(ev)[f.id]||0;
-      if(bal<-0.5){totalDebt+=Math.abs(bal);debtLines.push(`• "${ev.name}": ₪${Math.round(Math.abs(bal)).toLocaleString()}`);}
-    });
-    if(totalDebt<1) return;
-    const name=f.name.replace('משפחת','').trim();
-    const msg=`שלום ${name},\n\nיתרת חוב כוללת: ₪${Math.round(totalDebt).toLocaleString()}\n\n${debtLines.join('\n')}\n\nכנס לאפליקציה לפרטים ולסידור התשלומים.`;
-    const debtTableRows=events.filter(e=>e.open).map(ev=>{const bal=evAdjBalance(ev)[f.id]||0;if(bal>=-0.5)return null;return[_esc(ev.name),`<span style="color:#ef4444;font-weight:700">₪${Math.round(Math.abs(bal)).toLocaleString()}</span>`];}).filter(Boolean);
-    let rBodyHtml=`<p style="margin:0 0 12px">שלום <strong>${_esc(name)}</strong>,</p>`;
-    rBodyHtml+=_eCard([['יתרת חוב כוללת',`<span style="color:#ef4444">₪${Math.round(totalDebt).toLocaleString()}</span>`,false]]);
-    if(debtTableRows.length) rBodyHtml+=_eTable(['אירוע','חוב'],debtTableRows);
-    rBodyHtml+=`<p style="color:#666;font-size:13px;text-align:center;margin:8px 0 0">כנס לאפליקציה לפרטים ולסידור התשלומים.</p>`;
-    const rHtml=_emailWrap(rBodyHtml,'תזכורת חוב שבועית','⏰');
-    sendEmailNotif([{email:f.email,email2:f.email2,name}],'⏰ תזכורת שבועית · ינקלביץ',msg,rHtml);
-  });
-}
+
 
 function saveLocal(){
   try{
@@ -3789,7 +3727,6 @@ async function _updateCustomTotal(){
 applyEditMode();
 load().then(()=>autoUnlockBiometric());
 loadEjsSettings();
-checkWeeklyReminders();
 window.addEventListener('hashchange',handleHash);
 
 // Swipe between tabs
