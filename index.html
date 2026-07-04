@@ -747,7 +747,7 @@ let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
-let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null;
+let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal';
 let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
 let calItems=[];
@@ -800,7 +800,10 @@ const famWeight=(f,method,childOverride)=>{
 const evShares=ev=>{
   const method=ev.splitMethod||'equal';
   const totalCost=evCost(ev);
-  const partialItems=(ev.expenseItems||[]).filter(it=>it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length);
+  const partialItems=(ev.expenseItems||[]).filter(it=>
+    it.customSplit||
+    (it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length)
+  );
   const partialAmt=partialItems.reduce((s,it)=>s+it.amt,0);
   const globalCost=totalCost-partialAmt;
   let totalW=0; const w={};
@@ -809,9 +812,13 @@ const evShares=ev=>{
   const exact={};
   ev.participants.forEach(fid=>{ exact[fid]=globalCost*(w[fid]/totalW); });
   partialItems.forEach(it=>{
-    const sw=it.sharedWith.filter(fid=>ev.participants.includes(fid));
-    if(!sw.length)return;
-    sw.forEach(fid=>{ exact[fid]=(exact[fid]||0)+it.amt/sw.length; });
+    if(it.customSplit){
+      Object.entries(it.customSplit).forEach(([fid,a])=>{const nfid=parseInt(fid);if(ev.participants.includes(nfid))exact[nfid]=(exact[nfid]||0)+a;});
+    }else{
+      const sw=it.sharedWith.filter(fid=>ev.participants.includes(fid));
+      if(!sw.length)return;
+      sw.forEach(fid=>{ exact[fid]=(exact[fid]||0)+it.amt/sw.length; });
+    }
   });
   const floors={};
   ev.participants.forEach(fid=>{ floors[fid]=Math.floor(exact[fid]||0); });
@@ -1815,12 +1822,17 @@ function evCard(ev){
     const key=ev.id+'-'+fid;
     const isExpanded=expandedCumFamilies.has(key);
     const detailList=items.length&&isExpanded?`<div style="padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px">
-      ${items.map(it=>{const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
-        <div style="flex:1;min-width:0"><span style="color:var(--text2)">${esc(it.name)}</span>${swNames?`<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">👥 ${esc(swNames)}</span>`:''}
+      ${items.map(it=>{
+        const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';
+        const itSubLabel=it.customSplit?
+          `<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">⚖️ ידנית · חלקך ₪${(it.customSplit[String(fid)]||0).toLocaleString()}</span>`:
+          (swNames?`<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">👥 ${esc(swNames)}</span>`:'');
+        return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
+        <div style="flex:1;min-width:0"><span style="color:var(--text2)">${esc(it.name)}</span>${itSubLabel}
         </div>
         <span style="font-weight:600;color:var(--text)">₪${it.amt.toLocaleString()}${it.origAmt&&it.origCur?'<span style="font-size:10px;color:var(--text2);font-weight:400"> ('+it.origAmt+it.origCur+')</span>':''}</span>
         <button onclick="deleteExpItem(${ev.id},${it.id})" class="edit-only" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
-      </div>`}).join('')}
+      </div>`;}).join('')}
     </div>`:'';
     return`<div class="exp-input-row"${isExpanded?' style="flex-direction:column;align-items:stretch"':''}>
       <div style="display:flex;align-items:center;gap:8px">
@@ -2807,18 +2819,27 @@ function goTab(tab,el,skipHash,swipeDir){
   next.style.transition=tr;next.style.transform='translateX(0)';
   setTimeout(()=>{prev.classList.remove('sv-out');prev.style.cssText='';next.style.cssText='';},DUR+20);
 }
+function _enterPayShell(){
+  if(currentShell==='pay')return;
+  currentShell='pay';
+  document.body.classList.remove('at-home');
+  document.getElementById('mn-home').classList.remove('mn-active');
+  document.getElementById('mn-pay').classList.add('mn-active');
+}
 function handleHash(){
   const h=(window.location.hash||'').replace('#','');
   if(!h||h==='home'){goTab('home',document.getElementById('nb-home'),true);return;}
   const tabMap={events:'nb-events',archive:'nb-archive',fund:'nb-fund',families:'nb-families'};
-  if(tabMap[h]){goTab(h,document.getElementById(tabMap[h]),true);return;}
+  if(tabMap[h]){_enterPayShell();goTab(h,document.getElementById(tabMap[h]),true);return;}
   if(h.startsWith('event-')){
     const id=parseInt(h.slice(6));if(isNaN(id))return;
+    _enterPayShell();
     goTab('events',document.getElementById('nb-events'),true);
     collapsedEvents.delete(id);renderOpenList();
     setTimeout(()=>{const el=document.getElementById('ecard-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},150);
   } else if(h.startsWith('archive-')){
     const id=parseInt(h.slice(8));if(isNaN(id))return;
+    _enterPayShell();
     goTab('archive',document.getElementById('nb-archive'),true);
     expanded.add(id);renderArchive();
     setTimeout(()=>{const el=document.getElementById('ecard-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},150);
@@ -3155,6 +3176,7 @@ function openAddExpItem(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   addExpItemEvId=evId; addExpItemFamId=null;
   addExpItemSharedWith=new Set(ev.participants);
+  addExpItemSplitMode='equal';
   document.getElementById('expItemName').value='';
   document.getElementById('expItemAmt').value='';
   const errEl=document.getElementById('expItemErr');if(errEl)errEl.style.display='none';
@@ -3168,6 +3190,19 @@ function openAddExpItem(evId){
     const f=getFam(fid);if(!f)return'';
     return`<button onclick="toggleExpShareFam(${fid})" id="expshare-${fid}" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--blue-mid);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(f.name.replace('משפחת','').trim())}</button>`;
   }).join('');
+  const custInps=document.getElementById('expItemCustomInputs');
+  if(custInps){
+    custInps.innerHTML=ev.participants.map(fid=>{
+      const f=getFam(fid);if(!f)return'';
+      return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        ${famAva(f,30,'flex-shrink:0')}
+        <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
+        <input type="number" min="0" inputmode="numeric" placeholder="0" id="csplit-${fid}" oninput="_updateExpItemCustomTotal()" style="width:72px;border:1.5px solid var(--border);border-radius:var(--r2);padding:7px 8px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);text-align:center;direction:ltr;box-sizing:border-box">
+      </div>`;
+    }).join('');
+  }
+  setExpItemSplitMode('equal');
+  _updateExpItemCustomTotal();
   document.getElementById('addExpItemOverlay').style.display='flex';
 }
 function toggleExpShareFam(famId){
@@ -3189,17 +3224,51 @@ function selectAddExpFam(famId){
 }
 function closeAddExpItem(){
   document.getElementById('addExpItemOverlay').style.display='none';
-  addExpItemEvId=null; addExpItemFamId=null;
+  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal';
+}
+function setExpItemSplitMode(mode){
+  addExpItemSplitMode=mode;
+  const isCustom=mode==='custom';
+  document.getElementById('expItemSplitEqualDiv').style.display=isCustom?'none':'block';
+  document.getElementById('expItemSplitCustomDiv').style.display=isCustom?'block':'none';
+  const b1=document.getElementById('expSplitEqualBtn');
+  const b2=document.getElementById('expSplitCustomBtn');
+  if(b1){b1.style.background=isCustom?'transparent':'var(--blue-mid)';b1.style.color=isCustom?'var(--text2)':'#fff';b1.style.borderColor=isCustom?'var(--border)':'var(--blue-mid)';}
+  if(b2){b2.style.background=isCustom?'var(--blue-mid)':'transparent';b2.style.color=isCustom?'#fff':'var(--text2)';b2.style.borderColor=isCustom?'var(--blue-mid)':'var(--border)';}
+}
+function _updateExpItemCustomTotal(){
+  const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
+  let total=0;
+  ev.participants.forEach(fid=>{const inp=document.getElementById('csplit-'+fid);if(inp)total+=parseFloat(inp.value)||0;});
+  const el=document.getElementById('expItemCustomTotal');
+  if(el)el.textContent='₪'+Math.round(total).toLocaleString();
 }
 async function doAddExpItem(){
   const name=document.getElementById('expItemName').value.trim();
-  const rawAmt=parseFloat(document.getElementById('expItemAmt').value)||0;
   const errEl=document.getElementById('expItemErr');
+  const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
+  if(addExpItemSplitMode==='custom'){
+    if(!name||!addExpItemFamId){if(errEl)errEl.style.display='block';return;}
+    const customSplit={};let total=0;
+    ev.participants.forEach(fid=>{
+      const inp=document.getElementById('csplit-'+fid);
+      const v=Math.round(parseFloat(inp&&inp.value)||0);
+      if(v>0){customSplit[String(fid)]=v;total+=v;}
+    });
+    if(!total){if(errEl)errEl.style.display='block';return;}
+    if(errEl)errEl.style.display='none';
+    if(!ev.expenseItems)ev.expenseItems=[];
+    ev.expItemId=(ev.expItemId||0)+1;
+    ev.expenseItems.push({id:ev.expItemId,famId:addExpItemFamId,name,amt:total,customSplit});
+    ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+total;
+    closeAddExpItem();save();render();
+    return;
+  }
+  const rawAmt=parseFloat(document.getElementById('expItemAmt').value)||0;
   if(!name||!addExpItemFamId||rawAmt<=0){if(errEl)errEl.style.display='block';return;}
   if(errEl)errEl.style.display='none';
   const amt=await _toILS('expItemAmt','expItemCur');
   const origCur=document.getElementById('expItemCur')?.value||'₪';
-  const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
   if(!ev.expenseItems)ev.expenseItems=[];
   ev.expItemId=(ev.expItemId||0)+1;
   const sw=[...(addExpItemSharedWith||new Set(ev.participants))].filter(fid=>ev.participants.includes(fid));
@@ -3666,7 +3735,7 @@ if ('serviceWorker' in navigator) {
 
 <!-- Add expense item modal (cumulative events) -->
 <div id="addExpItemOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeAddExpItem()">
-  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
     <div style="font-size:14px;font-weight:700;margin-bottom:14px">➕ הוסף הוצאה</div>
     <div class="field">
       <label class="field-lbl">שם ההוצאה</label>
@@ -3677,16 +3746,35 @@ if ('serviceWorker' in navigator) {
       <div id="expItemFamPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
     </div>
     <div class="field" style="margin-top:12px">
-      <label class="field-lbl">מי משתתף בחלוקה</label>
-      <div id="expItemSharePicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
-    </div>
-    <div class="field" style="margin-top:12px">
-      <label class="field-lbl">סכום</label>
-      <div style="display:flex;gap:6px">
-        <input type="number" min="0" inputmode="numeric" id="expItemAmt" placeholder="0" oninput="_updateCurHint('expItemAmt','expItemCurHint','expItemCur')" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
-        <select id="expItemCur" onchange="_updateCurHint('expItemAmt','expItemCurHint','expItemCur')" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:0 8px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);cursor:pointer"><option>₪</option><option>$</option><option>€</option><option>£</option></select>
+      <label class="field-lbl">חלוקת הסכום</label>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button type="button" id="expSplitEqualBtn" onclick="setExpItemSplitMode('equal')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">שווה</button>
+        <button type="button" id="expSplitCustomBtn" onclick="setExpItemSplitMode('custom')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ידנית לכל משפחה</button>
       </div>
-      <div id="expItemCurHint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:4px;min-height:14px"></div>
+    </div>
+    <div id="expItemSplitEqualDiv">
+      <div class="field" style="margin-top:12px">
+        <label class="field-lbl">מי משתתף בחלוקה</label>
+        <div id="expItemSharePicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label class="field-lbl">סכום</label>
+        <div style="display:flex;gap:6px">
+          <input type="number" min="0" inputmode="numeric" id="expItemAmt" placeholder="0" oninput="_updateCurHint('expItemAmt','expItemCurHint','expItemCur')" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:16px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+          <select id="expItemCur" onchange="_updateCurHint('expItemAmt','expItemCurHint','expItemCur')" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:0 8px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);cursor:pointer"><option>₪</option><option>$</option><option>€</option><option>£</option></select>
+        </div>
+        <div id="expItemCurHint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:4px;min-height:14px"></div>
+      </div>
+    </div>
+    <div id="expItemSplitCustomDiv" style="display:none">
+      <div class="field" style="margin-top:12px">
+        <label class="field-lbl">כמה כל משפחה חייבת</label>
+        <div id="expItemCustomInputs" style="margin-top:8px"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);margin-top:4px">
+          <span style="font-size:12px;font-weight:700;color:var(--text2)">סה"כ לתשלום</span>
+          <span style="font-size:15px;font-weight:700;color:var(--blue-mid)" id="expItemCustomTotal">₪0</span>
+        </div>
+      </div>
     </div>
     <div id="expItemErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center">נא למלא שם, לבחור משפחה וסכום</div>
     <div style="display:flex;gap:8px;margin-top:14px">
