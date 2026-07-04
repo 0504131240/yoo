@@ -3614,7 +3614,7 @@ async function _updateCustomTotal(){
 }
 
 applyEditMode();
-load().then(()=>autoUnlockBiometric());
+load().then(()=>{autoUnlockBiometric();if(window.location.hash)handleHash();});
 loadEjsSettings();
 window.addEventListener('hashchange',handleHash);
 
