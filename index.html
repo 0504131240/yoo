@@ -747,7 +747,8 @@ let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
-let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal';
+let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null;
+const expandedExpItems=new Set();
 let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
 let calItems=[];
@@ -1824,15 +1825,25 @@ function evCard(ev){
     const detailList=items.length&&isExpanded?`<div style="padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px">
       ${items.map(it=>{
         const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';
+        const itemKey=ev.id+'-item-'+it.id;
+        const isItemExpanded=expandedExpItems.has(itemKey);
         const itSubLabel=it.customSplit?
-          `<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">⚖️ ידנית · חלקך ₪${(it.customSplit[String(fid)]||0).toLocaleString()}</span>`:
+          `<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">⚖️ ידנית</span>`:
           (swNames?`<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">👥 ${esc(swNames)}</span>`:'');
-        return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
-        <div style="flex:1;min-width:0"><span style="color:var(--text2)">${esc(it.name)}</span>${itSubLabel}
-        </div>
-        <span style="font-weight:600;color:var(--text)">₪${it.amt.toLocaleString()}${it.origAmt&&it.origCur?'<span style="font-size:10px;color:var(--text2);font-weight:400"> ('+it.origAmt+it.origCur+')</span>':''}</span>
-        <button onclick="deleteExpItem(${ev.id},${it.id})" class="edit-only" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
-      </div>`;}).join('')}
+        const breakdownHtml=it.customSplit&&isItemExpanded?
+          `<div style="margin-top:4px;padding:4px 8px;background:var(--surface2);border-radius:6px">${
+            Object.entries(it.customSplit).map(([sfid,a])=>{const sf=getFam(parseInt(sfid));if(!sf)return'';return`<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><span style="flex:1;font-size:11px;color:var(--text2)">${esc(sf.name.replace('משפחת','').trim())}</span><span style="font-size:11px;font-weight:700">₪${a.toLocaleString()}</span></div>`;}).join('')
+          }</div>`:'';
+        return`<div style="padding:3px 0;font-size:11px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;min-width:0"><span style="color:var(--text2)">${esc(it.name)}</span>${itSubLabel}</div>
+            <span style="font-weight:600;color:var(--text);flex-shrink:0">₪${it.amt.toLocaleString()}${it.origAmt&&it.origCur?'<span style="font-size:10px;color:var(--text2);font-weight:400"> ('+it.origAmt+it.origCur+')</span>':''}</span>
+            ${it.customSplit?`<button onclick="toggleExpItem(${ev.id},${it.id})" style="flex-shrink:0;padding:1px 5px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer">${isItemExpanded?'▲':'▼'}</button>`:''}
+            <button onclick="editExpItem(${ev.id},${it.id})" class="edit-only" style="flex-shrink:0;width:18px;height:18px;border-radius:50%;border:none;background:var(--blue-bg);color:var(--blue);font-size:10px;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✏</button>
+            <button onclick="deleteExpItem(${ev.id},${it.id})" class="edit-only" style="flex-shrink:0;width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
+          </div>
+          ${breakdownHtml}
+        </div>`;}).join('')}
     </div>`:'';
     return`<div class="exp-input-row"${isExpanded?' style="flex-direction:column;align-items:stretch"':''}>
       <div style="display:flex;align-items:center;gap:8px">
@@ -3176,7 +3187,9 @@ function openAddExpItem(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   addExpItemEvId=evId; addExpItemFamId=null;
   addExpItemSharedWith=new Set(ev.participants);
-  addExpItemSplitMode='equal';
+  addExpItemSplitMode='equal'; _editExpItemId=null;
+  const titleEl=document.getElementById('addExpItemTitle');
+  if(titleEl)titleEl.textContent='➕ הוסף הוצאה';
   document.getElementById('expItemName').value='';
   document.getElementById('expItemAmt').value='';
   const errEl=document.getElementById('expItemErr');if(errEl)errEl.style.display='none';
@@ -3224,7 +3237,7 @@ function selectAddExpFam(famId){
 }
 function closeAddExpItem(){
   document.getElementById('addExpItemOverlay').style.display='none';
-  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal';
+  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal'; _editExpItemId=null;
 }
 function setExpItemSplitMode(mode){
   addExpItemSplitMode=mode;
@@ -3257,10 +3270,15 @@ async function doAddExpItem(){
     });
     if(!total){if(errEl)errEl.style.display='block';return;}
     if(errEl)errEl.style.display='none';
-    if(!ev.expenseItems)ev.expenseItems=[];
-    ev.expItemId=(ev.expItemId||0)+1;
-    ev.expenseItems.push({id:ev.expItemId,famId:addExpItemFamId,name,amt:total,customSplit});
-    ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+total;
+    if(_editExpItemId!=null){
+      const old=(ev.expenseItems||[]).find(it=>it.id===_editExpItemId);
+      if(old){ev.expenses[old.famId]=Math.max(0,(ev.expenses[old.famId]||0)-old.amt);old.famId=addExpItemFamId;old.name=name;old.amt=total;old.customSplit=customSplit;delete old.sharedWith;delete old.origAmt;delete old.origCur;ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+total;}
+    }else{
+      if(!ev.expenseItems)ev.expenseItems=[];
+      ev.expItemId=(ev.expItemId||0)+1;
+      ev.expenseItems.push({id:ev.expItemId,famId:addExpItemFamId,name,amt:total,customSplit});
+      ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+total;
+    }
     closeAddExpItem();save();render();
     return;
   }
@@ -3269,15 +3287,20 @@ async function doAddExpItem(){
   if(errEl)errEl.style.display='none';
   const amt=await _toILS('expItemAmt','expItemCur');
   const origCur=document.getElementById('expItemCur')?.value||'₪';
-  if(!ev.expenseItems)ev.expenseItems=[];
-  ev.expItemId=(ev.expItemId||0)+1;
   const sw=[...(addExpItemSharedWith||new Set(ev.participants))].filter(fid=>ev.participants.includes(fid));
   const isPartial=sw.length>0&&sw.length<ev.participants.length;
-  const item={id:ev.expItemId,famId:addExpItemFamId,name,amt};
-  if(origCur!=='₪'){item.origAmt=rawAmt;item.origCur=origCur;}
-  if(isPartial)item.sharedWith=sw;
-  ev.expenseItems.push(item);
-  ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;
+  if(_editExpItemId!=null){
+    const old=(ev.expenseItems||[]).find(it=>it.id===_editExpItemId);
+    if(old){ev.expenses[old.famId]=Math.max(0,(ev.expenses[old.famId]||0)-old.amt);old.famId=addExpItemFamId;old.name=name;old.amt=amt;delete old.customSplit;if(origCur!=='₪'){old.origAmt=rawAmt;old.origCur=origCur;}else{delete old.origAmt;delete old.origCur;}if(isPartial)old.sharedWith=sw;else delete old.sharedWith;ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;}
+  }else{
+    if(!ev.expenseItems)ev.expenseItems=[];
+    ev.expItemId=(ev.expItemId||0)+1;
+    const item={id:ev.expItemId,famId:addExpItemFamId,name,amt};
+    if(origCur!=='₪'){item.origAmt=rawAmt;item.origCur=origCur;}
+    if(isPartial)item.sharedWith=sw;
+    ev.expenseItems.push(item);
+    ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;
+  }
   closeAddExpItem();
   save();render();
 }
@@ -3287,6 +3310,42 @@ function deleteExpItem(evId,itemId){
   ev.expenses[item.famId]=Math.max(0,(ev.expenses[item.famId]||0)-item.amt);
   ev.expenseItems=ev.expenseItems.filter(it=>it.id!==itemId);
   save();render();
+}
+function toggleExpItem(evId,itemId){
+  const key=evId+'-item-'+itemId;
+  if(expandedExpItems.has(key))expandedExpItems.delete(key);else expandedExpItems.add(key);
+  const el=document.getElementById('ecard-'+evId);
+  const ev=events.find(e=>e.id===evId);
+  if(el&&ev)el.outerHTML=evCard(ev);
+}
+function editExpItem(evId,itemId){
+  openAddExpItem(evId);
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const item=(ev.expenseItems||[]).find(it=>it.id===itemId);if(!item)return;
+  _editExpItemId=itemId;
+  const titleEl=document.getElementById('addExpItemTitle');
+  if(titleEl)titleEl.textContent='✏️ ערוך הוצאה';
+  document.getElementById('expItemName').value=item.name;
+  selectAddExpFam(item.famId);
+  if(item.customSplit){
+    setExpItemSplitMode('custom');
+    ev.participants.forEach(fid=>{
+      const inp=document.getElementById('csplit-'+fid);
+      if(inp)inp.value=item.customSplit[String(fid)]||'';
+    });
+    _updateExpItemCustomTotal();
+  } else {
+    setExpItemSplitMode('equal');
+    addExpItemSharedWith=new Set(item.sharedWith||ev.participants);
+    ev.participants.forEach(fid=>{
+      const btn=document.getElementById('expshare-'+fid);if(!btn)return;
+      if(addExpItemSharedWith.has(fid)){btn.style.background='var(--blue-bg)';btn.style.color='var(--blue)';btn.style.borderColor='var(--blue-mid)';}
+      else{btn.style.background='transparent';btn.style.color='var(--text2)';btn.style.borderColor='var(--border)';}
+    });
+    document.getElementById('expItemAmt').value=item.origAmt||item.amt;
+    const curEl=document.getElementById('expItemCur');
+    if(curEl)curEl.value=item.origCur||'₪';
+  }
 }
 function toggleCumFamily(evId,famId){
   const key=evId+'-'+famId;
@@ -3736,7 +3795,7 @@ if ('serviceWorker' in navigator) {
 <!-- Add expense item modal (cumulative events) -->
 <div id="addExpItemOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeAddExpItem()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
-    <div style="font-size:14px;font-weight:700;margin-bottom:14px">➕ הוסף הוצאה</div>
+    <div id="addExpItemTitle" style="font-size:14px;font-weight:700;margin-bottom:14px">➕ הוסף הוצאה</div>
     <div class="field">
       <label class="field-lbl">שם ההוצאה</label>
       <input type="text" id="expItemName" placeholder="לדוגמה: ארוחת ערב, כרטיסים..." style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
