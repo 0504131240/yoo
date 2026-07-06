@@ -749,6 +749,7 @@ let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null;
 const expandedExpItems=new Set();
+const expandedFamShares=new Set();
 let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
 let calItems=[];
@@ -1785,6 +1786,22 @@ function evCard(ev){
   const hasPot=potTotal>0;
   const balanced=cost>0&&!ev.participants.some(fid=>(adjBal[fid]||0)<-0.5);
   const shares=evShares(ev);
+  const _sMethod=ev.splitMethod||'equal';
+  let _sTotalW=0;const _sW={};
+  ev.participants.forEach(fid=>{_sW[fid]=famWeight(getFam(fid),_sMethod,ev.childOverrides?.[fid]);_sTotalW+=_sW[fid];});
+  const famItemBreakdown=fid=>{
+    if(!ev.expenseItems||!ev.expenseItems.length)return[];
+    return ev.expenseItems.flatMap(it=>{
+      if(it.customSplit){const a=it.customSplit[String(fid)]||0;return a>0?[{name:it.name,amt:a}]:[];}
+      if(it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length){
+        const sw=it.sharedWith.filter(id=>ev.participants.includes(id));
+        return sw.includes(fid)?[{name:it.name,amt:Math.round(it.amt/sw.length)}]:[];
+      }
+      if(!_sTotalW)return[];
+      const a=Math.round(it.amt*(_sW[fid]||0)/_sTotalW);
+      return a>0?[{name:it.name,amt:a}]:[];
+    });
+  };
   const mems=ev.participants.map(fid=>{
     const f=getFam(fid);if(!f)return'';
     const cl=col(fid);
@@ -1822,6 +1839,10 @@ function evCard(ev){
     const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
     const key=ev.id+'-'+fid;
     const isExpanded=expandedCumFamilies.has(key);
+    const shareKey=ev.id+'-share-'+fid;
+    const isShareExpanded=expandedFamShares.has(shareKey);
+    const shareBreakdown=cost>0&&share>0&&isShareExpanded?famItemBreakdown(fid):[];
+    const shareBreakdownHtml=shareBreakdown.length?`<div style="margin-top:3px;padding:4px 8px;background:var(--surface2);border-radius:6px">${shareBreakdown.map(b=>`<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><span style="flex:1;font-size:11px;color:var(--text2)">${esc(b.name)}</span><span style="font-size:11px;font-weight:700">₪${b.amt.toLocaleString()}</span></div>`).join('')}</div>`:'';
     const detailList=items.length&&isExpanded?`<div style="padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px">
       ${items.map(it=>{
         const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';
@@ -1850,7 +1871,7 @@ function evCard(ev){
         ${famAva(f)}
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-          ${cost>0&&share>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+          ${cost>0&&share>0?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:''}
         </div>
         ${spent>0?`<span style="font-size:12px;font-weight:700;color:var(--text);flex-shrink:0">₪${spent.toLocaleString()}</span>`:''}
         ${items.length?`<button onclick="toggleCumFamily(${ev.id},${fid})" style="padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer;flex-shrink:0">${isExpanded?'▲':'▼ '+items.length}</button>`:''}
@@ -3317,6 +3338,13 @@ function deleteExpItem(evId,itemId){
 function toggleExpItem(evId,itemId){
   const key=evId+'-item-'+itemId;
   if(expandedExpItems.has(key))expandedExpItems.delete(key);else expandedExpItems.add(key);
+  const el=document.getElementById('ecard-'+evId);
+  const ev=events.find(e=>e.id===evId);
+  if(el&&ev)el.outerHTML=evCard(ev);
+}
+function toggleFamShare(evId,famId){
+  const key=evId+'-share-'+famId;
+  if(expandedFamShares.has(key))expandedFamShares.delete(key);else expandedFamShares.add(key);
   const el=document.getElementById('ecard-'+evId);
   const ev=events.find(e=>e.id===evId);
   if(el&&ev)el.outerHTML=evCard(ev);
