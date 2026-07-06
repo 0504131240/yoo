@@ -1797,9 +1797,7 @@ function evCard(ev){
         const sw=it.sharedWith.filter(id=>ev.participants.includes(id));
         return sw.includes(fid)?[{name:it.name,amt:Math.round(it.amt/sw.length)}]:[];
       }
-      if(!_sTotalW)return[];
-      const a=Math.round(it.amt*(_sW[fid]||0)/_sTotalW);
-      return a>0?[{name:it.name,amt:a}]:[];
+      return [];
     });
   };
   const mems=ev.participants.map(fid=>{
@@ -1843,8 +1841,9 @@ function evCard(ev){
     const isExpanded=expandedCumFamilies.has(key);
     const shareKey=ev.id+'-share-'+fid;
     const isShareExpanded=expandedFamShares.has(shareKey);
-    const shareBreakdown=cost>0&&share>0&&isShareExpanded?famItemBreakdown(fid):[];
-    const shareBreakdownHtml=shareBreakdown.length?`<div style="margin-top:3px;padding:4px 8px;background:var(--surface2);border-radius:6px">${shareBreakdown.map(b=>`<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><span style="flex:1;font-size:11px;color:var(--text2)">${esc(b.name)}</span><span style="font-size:11px;font-weight:700">₪${b.amt.toLocaleString()}</span></div>`).join('')}</div>`:'';
+    const shareItems=cost>0&&share>0?famItemBreakdown(fid):[];
+    const hasShareDetail=shareItems.length>0;
+    const shareBreakdownHtml=hasShareDetail&&isShareExpanded?`<div style="margin-top:3px;padding:4px 8px;background:var(--surface2);border-radius:6px">${shareItems.map(b=>`<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><span style="flex:1;font-size:11px;color:var(--text2)">${esc(b.name)}</span><span style="font-size:11px;font-weight:700">₪${b.amt.toLocaleString()}</span></div>`).join('')}</div>`:'';
     const detailList=items.length&&isExpanded?`<div style="padding:4px 0 2px;border-top:1px solid var(--border);margin-top:4px">
       ${items.map(it=>{
         const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';
@@ -1873,7 +1872,7 @@ function evCard(ev){
         ${famAva(f)}
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-          ${cost>0&&share>0?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:''}
+          ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
         </div>
         <div style="flex-shrink:0;text-align:center;min-width:56px">
           ${spent>0?`<div style="font-size:12px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
