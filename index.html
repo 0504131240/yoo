@@ -2683,6 +2683,7 @@ function closeEv(evId){
         let _eTotalW=0;const _eW={};
         ev.participants.forEach(p=>{_eW[p]=famWeight(getFam(p),_em,ev.childOverrides?.[p]);_eTotalW+=_eW[p];});
         const _itemShare=(it,rfid)=>{
+          if(it.customSplit)return it.customSplit[String(rfid)]||0;
           const sw=it.sharedWith?it.sharedWith.filter(p=>ev.participants.includes(p)):ev.participants;
           if(!sw.includes(rfid))return 0;
           if(it.sharedWith)return Math.round(it.amt/sw.length);
@@ -2692,11 +2693,13 @@ function closeEv(evId){
         let itemRows='';
         ev.participants.forEach(fid2=>{
           const its=itemsByFam[fid2];if(!its||!its.length)return;
+          const isMine=fid2===fid;
+          // show payer all their items; others only see items they share in
+          const visibleIts=isMine?its:its.filter(it=>_itemShare(it,fid)>0);
+          if(!visibleIts.length)return;
           const pf=getFam(fid2);
           const pname=pf?pf.name.replace('משפחת','').trim():'?';
-          const isMine=fid2===fid;
-          const famTotal=its.reduce((s,it)=>s+it.amt,0);
-          its.forEach(it=>{
+          visibleIts.forEach(it=>{
             const myShare=_itemShare(it,fid);
             itemRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#f0f0ff':''}">
               <td style="padding:7px 10px">${_esc(it.name)}</td>
@@ -2705,10 +2708,10 @@ function closeEv(evId){
               <td style="padding:7px 10px;font-weight:700;color:#5b4fcf">${myShare?'₪'+myShare.toLocaleString():'—'}</td>
             </tr>`;
           });
-          if(its.length>1){
+          if(visibleIts.length>1){
             itemRows+=`<tr style="border-bottom:2px solid #e0e2ff${isMine?';background:#e8e8ff':''}">
               <td colspan="3" style="padding:4px 10px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
-              <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${its.reduce((s,it)=>s+_itemShare(it,fid),0).toLocaleString()}</td>
+              <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${visibleIts.reduce((s,it)=>s+_itemShare(it,fid),0).toLocaleString()}</td>
             </tr>`;
           }
         });
