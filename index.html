@@ -931,10 +931,10 @@ function _ejsUrl(){return window.location.origin+window.location.pathname;}
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function _emailWrap(bodyHtml,headerTitle,headerIcon,urlOverride){
   const url=urlOverride!=null?urlOverride:_ejsUrl();
-  return`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:12px;background:#eef0f8;font-family:-apple-system,Helvetica,Arial,sans-serif;direction:rtl"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" style="width:100%;max-width:560px" cellspacing="0" cellpadding="0"><tr><td style="background:linear-gradient(135deg,#5b4fcf 0%,#8b5cf6 100%);padding:28px 24px;text-align:center;border-radius:10px 10px 0 0"><div style="font-size:38px;margin-bottom:6px">${headerIcon}</div><div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:0.5px">ינקלביץ</div><div style="color:rgba(255,255,255,0.82);font-size:13px;margin-top:4px">${_esc(headerTitle)}</div></td></tr><tr><td style="background:#fff;padding:24px;direction:rtl;color:#1a1a2e;font-size:15px;line-height:1.65">${bodyHtml}</td></tr>${url?`<tr><td style="background:#fff;padding:0 24px 24px;text-align:center"><a href="${_esc(url)}" style="display:inline-block;background:#5b4fcf;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-size:15px;font-weight:700">קישור לאירוע ←</a></td></tr>`:''}<tr><td style="background:#f4f4f6;padding:10px 24px;text-align:center;border-radius:0 0 10px 10px;border-top:1px solid #e4e4e8"><span style="font-size:11px;color:#aaa">ינקלביץ · מערכת ניהול הוצאות משפחתית</span></td></tr></table></td></tr></table></body></html>`;
+  return`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:6px;background:#eef0f8;font-family:-apple-system,Helvetica,Arial,sans-serif;direction:rtl"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" style="width:100%;max-width:480px" cellspacing="0" cellpadding="0"><tr><td style="background:linear-gradient(135deg,#5b4fcf 0%,#8b5cf6 100%);padding:20px 16px;text-align:center;border-radius:10px 10px 0 0"><div style="font-size:32px;margin-bottom:4px">${headerIcon}</div><div style="color:#fff;font-size:18px;font-weight:700;letter-spacing:0.5px">ינקלביץ</div><div style="color:rgba(255,255,255,0.82);font-size:12px;margin-top:3px">${_esc(headerTitle)}</div></td></tr><tr><td style="background:#fff;padding:16px;direction:rtl;color:#1a1a2e;font-size:14px;line-height:1.6">${bodyHtml}</td></tr>${url?`<tr><td style="background:#fff;padding:0 16px 16px;text-align:center"><a href="${_esc(url)}" style="display:inline-block;background:#5b4fcf;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700">קישור לאירוע ←</a></td></tr>`:''}<tr><td style="background:#f4f4f6;padding:8px 16px;text-align:center;border-radius:0 0 10px 10px;border-top:1px solid #e4e4e8"><span style="font-size:11px;color:#aaa">ינקלביץ · מערכת ניהול הוצאות משפחתית</span></td></tr></table></td></tr></table></body></html>`;
 }
 function _eCard(rows){
-  return`<div style="background:#f6f7ff;border:1px solid #e0e2ff;border-radius:8px;padding:14px 16px;margin-bottom:16px">`+rows.map(([l,v,hi],i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0${i<rows.length-1?';border-bottom:1px solid #ecedff':''}"><span style="color:#666;font-size:14px">${_esc(l)}</span><span style="font-weight:700;font-size:14px${hi?';color:#5b4fcf':''}">${v}</span></div>`).join('')+`</div>`;
+  return`<div style="background:#f6f7ff;border:1px solid #e0e2ff;border-radius:8px;padding:10px 12px;margin-bottom:14px">`+rows.map(([l,v,hi],i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0${i<rows.length-1?';border-bottom:1px solid #ecedff':''}"><span style="color:#666;font-size:13px">${_esc(l)}</span><span style="font-weight:700;font-size:13px${hi?';color:#5b4fcf':''}">${v}</span></div>`).join('')+`</div>`;
 }
 function _eTable(headers,rows){
   return`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#edeeff">${headers.map(h=>`<th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">${_esc(h)}</th>`).join('')}</tr>${rows.map(r=>`<tr style="border-bottom:1px solid #f0f0f6">${r.map((c,i)=>`<td style="padding:7px 10px${i>0?';font-weight:600':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`;
@@ -2757,23 +2757,23 @@ function _sendCloseEvEmailOne(ev,fid){
       visibleIts.forEach(it=>{
         const myShare=_itemShare(it,fid);
         itemRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#f0f0ff':''}">
-          <td style="padding:7px 10px">${_esc(it.name)}</td>
-          <td style="padding:7px 10px;font-size:12px;color:#666">${_esc(pname)}</td>
-          <td style="padding:7px 10px;font-weight:600;${isMine?'color:#5b4fcf':''}">₪${it.amt.toLocaleString()}</td>
-          <td style="padding:7px 10px;font-weight:700;color:#5b4fcf">${myShare?'₪'+myShare.toLocaleString():'—'}</td>
+          <td style="padding:5px 6px">${_esc(it.name)}</td>
+          <td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pname)}</td>
+          <td style="padding:5px 6px;font-weight:600;${isMine?'color:#5b4fcf':''}">₪${it.amt.toLocaleString()}</td>
+          <td style="padding:5px 6px;font-weight:700;color:#5b4fcf">${myShare?'₪'+myShare.toLocaleString():'—'}</td>
         </tr>`;
       });
       if(visibleIts.length>1){
         const _totAmt=visibleIts.reduce((s,it)=>s+it.amt,0);
         const _totShare=visibleIts.reduce((s,it)=>s+_itemShare(it,fid),0);
         itemRows+=`<tr style="border-bottom:2px solid #e0e2ff${isMine?';background:#e8e8ff':''}">
-          <td colspan="2" style="padding:4px 10px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
-          <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${_totAmt.toLocaleString()}</td>
-          <td style="padding:4px 10px;font-size:11px;font-weight:700;color:#5b4fcf">₪${_totShare.toLocaleString()}</td>
+          <td colspan="2" style="padding:3px 6px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
+          <td style="padding:3px 6px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${_totAmt.toLocaleString()}</td>
+          <td style="padding:3px 6px;font-size:11px;font-weight:700;color:#5b4fcf">₪${_totShare.toLocaleString()}</td>
         </tr>`;
       }
     });
-    bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px"><tr style="background:#edeeff"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">פריט</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">שילם</th><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">סכום</th><th style="padding:8px 10px;text-align:right;color:#5b4fcf;font-weight:700;border-bottom:2px solid #d8d8f0">החלק שלך</th></tr>${itemRows}</table>`;
+    bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#edeeff"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #d8d8f0">סכום</th><th style="padding:6px;text-align:right;color:#5b4fcf;font-weight:700;border-bottom:2px solid #d8d8f0">החלק שלך</th></tr>${itemRows}</table>`;
     if(mySpent>0) bodyHtml+=`<p style="font-size:11px;color:#888;margin:0 0 12px;text-align:center">שורות בסגול = הוצאות שלך</p>`;
   }
   if(settleLines.length){
