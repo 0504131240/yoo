@@ -403,6 +403,17 @@ body:not(.at-home){padding-bottom:140px}
   </div>
 </div>
 
+<div id="closeEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCloseEvModal()">
+  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:320px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">🏁 סיום אירוע</div>
+    <div id="closeEvInfo" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6"></div>
+    <div style="display:flex;gap:8px">
+      <button id="closeEvConfirmBtn" onclick="confirmCloseEv()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח מיילים</button>
+      <button onclick="closeCloseEvModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div class="topbar">
   <div>
     <div class="topbar-title">👨‍👩‍👧‍👦 ינקלביץ</div>
@@ -1979,7 +1990,7 @@ function evCard(ev){
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
       ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
       ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${potTotal.toLocaleString()}</button>`:''}
-      ${ev.cumulative&&cost>0?`<button class="action-btn blue edit-only" onclick="closeEv(${ev.id})">🏁 סיים אירוע</button>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}`:balanced&&cost>0?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}
+      ${ev.cumulative&&cost>0?`<button class="action-btn blue edit-only" onclick="openCloseEvModal(${ev.id})">🏁 סיים אירוע</button>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}`:balanced&&cost>0?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}
       ${cost>0?`<button class="action-btn edit-only" onclick="sendDebtReminderEmails(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 שלח תזכורת</button>`:''}
       <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>`}
@@ -2641,6 +2652,27 @@ async function doCreate(){
 }
 
 // Actions
+let _closeEvPendingId=null;
+function openCloseEvModal(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  _closeEvPendingId=evId;
+  const adjBal=evAdjBalance(ev);
+  const settled=ev.participants.filter(fid=>{const f=getFam(fid);return f&&(f.email||f.email2)&&Math.abs(adjBal[fid]||0)<=0.5;});
+  const info=document.getElementById('closeEvInfo');
+  if(info)info.innerHTML=`<b>${esc(ev.name)}</b><br>פעולה זו תשלח מייל סיכום ל-${settled.length} משפח${settled.length===1?'ה':'ות'} מסודר${settled.length===1?'ת':'ות'}.<br><span style="color:var(--amber)">לא ניתן לבטל לאחר השליחה.</span>`;
+  const modal=document.getElementById('closeEvModal');
+  if(modal){modal.style.display='flex';}
+}
+function closeCloseEvModal(){
+  _closeEvPendingId=null;
+  const modal=document.getElementById('closeEvModal');
+  if(modal)modal.style.display='none';
+}
+function confirmCloseEv(){
+  const evId=_closeEvPendingId;
+  closeCloseEvModal();
+  if(evId!=null)closeEv(evId);
+}
 function closeEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   if(ev.cumulative){
