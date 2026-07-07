@@ -2706,10 +2706,11 @@ function _sendCloseEvEmailOne(ev,fid){
   }
   const _myPotRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&s.toFid===fid).reduce((s,t)=>s+t.amt,0));
   if(_myPotRec>0.5) settleLines.push(`קיבלת ₪${_myPotRec.toLocaleString()} מקופת האירוע`);
+  const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
   (ev.settled||[]).forEach(s=>{
     if(s.method==='pot') return;
-    const isFrom=s.fromFid!=null?s.fromFid===fid:(families.find(x=>x.name===s.from)||{}).id===fid;
-    const isTo=s.toFid!=null?s.toFid===fid:(families.find(x=>x.name===s.to)||{}).id===fid;
+    const isFrom=s.fromFid!=null?Number(s.fromFid)===Number(fid):(_sfByName(s.from)||{}).id===fid;
+    const isTo=s.toFid!=null?Number(s.toFid)===Number(fid):(_sfByName(s.to)||{}).id===fid;
     const sFrom=(getFam(s.fromFid)||{}).name?(getFam(s.fromFid).name.replace('משפחת','').trim()):s.from;
     const sTo=(getFam(s.toFid)||{}).name?(getFam(s.toFid).name.replace('משפחת','').trim()):s.to;
     if(isFrom){
