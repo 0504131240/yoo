@@ -1651,7 +1651,7 @@ function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
   const bal=fund.famBalances[key]||0;
   if(bal<amt){ alert('אין מספיק יתרה בקופה עבור '+from+' (יתרה: ₪'+bal.toLocaleString()+')'); return; }
   if(!ev.settled)ev.settled=[];
-  ev.settled.push({from,to,amt,method:'fund'});
+  ev.settled.push({from,fromFid,to,toFid,amt,method:'fund'});
   fund.famBalances[key]=bal-amt;
   fund.transactions.push({id:nxtTx++,type:'payout',famId:fromFid,amount:amt,
     desc:'תשלום של '+from+' ל'+to+' · '+ev.name,
@@ -1719,7 +1719,7 @@ function confirmPartPay(){
     const fromDirect=paid-fromFund;
     if(!ev.settled)ev.settled=[];
     if(fromFund>0){
-      ev.settled.push({from:_ppFrom,to:_ppTo,amt:fromFund,method:'fund'});
+      ev.settled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromFund,method:'fund'});
       fund.famBalances[key]=fundBal-fromFund;
       fund.transactions.push({id:nxtTx++,type:'payout',famId:_ppFromFid,amount:fromFund,
         desc:'תשלום של '+_ppFrom+' ל'+_ppTo+' (מהקופה) · '+ev.name,
@@ -1731,7 +1731,7 @@ function confirmPartPay(){
         desc:'קיבלת מ'+_ppFrom+' עבור "'+ev.name+'" (מהקופה)',
         date:new Date().toLocaleDateString('he-IL')});
     }
-    if(fromDirect>0) ev.settled.push({from:_ppFrom,to:_ppTo,amt:fromDirect,method:'direct'});
+    if(fromDirect>0) ev.settled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromDirect,method:'direct'});
     save();render();
     const adjAfter=evAdjBalance(ev);
     if((adjAfter[_ppFromFid]||0)>=-0.5){
@@ -2733,14 +2733,14 @@ function _sendCloseEvEmailOne(ev,fid){
   if(_myPotRec>0.5) settleLines.push(`קיבלת ₪${_myPotRec.toLocaleString()} מקופת האירוע`);
   (ev.settled||[]).forEach(s=>{
     if(s.method==='pot') return;
-    const fromF=families.find(x=>x.name===s.from);
-    const toF=families.find(x=>x.name===s.to);
-    const sFrom=s.from.replace('משפחת','').trim();
-    const sTo=s.to.replace('משפחת','').trim();
-    if(fromF&&fromF.id===fid){
+    const isFrom=s.fromFid!=null?s.fromFid===fid:(families.find(x=>x.name===s.from)||{}).id===fid;
+    const isTo=s.toFid!=null?s.toFid===fid:(families.find(x=>x.name===s.to)||{}).id===fid;
+    const sFrom=(getFam(s.fromFid)||{}).name?(getFam(s.fromFid).name.replace('משפחת','').trim()):s.from;
+    const sTo=(getFam(s.toFid)||{}).name?(getFam(s.toFid).name.replace('משפחת','').trim()):s.to;
+    if(isFrom){
       if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית שלך ל${sTo}`);
       else settleLines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${sTo}`);
-    } else if(toF&&toF.id===fid){
+    } else if(isTo){
       if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועבר לקופה הראשית שלך`);
       else settleLines.push(`קיבלת ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
     }
