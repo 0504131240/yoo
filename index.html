@@ -407,10 +407,11 @@ body:not(.at-home){padding-bottom:140px}
   <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:320px;box-sizing:border-box">
     <div style="font-size:15px;font-weight:700;margin-bottom:6px">🏁 סיום אירוע</div>
     <div id="closeEvInfo" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6"></div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <button id="closeEvConfirmBtn" onclick="confirmCloseEv()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח מיילים</button>
       <button onclick="closeCloseEvModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
+    <button onclick="confirmCloseEvNoEmail()" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">סגור ללא שליחה (מיילים כבר נשלחו ידנית)</button>
   </div>
 </div>
 
@@ -2677,6 +2678,19 @@ function confirmCloseEv(){
   const evId=_closeEvPendingId;
   closeCloseEvModal();
   if(evId!=null)closeEv(evId);
+}
+function confirmCloseEvNoEmail(){
+  const evId=_closeEvPendingId;
+  closeCloseEvModal();
+  if(evId==null)return;
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const adjBal=evAdjBalance(ev);
+  ev.participants.forEach(fid=>{
+    if(Math.abs(adjBal[fid]||0)<=0.5)
+      localStorage.setItem('closemail-'+ev.id+'-'+fid,'1');
+  });
+  ev.closed=true;
+  save();render();
 }
 function _sendCloseEvEmailOne(ev,fid){
   const notifKey='closemail-'+ev.id+'-'+fid;
