@@ -964,7 +964,7 @@ function sendSettledEmail(ev,famId){
   const lines=[];
   const _potTotal=Math.round((ev.potPayments||[]).filter(p=>p.famId===famId).reduce((s,p)=>s+p.amt,0));
   if(_potTotal>0.5) lines.push(`הפקדת לקופת האירוע: ₪${_potTotal.toLocaleString()}`);
-  (ev.settled||[]).filter(s=>{const sf=families.find(x=>x.name===s.from);return sf&&sf.id===famId;}).forEach(s=>{
+  (ev.settled||[]).filter(s=>s.fromFid!=null?Number(s.fromFid)===Number(famId):(families.find(x=>x.name===s.from||x.name.replace(/^משפחת\s*/,'')===s.from)||{}).id===famId).forEach(s=>{
     if(s.method==='pot') return;
     if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית ל${s.to}`);
     else lines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${s.to}`);
