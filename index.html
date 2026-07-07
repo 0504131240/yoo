@@ -2698,6 +2698,7 @@ function confirmCloseEv(){
     if(Math.abs(adjBal[fid]||0)>0.5)return;
     const chk=document.getElementById('closeev-chk-'+fid);
     if(chk&&chk.checked){
+      localStorage.removeItem('closemail-'+ev.id+'-'+fid);
       _sendCloseEvEmailOne(ev,fid);
     } else {
       localStorage.setItem('closemail-'+ev.id+'-'+fid,'1');
