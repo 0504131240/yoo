@@ -414,6 +414,17 @@ body:not(.at-home){padding-bottom:140px}
   </div>
 </div>
 
+<div id="emailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeEmailModal()">
+  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box;max-height:80vh;display:flex;flex-direction:column">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">📧 שליחת מיילים</div>
+    <div id="emailModalContent" style="font-size:13px;line-height:1.7;overflow-y:auto;flex:1;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button onclick="confirmSendEmails()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח</button>
+      <button onclick="closeEmailModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div class="topbar">
   <div>
     <div class="topbar-title">👨‍👩‍👧‍👦 ינקלביץ</div>
@@ -1994,7 +2005,7 @@ function evCard(ev){
       ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
       ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${potTotal.toLocaleString()}</button>`:''}
       ${ev.cumulative&&cost>0?ev.closed?`<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:6px;background:var(--surface2);border:1.5px solid var(--border);font-size:12px;color:var(--text2);font-weight:600">🏁 הסתיים</span>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}` :`<button class="action-btn blue edit-only" onclick="openCloseEvModal(${ev.id})">🏁 סיים אירוע</button>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}`:balanced&&cost>0?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}
-      ${cost>0?`<button class="action-btn edit-only" onclick="sendDebtReminderEmails(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 שלח תזכורת</button>`:''}
+      ${cost>0?`<button class="action-btn edit-only" onclick="openEmailModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 מיילים</button>`:''}
       <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
     </div>`}
   </div>`;
@@ -2858,6 +2869,84 @@ function archiveEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   ev.open=false;ev.closedOn='היום';save();render();
   goTab('archive',document.getElementById('nb-archive'));
+}
+let _emailModalEvId=null;
+function openEmailModal(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  _emailModalEvId=evId;
+  const adjBal=evAdjBalance(ev);
+  const debtors=ev.participants.filter(fid=>{const f=getFam(fid);return f&&(f.email||f.email2)&&(adjBal[fid]||0)<-0.5;});
+  const settled=ev.participants.filter(fid=>{const f=getFam(fid);return f&&(f.email||f.email2)&&Math.abs(adjBal[fid]||0)<=0.5;});
+  let html=`<div style="font-weight:700;margin-bottom:12px;font-size:14px">${esc(ev.name)}</div>`;
+  if(debtors.length){
+    html+=`<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:4px">⚠️ תזכורת לחייבים:</div>`;
+    debtors.forEach(fid=>{
+      const f=getFam(fid);
+      const name=f.name.replace('משפחת','').trim();
+      const owe=Math.round(Math.abs(adjBal[fid]||0));
+      html+=`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;border-bottom:1px solid var(--border)"><input type="checkbox" id="em-debt-${fid}" checked style="width:16px;height:16px;cursor:pointer;flex-shrink:0"><span style="flex:1;font-size:13px">${esc(name)}</span><span style="font-size:11px;color:var(--amber);font-weight:700">חוב ₪${owe.toLocaleString()}</span></label>`;
+    });
+  }
+  if(settled.length){
+    html+=`<div style="font-size:12px;font-weight:700;color:#16a34a;margin:${debtors.length?'12px':'0'} 0 4px">✅ מסודרים – שלח מייל שוב:</div>`;
+    settled.forEach(fid=>{
+      const f=getFam(fid);
+      const name=f.name.replace('משפחת','').trim();
+      const notifKey=ev.cumulative?'closemail-'+ev.id+'-'+fid:'settled-'+ev.id+'-'+fid;
+      const alreadySent=!!localStorage.getItem(notifKey);
+      html+=`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;border-bottom:1px solid var(--border)"><input type="checkbox" id="em-settled-${fid}" ${alreadySent?'':'checked'} style="width:16px;height:16px;cursor:pointer;flex-shrink:0"><span style="flex:1;font-size:13px">${esc(name)}</span>${alreadySent?`<span style="font-size:11px;color:var(--text3)">נשלח</span>`:''}</label>`;
+    });
+  }
+  if(!debtors.length&&!settled.length) html+=`<div style="color:var(--text2);font-size:12px">אין משפחות עם כתובת מייל.</div>`;
+  document.getElementById('emailModalContent').innerHTML=html;
+  document.getElementById('emailModal').style.display='flex';
+}
+function closeEmailModal(){
+  _emailModalEvId=null;
+  document.getElementById('emailModal').style.display='none';
+}
+function confirmSendEmails(){
+  const evId=_emailModalEvId;
+  closeEmailModal();
+  if(evId==null)return;
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const adjBal=evAdjBalance(ev);
+  const cost=evCost(ev);
+  const shares=evShares(ev);
+  let sentCount=0;
+  // reminders to debtors
+  ev.participants.forEach(fid=>{
+    if((adjBal[fid]||0)>=-0.5)return;
+    const chk=document.getElementById('em-debt-'+fid);
+    if(!chk||!chk.checked)return;
+    const f=getFam(fid);if(!f||(!f.email&&!f.email2))return;
+    const name=f.name.replace('משפחת','').trim();
+    const share=Math.round(shares[fid]||0);
+    const spent=Math.round(ev.expenses[fid]||0);
+    const owe=Math.round(Math.abs(adjBal[fid]||0));
+    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
+    let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]]);
+    bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+    const html=_emailWrap(bodyHtml,ev.name,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id,f.name);
+    sendEmailNotif([{email:f.email,email2:f.email2,name}],`⚠️ תזכורת: חוב ב"${ev.name}" · ינקלביץ`,msg,html);
+    sentCount++;
+  });
+  // summary to settled
+  ev.participants.forEach(fid=>{
+    if(Math.abs(adjBal[fid]||0)>0.5)return;
+    const chk=document.getElementById('em-settled-'+fid);
+    if(!chk||!chk.checked)return;
+    const f=getFam(fid);if(!f||(!f.email&&!f.email2))return;
+    if(ev.cumulative){
+      localStorage.removeItem('closemail-'+ev.id+'-'+fid);
+      _sendCloseEvEmailOne(ev,fid);
+    } else {
+      localStorage.removeItem('settled-'+ev.id+'-'+fid);
+      sendSettledEmail(ev,fid);
+    }
+    sentCount++;
+  });
+  if(sentCount>0)alert(`נשלח מייל ל-${sentCount} משפחות`);
 }
 function sendDebtReminderEmails(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
