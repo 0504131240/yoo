@@ -929,9 +929,9 @@ const _cleanEmail=e=>(e||'').replace(/[​-‏‪-‮⁠﻿ ]/g,'').trim().toLo
 const _validEmail=e=>!!e&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_cleanEmail(e));
 function _ejsUrl(){return window.location.origin+window.location.pathname;}
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function _emailWrap(bodyHtml,headerTitle,headerIcon,urlOverride){
+function _emailWrap(bodyHtml,headerTitle,headerIcon,urlOverride,headerSubtitle){
   const url=urlOverride!=null?urlOverride:_ejsUrl();
-  return`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:6px;background:#eef0f8;font-family:-apple-system,Helvetica,Arial,sans-serif;direction:rtl"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" style="width:100%;max-width:480px" cellspacing="0" cellpadding="0"><tr><td style="background:linear-gradient(135deg,#0C447C 0%,#1E88D8 100%);padding:20px 16px;text-align:center;border-radius:10px 10px 0 0"><div style="font-size:32px;margin-bottom:4px">${headerIcon}</div><div style="color:#fff;font-size:18px;font-weight:700;letter-spacing:0.5px">ינקלביץ</div><div style="color:rgba(255,255,255,0.82);font-size:12px;margin-top:3px">${_esc(headerTitle)}</div></td></tr><tr><td style="background:#fff;padding:16px;direction:rtl;color:#1a1a2e;font-size:14px;line-height:1.6">${bodyHtml}</td></tr>${url?`<tr><td style="background:#fff;padding:0 16px 16px;text-align:center"><a href="${_esc(url)}" style="display:inline-block;background:#1E88D8;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700">קישור לאירוע ←</a></td></tr>`:''}<tr><td style="background:#f4f4f6;padding:8px 16px;text-align:center;border-radius:0 0 10px 10px;border-top:1px solid #e4e4e8"><span style="font-size:11px;color:#aaa">ינקלביץ · מערכת ניהול הוצאות משפחתית</span></td></tr></table></td></tr></table></body></html>`;
+  return`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:6px;background:#eef0f8;font-family:-apple-system,Helvetica,Arial,sans-serif;direction:rtl"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" style="width:100%;max-width:480px" cellspacing="0" cellpadding="0"><tr><td style="background:linear-gradient(135deg,#0C447C 0%,#1E88D8 100%);padding:20px 16px;text-align:center;border-radius:10px 10px 0 0"><div style="font-size:32px;margin-bottom:4px">${headerIcon}</div><div style="color:#fff;font-size:18px;font-weight:700;letter-spacing:0.5px">${_esc(headerTitle)}</div>${headerSubtitle?`<div style="color:rgba(255,255,255,0.82);font-size:12px;margin-top:3px">${_esc(headerSubtitle)}</div>`:''}</td></tr><tr><td style="background:#fff;padding:16px;direction:rtl;color:#1a1a2e;font-size:14px;line-height:1.6">${bodyHtml}</td></tr>${url?`<tr><td style="background:#fff;padding:0 16px 16px;text-align:center"><a href="${_esc(url)}" style="display:inline-block;background:#1E88D8;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700">קישור לאירוע ←</a></td></tr>`:''}<tr><td style="background:#f4f4f6;padding:8px 16px;text-align:center;border-radius:0 0 10px 10px;border-top:1px solid #e4e4e8"><span style="font-size:11px;color:#aaa">ינקלביץ · מערכת ניהול הוצאות משפחתית</span></td></tr></table></td></tr></table></body></html>`;
 }
 function _eCard(rows){
   return`<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;margin-bottom:14px">`+rows.map(([l,v,hi],i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0${i<rows.length-1?';border-bottom:1px solid #DBEAFE':''}"><span style="color:#666;font-size:13px">${_esc(l)}</span><span style="font-weight:700;font-size:13px${hi?';color:#1E88D8':''}">${v}</span></div>`).join('')+`</div>`;
@@ -971,7 +971,7 @@ function sendSettledEmail(ev,famId){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${lines.map(l=>`<li style="margin-bottom:4px">${_esc(l)}</li>`).join('')}</ul>`;
   }
   bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
-  const html=_emailWrap(bodyHtml,`האירוע "${ev.name}"`, '✅',_ejsUrl()+'#event-'+ev.id);
+  const html=_emailWrap(bodyHtml,ev.name,'✅',_ejsUrl()+'#event-'+ev.id,f.name);
   sendEmailNotif([{email:f.email,email2:f.email2,name}],`✅ סידרת את חלקך ב"${ev.name}" · ינקלביץ`,msg,html);
 }
 function testSingleEmail(inputId,btnId){
@@ -1765,7 +1765,7 @@ function confirmPartPay(){
           }
           if(toFundBal>0) crBodyHtml+=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px;margin-bottom:12px">💰 יתרתך בקופה הראשית: <strong>₪${toFundBal.toLocaleString()}</strong></div>`;
           crBodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
-          const crHtml=_emailWrap(crBodyHtml,`האירוע "${ev.name}"`, '✅',_ejsUrl()+'#event-'+ev.id);
+          const crHtml=_emailWrap(crBodyHtml,ev.name,'✅',_ejsUrl()+'#event-'+ev.id,toF.name);
           sendEmailNotif([{email:toF.email,email2:toF.email2,name:toName}],`✅ קיבלת את חלקך ב"${ev.name}" · ינקלביץ`,msg,crHtml);
         }
       }}
@@ -2807,7 +2807,7 @@ function _sendCloseEvEmailOne(ev,fid){
     bodyHtml+=`<p style="font-weight:700;margin:16px 0 8px;color:#333">⚖️ איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${settleLines.map(l=>`<li style="margin-bottom:5px">${_esc(l)}</li>`).join('')}</ul>`;
   }
   bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
-  const html=_emailWrap(bodyHtml,`האירוע "${ev.name}" הסתיים`,'🏁',_ejsUrl()+'#archive-'+ev.id);
+  const html=_emailWrap(bodyHtml,ev.name,'🏁',_ejsUrl()+'#archive-'+ev.id,f.name);
   sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏁 האירוע הסתיים · ינקלביץ',msg,html);
 }
 function closeEv(evId){
@@ -2846,7 +2846,7 @@ function closeEv(evId){
       }
       const statusBadge=Math.abs(bal)<=0.5?_eBadge('✅ החשבון שלך מסודר','#16a34a'):bal>0.5?_eBadge(`💰 מגיע לך עוד ₪${bal.toLocaleString()}`,'#2563eb'):_eBadge(`⚠️ יתרת חוב ₪${Math.abs(bal).toLocaleString()}`,'#ef4444');
       cBodyHtml+=`<div style="text-align:center;margin-top:4px">${statusBadge}</div>`;
-      const cHtml=_emailWrap(cBodyHtml,`האירוע "${ev.name}" נסגר`,'🗂',_ejsUrl()+'#archive-'+ev.id);
+      const cHtml=_emailWrap(cBodyHtml,ev.name,'🗂',_ejsUrl()+'#archive-'+ev.id,f.name);
       sendEmailNotif([{email:f.email,email2:f.email2,name}],'🗂 האירוע נסגר · ינקלביץ',msg,cHtml);
     });
     ev.open=false;ev.closedOn='היום';save();render();
@@ -2875,7 +2875,7 @@ function sendDebtReminderEmails(evId){
     const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]]);
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
-    const html=_emailWrap(bodyHtml,`תזכורת: ${ev.name}`,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id);
+    const html=_emailWrap(bodyHtml,ev.name,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id,f.name);
     sendEmailNotif([{email:f.email,email2:f.email2,name}],`⚠️ תזכורת: חוב ב"${ev.name}" · ינקלביץ`,msg,html);
   });
   alert(`נשלח מייל ל-${withEmail.length} משפחות`);
@@ -3663,7 +3663,7 @@ function doDepositToCumPot(){
     const share=Math.round(evShares(evObj)[savedFamId]||0);
     const msg=`הפקדה של ₪${roundAmt.toLocaleString()} לקופת האירוע "${evObj.name}" נרשמה.\n\nסה"כ הפקדות שלך לקופה זו: ₪${totalPot.toLocaleString()}\n\n💓 נכון להיום, החלק שלך לפי ההוצאות הנוכחיות: ₪${share.toLocaleString()}`;
     const pBodyHtml=_eCard([['הפקדה',`<span style="color:#1E88D8;font-weight:700">₪${roundAmt.toLocaleString()}</span>`,false],['סה"כ הפקדות שלך',`₪${totalPot.toLocaleString()}`,true]])+`<p style="text-align:center;margin:4px 0 0;font-size:14px;color:#555">💓 נכון להיום, החלק שלך לפי ההוצאות הנוכחיות: <strong>₪${share.toLocaleString()}</strong></p>`;
-    const pHtml=_emailWrap(pBodyHtml,`קופת האירוע – ${evObj.name}`,'💰',_ejsUrl()+'#event-'+savedEvId);
+    const pHtml=_emailWrap(pBodyHtml,evObj.name,'💰',_ejsUrl()+'#event-'+savedEvId,f.name);
     sendEmailNotif([{email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}],'💰 הפקדה לקופת האירוע · ינקלביץ',msg,pHtml);
   }
 }
