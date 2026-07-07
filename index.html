@@ -2693,6 +2693,7 @@ function confirmCloseEv(){
   if(evId==null)return;
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   ev.closed=true;
+  ev.open=false;
   const adjBal=evAdjBalance(ev);
   ev.participants.forEach(fid=>{
     if(Math.abs(adjBal[fid]||0)>0.5)return;
