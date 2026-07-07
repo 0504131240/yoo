@@ -2692,6 +2692,7 @@ function _sendCloseEvEmailOne(ev,fid){
   const myItems=(ev.expenseItems||[]).filter(it=>it.famId===fid);
   const mySpent=Math.round(myItems.reduce((s,it)=>s+it.amt,0));
   const settleLines=[];
+  if(mySpent>0) settleLines.push(`הוצאות שלך באירוע: ₪${mySpent.toLocaleString()}`);
   const _myPotPend=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0));
   const _myPotDist=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
   const _excessToFund=Math.round((fund.transactions||[]).filter(t=>t.famId===fid&&t.type==='deposit'&&(t.desc||'').includes('החזר עודף מקופת האירוע')&&(t.desc||'').includes(ev.name)).reduce((s,t)=>s+t.amount,0));
@@ -2763,9 +2764,12 @@ function _sendCloseEvEmailOne(ev,fid){
         </tr>`;
       });
       if(visibleIts.length>1){
+        const _totAmt=visibleIts.reduce((s,it)=>s+it.amt,0);
+        const _totShare=visibleIts.reduce((s,it)=>s+_itemShare(it,fid),0);
         itemRows+=`<tr style="border-bottom:2px solid #e0e2ff${isMine?';background:#e8e8ff':''}">
-          <td colspan="3" style="padding:4px 10px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
-          <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${visibleIts.reduce((s,it)=>s+_itemShare(it,fid),0).toLocaleString()}</td>
+          <td colspan="2" style="padding:4px 10px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
+          <td style="padding:4px 10px;font-size:11px;font-weight:700;${isMine?'color:#5b4fcf':'color:#555'}">₪${_totAmt.toLocaleString()}</td>
+          <td style="padding:4px 10px;font-size:11px;font-weight:700;color:#5b4fcf">₪${_totShare.toLocaleString()}</td>
         </tr>`;
       }
     });
