@@ -3734,16 +3734,6 @@ function doDepositToCumPot(){
   ev.potPayments.push({famId:savedFamId,amt:roundAmt});
   closeCumPot();
   save();render();
-  const f=getFam(savedFamId);
-  if(f&&(f.email||f.email2)){
-    const evObj=events.find(e=>e.id===savedEvId);if(!evObj)return;
-    const totalPot=(evObj.potPayments||[]).filter(p=>p.famId===savedFamId).reduce((s,p)=>s+p.amt,0);
-    const share=Math.round(evShares(evObj)[savedFamId]||0);
-    const msg=`הפקדה של ₪${roundAmt.toLocaleString()} לקופת האירוע "${evObj.name}" נרשמה.\n\nסה"כ הפקדות שלך לקופה זו: ₪${totalPot.toLocaleString()}\n\n💓 נכון להיום, החלק שלך לפי ההוצאות הנוכחיות: ₪${share.toLocaleString()}`;
-    const pBodyHtml=_eCard([['הפקדה',`<span style="color:#1E88D8;font-weight:700">₪${roundAmt.toLocaleString()}</span>`,false],['סה"כ הפקדות שלך',`₪${totalPot.toLocaleString()}`,true]])+`<p style="text-align:center;margin:4px 0 0;font-size:14px;color:#555">💓 נכון להיום, החלק שלך לפי ההוצאות הנוכחיות: <strong>₪${share.toLocaleString()}</strong></p>`;
-    const pHtml=_emailWrap(pBodyHtml,evObj.name,'💰',_ejsUrl()+'#event-'+savedEvId,f.name);
-    sendEmailNotif([{email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}],'💰 הפקדה לקופת האירוע · ינקלביץ',msg,pHtml);
-  }
 }
 
 function applyEditMode(){
