@@ -1814,7 +1814,6 @@ function evCard(ev){
         ${spent>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
       </div>
       <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
-      ${(f.email||f.email2)?`<button onclick="sendEmailToFam(${ev.id},${fid})" title="שלח מייל" style="flex-shrink:0;width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);font-size:13px;cursor:pointer;padding:0;line-height:26px;text-align:center;color:var(--text2)">📧</button>`:''}
     </div>`;
   }).join('');
   const cumRows=ev.participants.map(fid=>{
@@ -1872,7 +1871,6 @@ function evCard(ev){
           ${items.length?`<button onclick="toggleCumFamily(${ev.id},${fid})" style="margin-top:${spent>0?'2':'0'}px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer">${isExpanded?'▲':'▼ '+items.length}</button>`:''}
         </div>
         <${tagTag} class="${tagCls}"${tagClick}>${tagText}</${tagTag}>
-        ${(f.email||f.email2)?`<button onclick="sendEmailToFam(${ev.id},${fid})" title="שלח מייל" style="flex-shrink:0;width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);font-size:13px;cursor:pointer;padding:0;line-height:26px;text-align:center;color:var(--text2)">📧</button>`:''}
       </div>
       ${detailList}
     </div>`;
