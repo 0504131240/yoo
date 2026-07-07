@@ -2848,8 +2848,12 @@ function sendEmailToFam(evId,fid){
     const share=Math.round(shares[fid]||0);
     const spent=Math.round(ev.expenses[fid]||0);
     const owe=Math.round(Math.abs(b));
-    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
-    let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]]);
+    const potDep=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0));
+    const msgPot=potDep>0.5?`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`:'';
+    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}${msgPot}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
+    const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]];
+    if(potDep>0.5) cardRows.push(['הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
+    let bodyHtml=_eCard(cardRows);
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
     const html=_emailWrap(bodyHtml,ev.name,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id,f.name);
     sendEmailNotif([{email:f.email,email2:f.email2,name}],`⚠️ תזכורת: חוב ב"${ev.name}" · ינקלביץ`,msg,html);
