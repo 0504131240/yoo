@@ -405,13 +405,12 @@ body:not(.at-home){padding-bottom:140px}
 
 <div id="closeEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCloseEvModal()">
   <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:320px;box-sizing:border-box">
-    <div style="font-size:15px;font-weight:700;margin-bottom:6px">🏁 סיום אירוע</div>
-    <div id="closeEvInfo" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6"></div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button id="closeEvConfirmBtn" onclick="confirmCloseEv()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח מיילים</button>
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px">🏁 סיום אירוע</div>
+    <div id="closeEvInfo" style="font-size:13px;margin-bottom:14px;line-height:1.7"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmCloseEv()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">סגור ושלח</button>
       <button onclick="closeCloseEvModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
-    <button onclick="confirmCloseEvNoEmail()" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">סגור ללא שליחה (מיילים כבר נשלחו ידנית)</button>
   </div>
 </div>
 
@@ -2665,9 +2664,23 @@ function openCloseEvModal(evId){
   const adjBal=evAdjBalance(ev);
   const settled=ev.participants.filter(fid=>{const f=getFam(fid);return f&&(f.email||f.email2)&&Math.abs(adjBal[fid]||0)<=0.5;});
   const info=document.getElementById('closeEvInfo');
-  if(info)info.innerHTML=`<b>${esc(ev.name)}</b><br>פעולה זו תשלח מייל סיכום ל-${settled.length} משפח${settled.length===1?'ה':'ות'} מסודר${settled.length===1?'ת':'ות'}.<br><span style="color:var(--amber)">לא ניתן לבטל לאחר השליחה.</span>`;
+  if(info){
+    const rows=settled.map(fid=>{
+      const f=getFam(fid);
+      const name=f.name.replace('משפחת','').trim();
+      const alreadySent=!!localStorage.getItem('closemail-'+ev.id+'-'+fid);
+      return`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;border-bottom:1px solid var(--border)">
+        <input type="checkbox" id="closeev-chk-${fid}" ${alreadySent?'':'checked'} style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
+        <span style="flex:1;font-size:13px">${esc(name)}</span>
+        ${alreadySent?`<span style="font-size:11px;color:var(--text3)">נשלח</span>`:''}
+      </label>`;
+    }).join('');
+    info.innerHTML=`<div style="font-weight:700;margin-bottom:8px">${esc(ev.name)}</div>`
+      +(settled.length?`<div style="font-size:12px;color:var(--text2);margin-bottom:8px">בחר למי לשלוח מייל סיכום:</div>${rows}`
+      :`<div style="color:var(--text2);font-size:12px">אין משפחות מסודרות עם כתובת מייל.</div>`);
+  }
   const modal=document.getElementById('closeEvModal');
-  if(modal){modal.style.display='flex';}
+  if(modal)modal.style.display='flex';
 }
 function closeCloseEvModal(){
   _closeEvPendingId=null;
@@ -2677,19 +2690,19 @@ function closeCloseEvModal(){
 function confirmCloseEv(){
   const evId=_closeEvPendingId;
   closeCloseEvModal();
-  if(evId!=null)closeEv(evId);
-}
-function confirmCloseEvNoEmail(){
-  const evId=_closeEvPendingId;
-  closeCloseEvModal();
   if(evId==null)return;
   const ev=events.find(e=>e.id===evId);if(!ev)return;
+  ev.closed=true;
   const adjBal=evAdjBalance(ev);
   ev.participants.forEach(fid=>{
-    if(Math.abs(adjBal[fid]||0)<=0.5)
+    if(Math.abs(adjBal[fid]||0)>0.5)return;
+    const chk=document.getElementById('closeev-chk-'+fid);
+    if(chk&&chk.checked){
+      _sendCloseEvEmailOne(ev,fid);
+    } else {
       localStorage.setItem('closemail-'+ev.id+'-'+fid,'1');
+    }
   });
-  ev.closed=true;
   save();render();
 }
 function _sendCloseEvEmailOne(ev,fid){
