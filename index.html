@@ -3600,6 +3600,12 @@ function renderPotModal(ev){
       <button class="edit-only" onclick="releasePotExcessToOneM(${ev.id},${fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
     </div>`;
   }).join('');
+  const settledList=ev.settled||[];
+  const doneRows=settledList.length?`<div style="border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">העברות שבוצעו:</div><div style="padding:0 16px 4px">`+settledList.map(s=>{
+    const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
+    const badge=s.method==='fund'?`<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>`:s.method==='pot'?`<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>`:`<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>`;
+    return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span style="flex:1"><b style="color:var(--text)">${esc(s.from)}</b> העביר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
+  }).join('')+'</div></div>':'';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div><div style="font-size:14px;font-weight:700">💰 קופת האירוע</div><div style="font-size:11px;color:var(--text2);margin-top:2px">₪${potTotal.toLocaleString()} · ${esc(ev.name)}</div></div>
@@ -3612,6 +3618,7 @@ function renderPotModal(ev){
     ${potTransfers.length?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
     ${excessRows}
     ${!creditorFids.length&&potPayments.length&&potExcess<=0.5?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
+    ${doneRows}
     <div style="padding:4px 16px 10px">
       <button onclick="closePotModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
