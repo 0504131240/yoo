@@ -3952,12 +3952,28 @@ window.addEventListener('hashchange',handleHash);
 const GP_CLIENT_ID='789621490367-pg6gmpqf9v8flqf58dkqav3uhdtg33vd.apps.googleusercontent.com';
 const GP_SCOPE='https://www.googleapis.com/auth/photoslibrary.readonly';
 const GP_LS_KEY='gp_connected';
+const GP_LS_TOKEN='gp_token';
+const GP_LS_EXPIRY='gp_expiry';
 let _gpTokenClient=null;
 let _gpAccessToken=null;
 let _gpAlbums=[];
 let _gpCurrentAlbumId=null;
 let _gpCurrentAlbumPhotos=[];
 let _gpConnecting=false;
+
+function _gpSaveToken(token,expiresIn){
+  _gpAccessToken=token;
+  localStorage.setItem(GP_LS_KEY,'1');
+  localStorage.setItem(GP_LS_TOKEN,token);
+  localStorage.setItem(GP_LS_EXPIRY,String(Date.now()+(expiresIn-120)*1000));
+}
+function _gpRestoreToken(){
+  const token=localStorage.getItem(GP_LS_TOKEN);
+  const expiry=parseInt(localStorage.getItem(GP_LS_EXPIRY)||'0');
+  if(token&&expiry>Date.now()){_gpAccessToken=token;return true;}
+  _gpAccessToken=null;
+  return false;
+}
 
 function initGPhotoClient(){
   if(_gpTokenClient) return;
@@ -3973,8 +3989,7 @@ function initGPhotoClient(){
         renderGPhotoSection();
         return;
       }
-      _gpAccessToken=resp.access_token;
-      localStorage.setItem(GP_LS_KEY,'1');
+      _gpSaveToken(resp.access_token,resp.expires_in||3600);
       _gpConnecting=false;
       fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',{headers:{Authorization:'Bearer '+resp.access_token}})
         .then(r=>r.json()).then(u=>{localStorage.setItem('gp_email',u.email||'');}).catch(()=>{});
@@ -3992,10 +4007,12 @@ function connectGPhotos(){
 }
 
 function disconnectGPhotos(){
-  if(_gpAccessToken) google.accounts.oauth2.revoke(_gpAccessToken,()=>{});
+  if(_gpAccessToken&&typeof google!=='undefined') google.accounts.oauth2.revoke(_gpAccessToken,()=>{});
   _gpAccessToken=null;
   _gpAlbums=[];
   localStorage.removeItem(GP_LS_KEY);
+  localStorage.removeItem(GP_LS_TOKEN);
+  localStorage.removeItem(GP_LS_EXPIRY);
   localStorage.removeItem('gp_email');
   renderGPhotoSection();
 }
@@ -4009,7 +4026,7 @@ async function loadGpAlbums(){
     do{
       const url='https://photoslibrary.googleapis.com/v1/albums?pageSize=50&excludeNonAppCreatedData=false'+(pageToken?'&pageToken='+pageToken:'');
       const r=await fetch(url,{headers:{Authorization:'Bearer '+_gpAccessToken}});
-      if(r.status===401){_gpAccessToken=null;renderGPhotoSection();return;}
+      if(r.status===401){_gpAccessToken=null;localStorage.removeItem(GP_LS_TOKEN);localStorage.removeItem(GP_LS_EXPIRY);renderGPhotoSection();return;}
       const d=await r.json();
       if(d.error){
         if(el) el.innerHTML=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">שגיאה: ${d.error.message||d.error.status||'לא ידוע'}</div>`;
@@ -4054,17 +4071,15 @@ function renderGPhotoSection(){
       ${_gpEmail?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;direction:ltr">${_gpEmail}</div>`:''}
       <div id="gpAlbumList"></div>
     </div>`;
-  if(_gpAccessToken){
+  if(_gpAlbums.length){
     renderGpAlbumList();
+  } else if(_gpAccessToken||_gpRestoreToken()){
+    loadGpAlbums();
   } else {
     const listEl=document.getElementById('gpAlbumList');
-    if(_gpAlbums.length){
-      renderGpAlbumList();
-    } else if(listEl){
-      listEl.innerHTML=`<div style="padding:10px 0 4px;display:flex;justify-content:center">
-        <button onclick="gpLoadAlbums()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:20px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:var(--font)">📂 טען אלבומים</button>
-      </div>`;
-    }
+    if(listEl) listEl.innerHTML=`<div style="padding:10px 0 4px;display:flex;justify-content:center">
+      <button onclick="gpLoadAlbums()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:20px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:var(--font)">📂 טען אלבומים</button>
+    </div>`;
   }
 }
 
