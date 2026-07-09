@@ -800,6 +800,7 @@ let _gpCurrentAlbumId=null;
 let _gpCurrentAlbumPhotos=[];
 let _gpConnecting=false;
 let _gpLoading=false;
+let _gpLastError='';
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId)){collapsedEvents.delete(evId);history.replaceState(null,'','#event-'+evId);}
   else{collapsedEvents.add(evId);history.replaceState(null,'','#events');}
@@ -4000,12 +4001,7 @@ function initGPhotoClient(cb){
       if(resp.error){
         _gpConnecting=false;
         if(resp.error==='access_denied'){localStorage.removeItem(GP_LS_KEY);}
-        const sec=document.getElementById('homePhotosSection');
-        if(sec){
-          const errBox=sec.querySelector('.gp-err-msg');
-          if(errBox)errBox.textContent='שגיאה: '+resp.error+(resp.error_description?' — '+resp.error_description:'');
-          else sec.insertAdjacentHTML('afterbegin',`<div class="gp-err-msg" style="margin:0 16px 8px;padding:10px 12px;background:#fce;border-radius:8px;font-size:12px;color:#700;direction:ltr">שגיאה: ${resp.error}${resp.error_description?' — '+resp.error_description:''}</div>`);
-        }
+        _gpLastError='OAuth: '+resp.error+(resp.error_description?' ('+resp.error_description+')':'');
         renderGPhotoSection();
         return;
       }
@@ -4086,6 +4082,8 @@ function renderGPhotoSection(){
   if(_gpAlbums.length){renderGpAlbumList();return;} // already loaded, just re-render list
   const connected=!!localStorage.getItem(GP_LS_KEY);
   if(!connected && !_gpAccessToken){
+    const errHtml=_gpLastError?`<div style="font-size:11px;color:var(--red-mid);direction:ltr;word-break:break-word;max-width:260px;text-align:center">${_gpLastError}</div>`:'';
+    _gpLastError='';
     sec.innerHTML=`
       <div style="margin:0 0 12px;padding:0 16px">
         <div class="sec-ttl">📸 אלבומי גוגל תמונות</div>
@@ -4096,6 +4094,7 @@ function renderGPhotoSection(){
             התחבר עם Google
           </button>
           ${_gpConnecting?'<div style="font-size:12px;color:var(--text3)">מתחבר…</div>':''}
+          ${errHtml}
         </div>
       </div>`;
     return;
