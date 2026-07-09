@@ -787,6 +787,19 @@ let settleModalEvId=null,potModalEvId=null;
 let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false,_ppPot=false;
 let adminPass='';
 let editMode=false;
+// Google Photos
+const GP_CLIENT_ID='789621490367-pg6gmpqf9v8flqf58dkqav3uhdtg33vd.apps.googleusercontent.com';
+const GP_SCOPE='https://www.googleapis.com/auth/photoslibrary.readonly';
+const GP_LS_KEY='gp_connected';
+const GP_LS_TOKEN='gp_token';
+const GP_LS_EXPIRY='gp_expiry';
+let _gpTokenClient=null;
+let _gpAccessToken=null;
+let _gpAlbums=[];
+let _gpCurrentAlbumId=null;
+let _gpCurrentAlbumPhotos=[];
+let _gpConnecting=false;
+let _gpLoading=false;
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId)){collapsedEvents.delete(evId);history.replaceState(null,'','#event-'+evId);}
   else{collapsedEvents.add(evId);history.replaceState(null,'','#events');}
@@ -3952,18 +3965,6 @@ window.addEventListener('hashchange',handleHash);
 })();
 
 // ── Google Photos Integration ──────────────────────────────────────────────
-const GP_CLIENT_ID='789621490367-pg6gmpqf9v8flqf58dkqav3uhdtg33vd.apps.googleusercontent.com';
-const GP_SCOPE='https://www.googleapis.com/auth/photoslibrary.readonly';
-const GP_LS_KEY='gp_connected';
-const GP_LS_TOKEN='gp_token';
-const GP_LS_EXPIRY='gp_expiry';
-let _gpTokenClient=null;
-let _gpAccessToken=null;
-let _gpAlbums=[];
-let _gpCurrentAlbumId=null;
-let _gpCurrentAlbumPhotos=[];
-let _gpConnecting=false;
-let _gpLoading=false;
 
 function _gpSaveToken(token,expiresIn){
   _gpAccessToken=token;
