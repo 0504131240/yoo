@@ -4000,6 +4000,12 @@ function initGPhotoClient(cb){
       if(resp.error){
         _gpConnecting=false;
         if(resp.error==='access_denied'){localStorage.removeItem(GP_LS_KEY);}
+        const sec=document.getElementById('homePhotosSection');
+        if(sec){
+          const errBox=sec.querySelector('.gp-err-msg');
+          if(errBox)errBox.textContent='שגיאה: '+resp.error+(resp.error_description?' — '+resp.error_description:'');
+          else sec.insertAdjacentHTML('afterbegin',`<div class="gp-err-msg" style="margin:0 16px 8px;padding:10px 12px;background:#fce;border-radius:8px;font-size:12px;color:#700;direction:ltr">שגיאה: ${resp.error}${resp.error_description?' — '+resp.error_description:''}</div>`);
+        }
         renderGPhotoSection();
         return;
       }
