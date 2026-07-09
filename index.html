@@ -4051,10 +4051,15 @@ async function loadGpAlbums(){
       const url='https://photoslibrary.googleapis.com/v1/albums?pageSize=50&excludeNonAppCreatedData=false'+(pageToken?'&pageToken='+pageToken:'');
       const r=await fetch(url,{headers:{Authorization:'Bearer '+_gpAccessToken}});
       if(r.status===401||r.status===403){
+        const errData=await r.json().catch(()=>({}));
+        const errMsg=(errData.error&&(errData.error.message||errData.error.status))||('HTTP '+r.status);
+        if(el) el.innerHTML=`<div style="padding:12px 16px;color:var(--red-mid);font-size:12px;direction:ltr;word-break:break-word">שגיאת API: ${errMsg}</div>`;
         _gpAccessToken=null;
         localStorage.removeItem(GP_LS_TOKEN);localStorage.removeItem(GP_LS_EXPIRY);
         localStorage.removeItem(GP_LS_KEY);
-        _gpLoading=false;renderGPhotoSection();return;
+        _gpLoading=false;
+        setTimeout(()=>renderGPhotoSection(),4000);
+        return;
       }
       const d=await r.json();
       if(d.error){
