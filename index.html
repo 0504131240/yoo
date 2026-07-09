@@ -778,6 +778,7 @@ let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
 let calItems=[];
 let birthdays=[];
+let gpAlbums=[];
 let nxtMsg=1,nxtCal=1,nxtBday=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
@@ -787,9 +788,7 @@ let settleModalEvId=null,potModalEvId=null;
 let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false,_ppPot=false;
 let adminPass='';
 let editMode=false;
-// Google Photos
-const GP_ALBUM_URL_KEY='gp_album_url';
-const GP_ALBUM_NAME_KEY='gp_album_name';
+// Google Photos (albums stored in Firebase via gpAlbums variable)
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId)){collapsedEvents.delete(evId);history.replaceState(null,'','#event-'+evId);}
   else{collapsedEvents.add(evId);history.replaceState(null,'','#events');}
@@ -1056,7 +1055,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass,messages,calItems,birthdays});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass,messages,calItems,birthdays,gpAlbums});
     localStorage.removeItem('pendingSave');
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
@@ -1088,6 +1087,7 @@ async function load(){
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
+    gpAlbums=d.gpAlbums||[];
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
@@ -3956,10 +3956,8 @@ window.addEventListener('hashchange',handleHash);
 
 // ── Google Photos Integration ──────────────────────────────────────────────
 
-function _gpGetAlbums(){
-  try{return JSON.parse(localStorage.getItem(GP_ALBUM_URL_KEY)||'[]');}catch{return[];}
-}
-function _gpSetAlbums(arr){localStorage.setItem(GP_ALBUM_URL_KEY,JSON.stringify(arr));}
+function _gpGetAlbums(){return gpAlbums||[];}
+function _gpSetAlbums(arr){gpAlbums=arr;save();}
 
 const GP_ICON=`<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="14" fill="#4285F4"/><path d="M14 7a7 7 0 100 14A7 7 0 0014 7z" fill="#fbbc04"/><path d="M8.5 14a5.5 5.5 0 0011 0" fill="#34a853"/><path d="M19.5 14a5.5 5.5 0 01-11 0" fill="#ea4335"/></svg>`;
 
