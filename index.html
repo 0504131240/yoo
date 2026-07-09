@@ -4180,7 +4180,14 @@ function closeGpAlbum(){
 
 // Initialize GIS client once the library loads
 (function _gpInit(){
-  function tryInit(){if(typeof google!=='undefined'&&google.accounts){initGPhotoClient();if(localStorage.getItem(GP_LS_KEY)){renderGPhotoSection();}}else{setTimeout(tryInit,300);}}
+  function tryInit(){
+    if(typeof google!=='undefined'&&google.accounts){
+      // Disable Google One Tap / FedCM auto-prompt completely
+      if(google.accounts.id) google.accounts.id.disableAutoSelect();
+      initGPhotoClient();
+      if(localStorage.getItem(GP_LS_KEY)) renderGPhotoSection();
+    }else{setTimeout(tryInit,300);}
+  }
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',tryInit);}else{tryInit();}
 })();
 // ──────────────────────────────────────────────────────────────────────────
