@@ -3990,6 +3990,7 @@ function _gpLoadScript(cb){
 }
 
 function initGPhotoClient(cb){
+  if(_gpTokenClient){if(cb)cb();return;}
   _gpLoadScript(()=>{
   if(google.accounts.id)google.accounts.id.disableAutoSelect();
   _gpTokenClient=google.accounts.oauth2.initTokenClient({
@@ -4016,16 +4017,21 @@ function initGPhotoClient(cb){
 }
 
 function connectGPhotos(){
-  _gpTokenClient=null;
   localStorage.removeItem(GP_LS_KEY);
   localStorage.removeItem(GP_LS_TOKEN);
   localStorage.removeItem(GP_LS_EXPIRY);
   _gpAccessToken=null;
-  initGPhotoClient(()=>{
+  if(_gpTokenClient){
     _gpConnecting=true;
     renderGPhotoSection();
     _gpTokenClient.requestAccessToken({prompt:'consent'});
-  });
+  } else {
+    initGPhotoClient(()=>{
+      _gpConnecting=true;
+      renderGPhotoSection();
+      _gpTokenClient.requestAccessToken({prompt:'consent'});
+    });
+  }
 }
 
 function disconnectGPhotos(){
@@ -4085,6 +4091,8 @@ function renderGPhotoSection(){
   if(_gpAlbums.length){renderGpAlbumList();return;} // already loaded, just re-render list
   const connected=!!localStorage.getItem(GP_LS_KEY);
   if(!connected && !_gpAccessToken){
+    // Pre-load GIS so button click is synchronous (avoids popup blocker)
+    if(!_gpTokenClient) initGPhotoClient(null);
     const errHtml=_gpLastError?`<div style="font-size:11px;color:var(--red-mid);direction:ltr;word-break:break-word;max-width:260px;text-align:center">${_gpLastError}</div>`:'';
     _gpLastError='';
     sec.innerHTML=`
