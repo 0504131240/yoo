@@ -788,7 +788,14 @@ let settleModalEvId=null,potModalEvId=null;
 let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false,_ppPot=false;
 let adminPass='';
 let editMode=false;
-// Google Photos (albums stored in Firebase via gpAlbums variable)
+// Google Photos
+const GP_CLIENT_ID='789621490367-pg6gmpqf9v8flqf58dkqav3uhdtg33vd.apps.googleusercontent.com';
+const GP_SCOPE='https://www.googleapis.com/auth/photoslibrary.readonly';
+let _gpTokenClient=null;
+let _gpAccessToken=null;
+let _gpConnecting=false;
+let _gpLoading=false;
+let _gpLastError='';
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId)){collapsedEvents.delete(evId);history.replaceState(null,'','#event-'+evId);}
   else{collapsedEvents.add(evId);history.replaceState(null,'','#events');}
@@ -3956,60 +3963,155 @@ window.addEventListener('hashchange',handleHash);
 
 // ── Google Photos Integration ──────────────────────────────────────────────
 
-function _gpGetAlbums(){return gpAlbums||[];}
-function _gpSetAlbums(arr){gpAlbums=arr;save();}
+function _gpLoadScript(cb){
+  if(typeof google!=='undefined'&&google.accounts){cb();return;}
+  const s=document.createElement('script');
+  s.src='https://accounts.google.com/gsi/client';
+  s.onload=cb;s.onerror=()=>{_gpLastError='נכשלה טעינת ספריית Google';renderGPhotoSection();};
+  document.head.appendChild(s);
+}
 
-const GP_ICON=`<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="14" fill="#4285F4"/><path d="M14 7a7 7 0 100 14A7 7 0 0014 7z" fill="#fbbc04"/><path d="M8.5 14a5.5 5.5 0 0011 0" fill="#34a853"/><path d="M19.5 14a5.5 5.5 0 01-11 0" fill="#ea4335"/></svg>`;
+function initGPhotoClient(cb){
+  if(_gpTokenClient){if(cb)cb();return;}
+  _gpLoadScript(()=>{
+    if(google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect();
+    _gpTokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:GP_CLIENT_ID,scope:GP_SCOPE,include_granted_scopes:false,
+      callback:(resp)=>{
+        _gpConnecting=false;
+        if(resp.error){
+          _gpLastError=resp.error==='access_denied'?'הגישה נדחתה':'שגיאת OAuth: '+resp.error;
+          renderGPhotoSection();return;
+        }
+        _gpAccessToken=resp.access_token;
+        localStorage.setItem('gp_token',resp.access_token);
+        localStorage.setItem('gp_expiry',String(Date.now()+(((resp.expires_in||3600)-120)*1000)));
+        renderGPhotoSection();
+      }
+    });
+    if(cb)cb();
+  });
+}
+
+function connectGPhotos(){
+  localStorage.removeItem('gp_token');localStorage.removeItem('gp_expiry');
+  _gpAccessToken=null;_gpLastError='';
+  if(_gpTokenClient){
+    _gpConnecting=true;renderGPhotoSection();
+    _gpTokenClient.requestAccessToken({prompt:'consent'});
+  } else {
+    initGPhotoClient(()=>{
+      _gpConnecting=true;renderGPhotoSection();
+      _gpTokenClient.requestAccessToken({prompt:'consent'});
+    });
+  }
+}
+
+function disconnectGPhotos(){
+  if(_gpAccessToken&&typeof google!=='undefined')google.accounts.oauth2.revoke(_gpAccessToken,()=>{});
+  _gpAccessToken=null;_gpLastError='';
+  localStorage.removeItem('gp_token');localStorage.removeItem('gp_expiry');
+  renderGPhotoSection();
+}
+
+function _gpRestoreToken(){
+  const t=localStorage.getItem('gp_token'),exp=parseInt(localStorage.getItem('gp_expiry')||'0');
+  if(t&&exp>Date.now()){_gpAccessToken=t;return true;}
+  _gpAccessToken=null;return false;
+}
 
 function renderGPhotoSection(){
   const sec=document.getElementById('homePhotosSection');
-  if(!sec) return;
-  const albums=_gpGetAlbums();
-  const cardStyle='display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:12px 14px;text-decoration:none;color:var(--text1);margin-bottom:8px';
-  if(!albums.length && !editMode){sec.innerHTML='';return;}
-  let html=`<div style="margin:0 0 12px;padding:0 16px"><div class="sec-ttl" style="margin-bottom:8px">📸 אלבומי תמונות</div>`;
-  albums.forEach((a,i)=>{
-    html+=`<div style="position:relative">
-      <a href="${esc(a.url)}" target="_blank" rel="noopener" style="${cardStyle}">
-        ${GP_ICON}
-        <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:1px">פתח ב-Google Photos ←</div>
-        </div>
-      </a>
-      ${editMode?`<button onclick="gpRemoveAlbum(${i})" style="position:absolute;top:6px;left:6px;background:var(--red-mid,#e53);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>`:''}
-    </div>`;
-  });
-  if(editMode){
-    html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px;display:flex;flex-direction:column;gap:8px;margin-top:4px">
-      <input id="gpAlbumNameInput" type="text" placeholder="שם האלבום" style="width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:var(--r1);background:var(--bg);color:var(--text1);font-size:13px;font-family:inherit">
-      <input id="gpAlbumUrlInput" type="url" placeholder="https://photos.google.com/share/..." style="width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:var(--r1);background:var(--bg);color:var(--text1);font-size:13px;font-family:inherit;direction:ltr">
-      <button onclick="gpAddAlbum()" style="background:var(--brand,#3b82f6);color:#fff;border:none;border-radius:var(--r1);padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">+ הוסף אלבום</button>
-    </div>`;
+  if(!sec)return;
+  if(!_gpAccessToken&&!_gpRestoreToken()){
+    if(!_gpTokenClient)initGPhotoClient(null);
+    const err=_gpLastError?`<div style="font-size:12px;color:var(--red-mid);margin-top:6px;text-align:center">${_gpLastError}</div>`:'';
+    _gpLastError='';
+    sec.innerHTML=`<div style="margin:0 0 12px;padding:0 16px">
+      <div class="sec-ttl">📸 גלריית תמונות</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:8px">
+        <div style="font-size:13px;color:var(--text2);text-align:center">חבר את Google כדי לצפות באלבומים ישירות כאן</div>
+        <button onclick="connectGPhotos()" style="background:#4285F4;color:#fff;border:none;border-radius:20px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#fff" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#fff" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.258c-.806.54-1.837.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#fff" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#fff" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+          התחבר עם Google
+        </button>
+        ${_gpConnecting?'<div style="font-size:12px;color:var(--text3)">מתחבר…</div>':''}${err}
+      </div></div>`;
+    return;
   }
-  html+='</div>';
-  sec.innerHTML=html;
+  sec.innerHTML=`<div style="margin:0 0 12px;padding:0 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="sec-ttl" style="margin:0">📸 גלריית תמונות</div>
+      <button onclick="disconnectGPhotos()" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline">התנתק</button>
+    </div>
+    <div id="gpAlbumList"><div style="padding:12px 0;color:var(--text3);font-size:13px;text-align:center">טוען אלבומים…</div></div>
+  </div>`;
+  loadGpAlbums();
 }
 
-function gpAddAlbum(){
-  const url=(document.getElementById('gpAlbumUrlInput')||{}).value||'';
-  const name=(document.getElementById('gpAlbumNameInput')||{}).value||'';
-  if(!url.trim()) return;
-  const albums=_gpGetAlbums();
-  albums.push({url:url.trim(),name:name.trim()||'אלבום'});
-  _gpSetAlbums(albums);
-  renderGPhotoSection();
+async function loadGpAlbums(){
+  if(_gpLoading)return;_gpLoading=true;
+  const el=document.getElementById('gpAlbumList');
+  try{
+    let albums=[],pageToken='';
+    do{
+      const r=await fetch('https://photoslibrary.googleapis.com/v1/albums?pageSize=50'+(pageToken?'&pageToken='+pageToken:''),
+        {headers:{Authorization:'Bearer '+_gpAccessToken}});
+      if(r.status===401||r.status===403){
+        const msg=await r.json().catch(()=>({}));
+        const txt=(msg.error&&msg.error.message)||'HTTP '+r.status;
+        _gpAccessToken=null;localStorage.removeItem('gp_token');localStorage.removeItem('gp_expiry');
+        _gpLoading=false;_gpLastError=txt;renderGPhotoSection();return;
+      }
+      const d=await r.json();
+      if(d.albums)albums=albums.concat(d.albums);
+      pageToken=d.nextPageToken||'';
+    }while(pageToken);
+    _gpLoading=false;
+    if(!el)return;
+    if(!albums.length){el.innerHTML='<div style="padding:12px;color:var(--text3);font-size:13px;text-align:center">לא נמצאו אלבומים</div>';return;}
+    el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">${albums.map(a=>{
+      const cover=a.coverPhotoBaseUrl?a.coverPhotoBaseUrl+'=w200-h200-c':'';
+      const cnt=a.mediaItemsCount?parseInt(a.mediaItemsCount).toLocaleString()+' פריטים':'';
+      return`<div onclick="gpOpenAlbum('${a.id}','${(a.title||'אלבום').replace(/'/g,"\\'")}',this)" style="cursor:pointer;border-radius:var(--r2);overflow:hidden;border:1px solid var(--border);background:var(--surface2)">
+        ${cover?`<img src="${cover}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none'">`:`<div style="width:100%;aspect-ratio:1;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:28px">📁</div>`}
+        <div style="padding:6px 8px 8px"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title||'ללא שם')}</div>${cnt?`<div style="font-size:10px;color:var(--text3)">${cnt}</div>`:''}</div>
+      </div>`;
+    }).join('')}</div>`;
+  }catch(e){_gpLoading=false;if(el)el.innerHTML=`<div style="padding:12px;color:var(--text3);font-size:13px;text-align:center">שגיאה: ${e.message}</div>`;}
 }
 
-function gpRemoveAlbum(i){
-  const albums=_gpGetAlbums();
-  albums.splice(i,1);
-  _gpSetAlbums(albums);
-  renderGPhotoSection();
+async function gpOpenAlbum(id,title){
+  const modal=document.getElementById('gpAlbumModal');
+  const grid=document.getElementById('gpAlbumGrid');
+  document.getElementById('gpAlbumTitle').textContent=title;
+  modal.style.display='flex';
+  grid.innerHTML='<div style="grid-column:1/-1;padding:24px;color:#ccc;font-size:13px;text-align:center">טוען…</div>';
+  try{
+    let items=[],pt='';
+    do{
+      const b={albumId:id,pageSize:100};if(pt)b.pageToken=pt;
+      const r=await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search',
+        {method:'POST',headers:{Authorization:'Bearer '+_gpAccessToken,'Content-Type':'application/json'},body:JSON.stringify(b)});
+      const d=await r.json();
+      if(d.mediaItems)items=items.concat(d.mediaItems);
+      pt=d.nextPageToken||'';
+    }while(pt&&items.length<500);
+    if(!items.length){grid.innerHTML='<div style="grid-column:1/-1;padding:24px;color:#ccc;font-size:13px;text-align:center">אין תמונות</div>';return;}
+    grid.innerHTML=items.map((item,i)=>`<div onclick="gpViewPhoto('${item.baseUrl}','${item.mimeType||''}')" style="cursor:pointer;aspect-ratio:1;overflow:hidden;background:#111;border-radius:2px">
+      <img src="${item.baseUrl}=w300-h300-c" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy">
+    </div>`).join('');
+  }catch(e){grid.innerHTML='<div style="grid-column:1/-1;padding:24px;color:#ccc;font-size:13px;text-align:center">שגיאה</div>';}
 }
 
-function saveGpAlbumUrl(){gpAddAlbum();}
-function clearGpAlbumUrl(){_gpSetAlbums([]);renderGPhotoSection();}
+function gpViewPhoto(baseUrl,mime){
+  const viewer=document.getElementById('gpPhotoViewer');
+  const img=document.getElementById('gpPhotoImg');
+  img.src=baseUrl+'=w1600-h1600';
+  viewer.style.display='flex';
+}
+function gpClosePhoto(){document.getElementById('gpPhotoViewer').style.display='none';document.getElementById('gpPhotoImg').src='';}
+function gpCloseAlbum(){document.getElementById('gpAlbumModal').style.display='none';}
 
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -4111,6 +4213,21 @@ if ('serviceWorker' in navigator) {
       <button onclick="closePhotoRepos()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
   </div>
+</div>
+
+<!-- Google Photos album modal -->
+<div id="gpAlbumModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:2000;flex-direction:column" onclick="if(event.target===this)gpCloseAlbum()">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-shrink:0">
+    <button onclick="gpCloseAlbum()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    <div id="gpAlbumTitle" style="color:#fff;font-weight:600;font-size:15px;direction:rtl"></div>
+    <div style="width:34px"></div>
+  </div>
+  <div id="gpAlbumGrid" style="flex:1;overflow-y:auto;padding:4px 8px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:3px"></div>
+</div>
+<!-- Google Photos photo viewer -->
+<div id="gpPhotoViewer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.97);z-index:2100;align-items:center;justify-content:center;flex-direction:column" onclick="if(event.target===this)gpClosePhoto()">
+  <button onclick="gpClosePhoto()" style="position:absolute;top:12px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+  <img id="gpPhotoImg" src="" style="max-width:100%;max-height:90vh;object-fit:contain;border-radius:4px">
 </div>
 
 <!-- Lock modal -->
