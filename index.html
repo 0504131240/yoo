@@ -1889,17 +1889,13 @@ function evCard(ev){
     </div>`;
   }).join('');
   const settledList=(ev.settled||[]);
-  const doneHtml=settledList.length ? '<div style="margin-top:8px;padding-top:4px">'+settledList.map(s=>{
-    const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
-    const badge=s.method==='fund'
-      ?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 7px;border-radius:10px">קופה</span>'
-      :s.method==='pot'
-        ?'<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 7px;border-radius:10px">קופת אירוע</span>'
-        :'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 7px;border-radius:10px">ישיר</span>';
-    const _sfrom=s.method==='pot'?'קופת האירוע':s.from;
-    return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">'
-      +icon+'</span><span><b style="color:var(--text)">'+esc(_sfrom)+'</b> העביר ל<b style="color:var(--text)">'+esc(s.to)+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
-  }).join('')+'</div>' : '';
+  const _dPotByTo={};const _dNonPot=[];
+  settledList.forEach(s=>{if(s.method==='pot'){const k=s.toFid!=null?String(s.toFid):s.to;if(!_dPotByTo[k])_dPotByTo[k]={to:s.to,amt:0};_dPotByTo[k].amt+=s.amt;}else _dNonPot.push(s);});
+  const _dRow=(icon,badge,from,to,amt)=>'<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">'+icon+'</span><span><b style="color:var(--text)">'+esc(from)+'</b> העביר ל<b style="color:var(--text)">'+esc(to)+'</b> ₪'+Math.round(amt).toLocaleString()+'</span>'+badge+'</div>';
+  const _dPotBadge='<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 7px;border-radius:10px">קופת אירוע</span>';
+  const _dPotRows=Object.values(_dPotByTo).map(p=>_dRow('💰',_dPotBadge,'קופת האירוע',p.to,p.amt));
+  const _dNonPotRows=_dNonPot.map(s=>{const icon=s.method==='fund'?'🏦':'✓';const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 7px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 7px;border-radius:10px">ישיר</span>';return _dRow(icon,badge,s.from,s.to,s.amt);});
+  const doneHtml=settledList.length?'<div style="margin-top:8px;padding-top:4px">'+[..._dNonPotRows,..._dPotRows].join('')+'</div>':'';
   const creditorFids=ev.participants.filter(fid=>(adjBal[fid]||0)>0.5);
   const potTransfers=calcPotTransfers(ev);
   const potByCreditor={};
@@ -3548,12 +3544,13 @@ function renderSettleModal(ev){
       </div>
     </div>`;
   }).join('');
-  const doneRows=settledList.length?'<div style="padding:6px 16px 2px">'+settledList.map(s=>{
-    const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
-    const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':s.method==='pot'?'<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';
-    const _sf=s.method==='pot'?'קופת האירוע':s.from;
-    return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(_sf)}</b> העביר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
-  }).join('')+'</div>':'';
+  const _potByTo={};const _nonPot=[];
+  settledList.forEach(s=>{if(s.method==='pot'){const k=s.toFid!=null?String(s.toFid):s.to;if(!_potByTo[k])_potByTo[k]={to:s.to,amt:0};_potByTo[k].amt+=s.amt;}else _nonPot.push(s);});
+  const _rowHtml=(icon,badge,from,to,amt)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(from)}</b> העביר ל<b style="color:var(--text)">${esc(to)}</b> ₪${Math.round(amt).toLocaleString()}</span>${badge}</div>`;
+  const _potBadge='<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>';
+  const _potRows=Object.values(_potByTo).map(p=>_rowHtml('💰',_potBadge,'קופת האירוע',p.to,p.amt));
+  const _nonPotRows=_nonPot.map(s=>{const icon=s.method==='fund'?'🏦':'✓';const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';return _rowHtml(icon,badge,s.from,s.to,s.amt);});
+  const doneRows=settledList.length?'<div style="padding:6px 16px 2px">'+[..._nonPotRows,..._potRows].join('')+'</div>':'';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div><div style="font-size:14px;font-weight:700">📊 העברות לאיזון</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${shareLabel(ev)} · ${esc(ev.name)}</div></div>
