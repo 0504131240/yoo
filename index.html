@@ -4038,9 +4038,10 @@ async function loadGpAlbums(){
     do{
       const url='https://photoslibrary.googleapis.com/v1/albums?pageSize=50&excludeNonAppCreatedData=false'+(pageToken?'&pageToken='+pageToken:'');
       const r=await fetch(url,{headers:{Authorization:'Bearer '+_gpAccessToken}});
-      if(r.status===401){
+      if(r.status===401||r.status===403){
         _gpAccessToken=null;
         localStorage.removeItem(GP_LS_TOKEN);localStorage.removeItem(GP_LS_EXPIRY);
+        localStorage.removeItem(GP_LS_KEY);
         _gpLoading=false;renderGPhotoSection();return;
       }
       const d=await r.json();
