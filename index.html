@@ -278,7 +278,6 @@ body:not(.at-home){padding-bottom:140px}
 .fh-cal-add-row input{border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 11px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="at-home">
 
@@ -3975,9 +3974,18 @@ function _gpRestoreToken(){
   return false;
 }
 
-function initGPhotoClient(){
-  if(_gpTokenClient) return;
-  if(typeof google==='undefined'||!google.accounts) return;
+function _gpLoadScript(cb){
+  if(typeof google!=='undefined'&&google.accounts){cb();return;}
+  const s=document.createElement('script');
+  s.src='https://accounts.google.com/gsi/client';
+  s.onload=()=>{if(google.accounts.id)google.accounts.id.disableAutoSelect();cb();};
+  document.head.appendChild(s);
+}
+
+function initGPhotoClient(cb){
+  if(_gpTokenClient){if(cb)cb();return;}
+  _gpLoadScript(()=>{
+  if(google.accounts.id)google.accounts.id.disableAutoSelect();
   _gpTokenClient=google.accounts.oauth2.initTokenClient({
     client_id:GP_CLIENT_ID,
     scope:GP_SCOPE,
@@ -3997,15 +4005,16 @@ function initGPhotoClient(){
       loadGpAlbums();
     }
   });
+  if(cb) cb();
+  });
 }
 
 function connectGPhotos(){
-  if(!_gpTokenClient){initGPhotoClient();}
-  if(!_gpTokenClient) return;
+  initGPhotoClient(()=>{
   _gpConnecting=true;
   renderGPhotoSection();
   _gpTokenClient.requestAccessToken({prompt:'consent'});
-}
+  });
 
 function disconnectGPhotos(){
   if(_gpAccessToken&&typeof google!=='undefined') google.accounts.oauth2.revoke(_gpAccessToken,()=>{});
@@ -4087,12 +4096,12 @@ function renderGPhotoSection(){
 }
 
 function gpLoadAlbums(){
-  initGPhotoClient();
-  if(!_gpTokenClient) return;
   const listEl=document.getElementById('gpAlbumList');
   if(listEl) listEl.innerHTML='<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">טוען…</div>';
-  const hint=localStorage.getItem('gp_email')||'';
-  _gpTokenClient.requestAccessToken(hint?{prompt:'',hint}:{prompt:''});
+  initGPhotoClient(()=>{
+    const hint=localStorage.getItem('gp_email')||'';
+    _gpTokenClient.requestAccessToken(hint?{prompt:'',hint}:{prompt:''});
+  });
 }
 
 function renderGpAlbumList(){
@@ -4179,17 +4188,8 @@ function closeGpAlbum(){
 }
 
 // Initialize GIS client once the library loads
-(function _gpInit(){
-  function tryInit(){
-    if(typeof google!=='undefined'&&google.accounts){
-      // Disable Google One Tap / FedCM auto-prompt completely
-      if(google.accounts.id) google.accounts.id.disableAutoSelect();
-      initGPhotoClient();
-      if(localStorage.getItem(GP_LS_KEY)) renderGPhotoSection();
-    }else{setTimeout(tryInit,300);}
-  }
-  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',tryInit);}else{tryInit();}
-})();
+// GIS script is loaded lazily (on demand) — never on page load, to avoid auto-prompts
+// renderGPhotoSection() is called from renderHome() and handles the initial display
 // ──────────────────────────────────────────────────────────────────────────
 
 </script>
