@@ -3959,6 +3959,7 @@ let _gpAlbums=[];
 let _gpCurrentAlbumId=null;
 let _gpCurrentAlbumPhotos=[];
 let _gpConnecting=false;
+let _gpLoading=false;
 
 function _gpSaveToken(token,expiresIn){
   _gpAccessToken=token;
@@ -4028,7 +4029,8 @@ function disconnectGPhotos(){
 }
 
 async function loadGpAlbums(){
-  if(!_gpAccessToken) return;
+  if(!_gpAccessToken||_gpLoading) return;
+  _gpLoading=true;
   const el=document.getElementById('gpAlbumList');
   if(el) el.innerHTML='<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">טוען אלבומים…</div>';
   try{
@@ -4036,18 +4038,25 @@ async function loadGpAlbums(){
     do{
       const url='https://photoslibrary.googleapis.com/v1/albums?pageSize=50&excludeNonAppCreatedData=false'+(pageToken?'&pageToken='+pageToken:'');
       const r=await fetch(url,{headers:{Authorization:'Bearer '+_gpAccessToken}});
-      if(r.status===401){_gpAccessToken=null;localStorage.removeItem(GP_LS_TOKEN);localStorage.removeItem(GP_LS_EXPIRY);renderGPhotoSection();return;}
+      if(r.status===401){
+        _gpAccessToken=null;
+        localStorage.removeItem(GP_LS_TOKEN);localStorage.removeItem(GP_LS_EXPIRY);
+        _gpLoading=false;renderGPhotoSection();return;
+      }
       const d=await r.json();
       if(d.error){
-        if(el) el.innerHTML=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">שגיאה: ${d.error.message||d.error.status||'לא ידוע'}</div>`;
-        return;
+        const msg=d.error.message||d.error.status||'לא ידוע';
+        if(el) el.innerHTML=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">שגיאה: ${msg}</div>`;
+        _gpLoading=false;return;
       }
       if(d.albums) albums=albums.concat(d.albums);
       pageToken=d.nextPageToken||'';
     }while(pageToken);
     _gpAlbums=albums;
+    _gpLoading=false;
     renderGpAlbumList();
   }catch(e){
+    _gpLoading=false;
     if(el) el.innerHTML=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">שגיאה: ${e.message}</div>`;
   }
 }
@@ -4055,6 +4064,8 @@ async function loadGpAlbums(){
 function renderGPhotoSection(){
   const sec=document.getElementById('homePhotosSection');
   if(!sec) return;
+  if(_gpLoading) return; // don't disrupt an in-progress load
+  if(_gpAlbums.length){renderGpAlbumList();return;} // already loaded, just re-render list
   const connected=!!localStorage.getItem(GP_LS_KEY);
   if(!connected && !_gpAccessToken){
     sec.innerHTML=`
