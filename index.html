@@ -4001,7 +4001,6 @@ function initGPhotoClient(cb){
         return;
       }
       _gpSaveToken(resp.access_token,resp.expires_in||3600);
-      if(_gpSilentTimer){clearTimeout(_gpSilentTimer);_gpSilentTimer=null;}
       _gpConnecting=false;
       fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',{headers:{Authorization:'Bearer '+resp.access_token}})
         .then(r=>r.json()).then(u=>{localStorage.setItem('gp_email',u.email||'');}).catch(()=>{});
