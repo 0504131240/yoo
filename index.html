@@ -1896,8 +1896,9 @@ function evCard(ev){
       :s.method==='pot'
         ?'<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 7px;border-radius:10px">קופת אירוע</span>'
         :'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 7px;border-radius:10px">ישיר</span>';
+    const _sfrom=s.method==='pot'?'קופת האירוע':s.from;
     return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">'
-      +icon+'</span><span><b style="color:var(--text)">'+esc(s.from)+'</b> העביר ל<b style="color:var(--text)">'+esc(s.to)+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
+      +icon+'</span><span><b style="color:var(--text)">'+esc(_sfrom)+'</b> העביר ל<b style="color:var(--text)">'+esc(s.to)+'</b> ₪'+s.amt.toLocaleString()+'</span>'+badge+'</div>';
   }).join('')+'</div>' : '';
   const creditorFids=ev.participants.filter(fid=>(adjBal[fid]||0)>0.5);
   const potTransfers=calcPotTransfers(ev);
@@ -2848,7 +2849,7 @@ function sendEmailToFam(evId,fid){
     const share=Math.round(shares[fid]||0);
     const spent=Math.round(ev.expenses[fid]||0);
     const owe=Math.round(Math.abs(b));
-    const potDep=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0));
+    const potDep=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
     const msgPot=potDep>0.5?`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`:'';
     const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}${msgPot}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]];
@@ -3550,7 +3551,8 @@ function renderSettleModal(ev){
   const doneRows=settledList.length?'<div style="padding:6px 16px 2px">'+settledList.map(s=>{
     const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
     const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':s.method==='pot'?'<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';
-    return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(s.from)}</b> העביר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
+    const _sf=s.method==='pot'?'קופת האירוע':s.from;
+    return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(_sf)}</b> העביר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
   }).join('')+'</div>':'';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
