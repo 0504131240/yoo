@@ -3983,10 +3983,25 @@ function initGPhotoClient(cb){
           _gpLastError=resp.error==='access_denied'?'הגישה נדחתה':'שגיאת OAuth: '+resp.error;
           renderGPhotoSection();return;
         }
-        _gpAccessToken=resp.access_token;
-        localStorage.setItem('gp_token',resp.access_token);
-        localStorage.setItem('gp_expiry',String(Date.now()+(((resp.expires_in||3600)-120)*1000)));
-        renderGPhotoSection();
+        // Verify the token actually contains the Photos scope
+        fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token='+resp.access_token)
+          .then(r=>r.json())
+          .then(info=>{
+            if(!info.scope||!info.scope.includes('photoslibrary')){
+              _gpLastError='לא אושרה גישה ל-Google Photos. בצע "התחבר" שוב ובחלון הגוגל סמן ✓ ליד Photos.';
+              renderGPhotoSection();return;
+            }
+            _gpAccessToken=resp.access_token;
+            localStorage.setItem('gp_token',resp.access_token);
+            localStorage.setItem('gp_expiry',String(Date.now()+(((resp.expires_in||3600)-120)*1000)));
+            renderGPhotoSection();
+          })
+          .catch(()=>{
+            _gpAccessToken=resp.access_token;
+            localStorage.setItem('gp_token',resp.access_token);
+            localStorage.setItem('gp_expiry',String(Date.now()+(((resp.expires_in||3600)-120)*1000)));
+            renderGPhotoSection();
+          });
       }
     });
     if(cb)cb();
@@ -4067,6 +4082,20 @@ async function loadGpAlbums(){
       if(d.albums)albums=albums.concat(d.albums);
       pageToken=d.nextPageToken||'';
     }while(pageToken);
+    // Also fetch shared albums (albums shared WITH the user)
+    try{
+      let sharedAlbums=[],spt='';
+      do{
+        const sr=await fetch('https://photoslibrary.googleapis.com/v1/sharedAlbums?pageSize=50'+(spt?'&pageToken='+spt:''),
+          {headers:{Authorization:'Bearer '+_gpAccessToken}});
+        if(sr.status===401||sr.status===403)break;
+        const sd=await sr.json();
+        if(sd.sharedAlbums)sharedAlbums=sharedAlbums.concat(sd.sharedAlbums);
+        spt=sd.nextPageToken||'';
+      }while(spt);
+      const seenIds=new Set(albums.map(a=>a.id));
+      albums=albums.concat(sharedAlbums.filter(a=>!seenIds.has(a.id)));
+    }catch(e){}
     _gpLoading=false;
     if(!el)return;
     if(!albums.length){el.innerHTML='<div style="padding:12px;color:var(--text3);font-size:13px;text-align:center">לא נמצאו אלבומים</div>';return;}
