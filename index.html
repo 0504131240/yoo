@@ -4012,10 +4012,11 @@ function initGPhotoClient(cb){
 
 function connectGPhotos(){
   initGPhotoClient(()=>{
-  _gpConnecting=true;
-  renderGPhotoSection();
-  _gpTokenClient.requestAccessToken({prompt:'consent'});
+    _gpConnecting=true;
+    renderGPhotoSection();
+    _gpTokenClient.requestAccessToken({prompt:'consent'});
   });
+}
 
 function disconnectGPhotos(){
   if(_gpAccessToken&&typeof google!=='undefined') google.accounts.oauth2.revoke(_gpAccessToken,()=>{});
