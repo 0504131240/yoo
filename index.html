@@ -4005,11 +4005,23 @@ function initGPhotoClient(cb){
         renderGPhotoSection();
         return;
       }
-      _gpSaveToken(resp.access_token,resp.expires_in||3600);
       _gpConnecting=false;
-      fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',{headers:{Authorization:'Bearer '+resp.access_token}})
-        .then(r=>r.json()).then(u=>{localStorage.setItem('gp_email',u.email||'');}).catch(()=>{});
-      renderGPhotoSection();
+      // Verify the token actually has photoslibrary scope before saving
+      fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token='+resp.access_token)
+        .then(r=>r.json()).then(info=>{
+          if(!info.scope||!info.scope.includes('photoslibrary')){
+            _gpLastError='חסרה הרשאת Google Photos. יש להוסיף את ה-scope ב-Google Cloud Console ולנסות שוב.';
+            renderGPhotoSection();
+            return;
+          }
+          _gpSaveToken(resp.access_token,resp.expires_in||3600);
+          fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',{headers:{Authorization:'Bearer '+resp.access_token}})
+            .then(r=>r.json()).then(u=>{localStorage.setItem('gp_email',u.email||'');}).catch(()=>{});
+          renderGPhotoSection();
+        }).catch(()=>{
+          _gpSaveToken(resp.access_token,resp.expires_in||3600);
+          renderGPhotoSection();
+        });
     }
   });
   if(cb) cb();
