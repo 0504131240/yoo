@@ -3976,6 +3976,8 @@ function initGPhotoClient(){
       _gpAccessToken=resp.access_token;
       localStorage.setItem(GP_LS_KEY,'1');
       _gpConnecting=false;
+      fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',{headers:{Authorization:'Bearer '+resp.access_token}})
+        .then(r=>r.json()).then(u=>{localStorage.setItem('gp_email',u.email||'');}).catch(()=>{});
       loadGpAlbums();
     }
   });
@@ -3994,6 +3996,7 @@ function disconnectGPhotos(){
   _gpAccessToken=null;
   _gpAlbums=[];
   localStorage.removeItem(GP_LS_KEY);
+  localStorage.removeItem('gp_email');
   renderGPhotoSection();
 }
 
@@ -4041,12 +4044,14 @@ function renderGPhotoSection(){
       </div>`;
     return;
   }
+  const _gpEmail=localStorage.getItem('gp_email')||'';
   sec.innerHTML=`
     <div style="margin:0 0 12px;padding:0 16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
         <div class="sec-ttl" style="margin:0">📸 אלבומי גוגל תמונות</div>
         <button onclick="disconnectGPhotos()" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline">התנתק</button>
       </div>
+      ${_gpEmail?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;direction:ltr">${_gpEmail}</div>`:''}
       <div id="gpAlbumList"><div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">טוען…</div></div>
     </div>`;
   if(_gpAccessToken){
