@@ -3990,6 +3990,7 @@ function initGPhotoClient(){
         return;
       }
       _gpSaveToken(resp.access_token,resp.expires_in||3600);
+      if(_gpSilentTimer){clearTimeout(_gpSilentTimer);_gpSilentTimer=null;}
       _gpConnecting=false;
       fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',{headers:{Authorization:'Bearer '+resp.access_token}})
         .then(r=>r.json()).then(u=>{localStorage.setItem('gp_email',u.email||'');}).catch(()=>{});
@@ -4076,11 +4077,29 @@ function renderGPhotoSection(){
   } else if(_gpAccessToken||_gpRestoreToken()){
     loadGpAlbums();
   } else {
-    const listEl=document.getElementById('gpAlbumList');
-    if(listEl) listEl.innerHTML=`<div style="padding:10px 0 4px;display:flex;justify-content:center">
-      <button onclick="gpLoadAlbums()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:20px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:var(--font)">📂 טען אלבומים</button>
-    </div>`;
+    // Try silent refresh first; show button only if it fails after timeout
+    _gpSilentRefresh();
   }
+}
+
+let _gpSilentTimer=null;
+function _gpSilentRefresh(){
+  const listEl=document.getElementById('gpAlbumList');
+  if(listEl) listEl.innerHTML='<div style="padding:16px;color:var(--text3);font-size:12px;text-align:center;color:var(--text3)">…</div>';
+  initGPhotoClient();
+  if(!_gpTokenClient){_gpShowLoadBtn();return;}
+  // Override callback temporarily to detect failure
+  const hint=localStorage.getItem('gp_email')||'';
+  _gpSilentTimer=setTimeout(_gpShowLoadBtn,4000);
+  _gpTokenClient.requestAccessToken(hint?{prompt:'',hint}:{prompt:''});
+}
+function _gpShowLoadBtn(){
+  if(_gpSilentTimer){clearTimeout(_gpSilentTimer);_gpSilentTimer=null;}
+  if(_gpAccessToken) return; // silent refresh succeeded
+  const listEl=document.getElementById('gpAlbumList');
+  if(listEl) listEl.innerHTML=`<div style="padding:10px 0 4px;display:flex;justify-content:center">
+    <button onclick="gpLoadAlbums()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:20px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:var(--font)">📂 טען אלבומים</button>
+  </div>`;
 }
 
 function gpLoadAlbums(){
@@ -4089,7 +4108,7 @@ function gpLoadAlbums(){
   const listEl=document.getElementById('gpAlbumList');
   if(listEl) listEl.innerHTML='<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">טוען…</div>';
   const hint=localStorage.getItem('gp_email')||'';
-  _gpTokenClient.requestAccessToken(hint?{prompt:'',hint}:{prompt:''});
+  _gpTokenClient.requestAccessToken(hint?{prompt:'consent',hint}:{prompt:'consent'});
 }
 
 function renderGpAlbumList(){
