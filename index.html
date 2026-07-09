@@ -301,6 +301,9 @@ body:not(.at-home){padding-bottom:140px}
     <div class="msg-list" id="msgList"></div>
   </div>
 
+  <!-- Google Photos -->
+  <div id="homePhotosSection"></div>
+
   <!-- Calendar -->
   <div class="fh-card" style="margin-bottom:14px">
     <div class="fh-cal-nav">
@@ -449,7 +452,6 @@ body:not(.at-home){padding-bottom:140px}
     </div>
 
     <div id="homeEvSection"></div>
-    <div id="homePhotosSection"></div>
   </div>
 
   <!-- EVENTS -->
@@ -1191,6 +1193,7 @@ function renderFamilyHome(){
   }
   renderMessages();
   renderCalendar();
+  renderGPhotoSection();
 }
 
 function fmtTs(ts){
@@ -1595,7 +1598,6 @@ function renderHome(){
       ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
     </div>`;
   }).join('');
-  renderGPhotoSection();
 }
 function goToEvent(evId){
   goTab('events',document.getElementById('nb-events'));
