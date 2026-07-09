@@ -3990,13 +3990,12 @@ function _gpLoadScript(cb){
 }
 
 function initGPhotoClient(cb){
-  if(_gpTokenClient){if(cb)cb();return;}
   _gpLoadScript(()=>{
   if(google.accounts.id)google.accounts.id.disableAutoSelect();
   _gpTokenClient=google.accounts.oauth2.initTokenClient({
     client_id:GP_CLIENT_ID,
     scope:GP_SCOPE,
-    prompt:'',
+    include_granted_scopes:false,
     callback:(resp)=>{
       if(resp.error){
         _gpConnecting=false;
@@ -4009,7 +4008,6 @@ function initGPhotoClient(cb){
       _gpConnecting=false;
       fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',{headers:{Authorization:'Bearer '+resp.access_token}})
         .then(r=>r.json()).then(u=>{localStorage.setItem('gp_email',u.email||'');}).catch(()=>{});
-      // Re-render section first so gpAlbumList exists in DOM, then load albums
       renderGPhotoSection();
     }
   });
@@ -4018,6 +4016,11 @@ function initGPhotoClient(cb){
 }
 
 function connectGPhotos(){
+  _gpTokenClient=null;
+  localStorage.removeItem(GP_LS_KEY);
+  localStorage.removeItem(GP_LS_TOKEN);
+  localStorage.removeItem(GP_LS_EXPIRY);
+  _gpAccessToken=null;
   initGPhotoClient(()=>{
     _gpConnecting=true;
     renderGPhotoSection();
