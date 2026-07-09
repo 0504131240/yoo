@@ -301,9 +301,6 @@ body:not(.at-home){padding-bottom:140px}
     <div class="msg-list" id="msgList"></div>
   </div>
 
-  <!-- Google Photos -->
-  <div id="homePhotosSection"></div>
-
   <!-- Calendar -->
   <div class="fh-card" style="margin-bottom:14px">
     <div class="fh-cal-nav">
@@ -324,6 +321,9 @@ body:not(.at-home){padding-bottom:140px}
       <button onclick="openBdayModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #c0392b;background:transparent;color:#c0392b;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
     </div>
   </div>
+
+  <!-- Google Photos -->
+  <div id="homePhotosSection"></div>
 
 </div>
 
@@ -787,6 +787,19 @@ let settleModalEvId=null,potModalEvId=null;
 let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false,_ppPot=false;
 let adminPass='';
 let editMode=false;
+// Google Photos
+const GP_CLIENT_ID='789621490367-pg6gmpqf9v8flqf58dkqav3uhdtg33vd.apps.googleusercontent.com';
+const GP_SCOPE='https://www.googleapis.com/auth/photoslibrary.readonly';
+const GP_LS_KEY='gp_connected';
+const GP_LS_TOKEN='gp_token';
+const GP_LS_EXPIRY='gp_expiry';
+let _gpTokenClient=null;
+let _gpAccessToken=null;
+let _gpAlbums=[];
+let _gpCurrentAlbumId=null;
+let _gpCurrentAlbumPhotos=[];
+let _gpConnecting=false;
+let _gpLoading=false;
 function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId)){collapsedEvents.delete(evId);history.replaceState(null,'','#event-'+evId);}
   else{collapsedEvents.add(evId);history.replaceState(null,'','#events');}
@@ -1144,10 +1157,12 @@ function showSyncStatus(msg,hideAfter){
 
 function render(){
   applyEditMode();
-  renderHome();renderMetrics();renderOpenList();renderArchive();renderDebts();renderFamilies();renderFund();renderGoalFunds();renderFamilyHome();
+  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderDebts,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome];
+  fns.forEach(fn=>{try{fn();}catch(e){console.error(fn.name,e);}});
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
-  document.getElementById('topSub').textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופה: ₪'+fundTotal().toLocaleString();
+  const sub=document.getElementById('topSub');
+  if(sub)sub.textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופה: ₪'+fundTotal().toLocaleString();
 }
 function calcDebt(){
   let t=0;
@@ -3950,18 +3965,6 @@ window.addEventListener('hashchange',handleHash);
 })();
 
 // ── Google Photos Integration ──────────────────────────────────────────────
-const GP_CLIENT_ID='789621490367-pg6gmpqf9v8flqf58dkqav3uhdtg33vd.apps.googleusercontent.com';
-const GP_SCOPE='https://www.googleapis.com/auth/photoslibrary.readonly';
-const GP_LS_KEY='gp_connected';
-const GP_LS_TOKEN='gp_token';
-const GP_LS_EXPIRY='gp_expiry';
-let _gpTokenClient=null;
-let _gpAccessToken=null;
-let _gpAlbums=[];
-let _gpCurrentAlbumId=null;
-let _gpCurrentAlbumPhotos=[];
-let _gpConnecting=false;
-let _gpLoading=false;
 
 function _gpSaveToken(token,expiresIn){
   _gpAccessToken=token;
