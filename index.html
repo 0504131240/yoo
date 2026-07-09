@@ -4004,17 +4004,21 @@ async function loadGpAlbums(){
   try{
     let albums=[],pageToken='';
     do{
-      const url='https://photoslibrary.googleapis.com/v1/albums?pageSize=50'+(pageToken?'&pageToken='+pageToken:'');
+      const url='https://photoslibrary.googleapis.com/v1/albums?pageSize=50&excludeNonAppCreatedData=false'+(pageToken?'&pageToken='+pageToken:'');
       const r=await fetch(url,{headers:{Authorization:'Bearer '+_gpAccessToken}});
       if(r.status===401){_gpAccessToken=null;renderGPhotoSection();return;}
       const d=await r.json();
+      if(d.error){
+        if(el) el.innerHTML=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">שגיאה: ${d.error.message||d.error.status||'לא ידוע'}</div>`;
+        return;
+      }
       if(d.albums) albums=albums.concat(d.albums);
       pageToken=d.nextPageToken||'';
     }while(pageToken);
     _gpAlbums=albums;
     renderGpAlbumList();
   }catch(e){
-    if(el) el.innerHTML='<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">שגיאה בטעינה</div>';
+    if(el) el.innerHTML=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">שגיאה: ${e.message}</div>`;
   }
 }
 
