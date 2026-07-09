@@ -3956,55 +3956,62 @@ window.addEventListener('hashchange',handleHash);
 
 // ── Google Photos Integration ──────────────────────────────────────────────
 
+function _gpGetAlbums(){
+  try{return JSON.parse(localStorage.getItem(GP_ALBUM_URL_KEY)||'[]');}catch{return[];}
+}
+function _gpSetAlbums(arr){localStorage.setItem(GP_ALBUM_URL_KEY,JSON.stringify(arr));}
+
+const GP_ICON=`<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="14" fill="#4285F4"/><path d="M14 7a7 7 0 100 14A7 7 0 0014 7z" fill="#fbbc04"/><path d="M8.5 14a5.5 5.5 0 0011 0" fill="#34a853"/><path d="M19.5 14a5.5 5.5 0 01-11 0" fill="#ea4335"/></svg>`;
+
 function renderGPhotoSection(){
   const sec=document.getElementById('homePhotosSection');
   if(!sec) return;
-  const url=localStorage.getItem(GP_ALBUM_URL_KEY);
-  const name=localStorage.getItem(GP_ALBUM_NAME_KEY)||'אלבום משפחתי';
-  if(!url){
-    if(!editMode){sec.innerHTML='';return;}
-    sec.innerHTML=`
-      <div style="margin:0 0 12px;padding:0 16px">
-        <div class="sec-ttl">📸 אלבום גוגל תמונות</div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px;margin-top:8px;display:flex;flex-direction:column;gap:8px">
-          <div style="font-size:13px;color:var(--text2)">הדבק קישור לאלבום שיתופי ב-Google Photos</div>
-          <input id="gpAlbumUrlInput" type="url" placeholder="https://photos.google.com/share/..." style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r1);background:var(--bg);color:var(--text1);font-size:13px;font-family:inherit">
-          <input id="gpAlbumNameInput" type="text" placeholder="שם האלבום" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r1);background:var(--bg);color:var(--text1);font-size:13px;font-family:inherit">
-          <button onclick="saveGpAlbumUrl()" style="background:var(--brand,#3b82f6);color:#fff;border:none;border-radius:var(--r1);padding:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">שמור קישור</button>
-        </div>
-      </div>`;
-    return;
-  }
-  sec.innerHTML=`
-    <div style="margin:0 0 12px;padding:0 16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="sec-ttl" style="margin:0">📸 ${name}</div>
-        ${editMode?`<button onclick="clearGpAlbumUrl()" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline">שנה</button>`:''}
-      </div>
-      <a href="${url}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;text-decoration:none;color:var(--text1)">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#4285F4"/><path d="M16 8a8 8 0 100 16A8 8 0 0016 8z" fill="#fbbc04"/><path d="M10 16a6 6 0 0012 0" fill="#34a853"/><path d="M22 16a6 6 0 01-12 0" fill="#ea4335"/></svg>
-        <div>
-          <div style="font-size:14px;font-weight:600">${name}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px">לחץ לפתיחה ב-Google Photos ←</div>
+  const albums=_gpGetAlbums();
+  const cardStyle='display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:12px 14px;text-decoration:none;color:var(--text1);margin-bottom:8px';
+  if(!albums.length && !editMode){sec.innerHTML='';return;}
+  let html=`<div style="margin:0 0 12px;padding:0 16px"><div class="sec-ttl" style="margin-bottom:8px">📸 אלבומי תמונות</div>`;
+  albums.forEach((a,i)=>{
+    html+=`<div style="position:relative">
+      <a href="${esc(a.url)}" target="_blank" rel="noopener" style="${cardStyle}">
+        ${GP_ICON}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:1px">פתח ב-Google Photos ←</div>
         </div>
       </a>
+      ${editMode?`<button onclick="gpRemoveAlbum(${i})" style="position:absolute;top:6px;left:6px;background:var(--red-mid,#e53);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>`:''}
     </div>`;
+  });
+  if(editMode){
+    html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px;display:flex;flex-direction:column;gap:8px;margin-top:4px">
+      <input id="gpAlbumNameInput" type="text" placeholder="שם האלבום" style="width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:var(--r1);background:var(--bg);color:var(--text1);font-size:13px;font-family:inherit">
+      <input id="gpAlbumUrlInput" type="url" placeholder="https://photos.google.com/share/..." style="width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:var(--r1);background:var(--bg);color:var(--text1);font-size:13px;font-family:inherit;direction:ltr">
+      <button onclick="gpAddAlbum()" style="background:var(--brand,#3b82f6);color:#fff;border:none;border-radius:var(--r1);padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">+ הוסף אלבום</button>
+    </div>`;
+  }
+  html+='</div>';
+  sec.innerHTML=html;
 }
 
-function saveGpAlbumUrl(){
+function gpAddAlbum(){
   const url=(document.getElementById('gpAlbumUrlInput')||{}).value||'';
-  const name=(document.getElementById('gpAlbumNameInput')||{}).value||'אלבום משפחתי';
+  const name=(document.getElementById('gpAlbumNameInput')||{}).value||'';
   if(!url.trim()) return;
-  localStorage.setItem(GP_ALBUM_URL_KEY,url.trim());
-  localStorage.setItem(GP_ALBUM_NAME_KEY,name.trim()||'אלבום משפחתי');
+  const albums=_gpGetAlbums();
+  albums.push({url:url.trim(),name:name.trim()||'אלבום'});
+  _gpSetAlbums(albums);
   renderGPhotoSection();
 }
 
-function clearGpAlbumUrl(){
-  localStorage.removeItem(GP_ALBUM_URL_KEY);
-  localStorage.removeItem(GP_ALBUM_NAME_KEY);
+function gpRemoveAlbum(i){
+  const albums=_gpGetAlbums();
+  albums.splice(i,1);
+  _gpSetAlbums(albums);
   renderGPhotoSection();
 }
+
+function saveGpAlbumUrl(){gpAddAlbum();}
+function clearGpAlbumUrl(){_gpSetAlbums([]);renderGPhotoSection();}
 
 // ──────────────────────────────────────────────────────────────────────────
 
