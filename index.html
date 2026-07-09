@@ -3988,23 +3988,24 @@ function initGPhotoClient(cb){
           _gpLastError='גוגל לא אישרה גישה ל-Photos Library. בטל גישה באתר myaccount.google.com/permissions ואז לחץ "התחבר" שוב ואשר את כל ההרשאות.';
           renderGPhotoSection();return;
         }
-        // Double-check via tokeninfo
+        // Verify via tokeninfo and show debug info
         fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token='+resp.access_token)
           .then(r=>r.json())
           .then(info=>{
-            if(!info.scope||!info.scope.includes('photoslibrary')){
-              _gpLastError='הטוקן חסר הרשאת Photos (קיבלנו: '+(info.scope||'לא ידוע').split(' ').filter(s=>s).map(s=>s.split('/').pop()).join(', ')+'). בטל גישה ב-myaccount.google.com/permissions ונסה שוב.';
+            const scopeStr=info.scope||'';
+            const scopeShort=scopeStr.split(' ').filter(s=>s).map(s=>s.split('/').pop()).join(', ')||'(ריק)';
+            if(!scopeStr.includes('photoslibrary')){
+              _gpLastError='הטוקן חסר Photos scope. מה שקיבלנו: ['+scopeShort+']. בטל גישה ב-myaccount.google.com/permissions ונסה שוב.';
               renderGPhotoSection();return;
             }
             _gpAccessToken=resp.access_token;
             localStorage.setItem('gp_token',resp.access_token);
             localStorage.setItem('gp_expiry',String(Date.now()+(((resp.expires_in||3600)-120)*1000)));
+            localStorage.setItem('gp_scope_debug',scopeShort);
             renderGPhotoSection();
           })
-          .catch(()=>{
-            _gpAccessToken=resp.access_token;
-            localStorage.setItem('gp_token',resp.access_token);
-            localStorage.setItem('gp_expiry',String(Date.now()+(((resp.expires_in||3600)-120)*1000)));
+          .catch((e)=>{
+            _gpLastError='שגיאה באימות scope: '+e.message+'. נסה שוב.';
             renderGPhotoSection();
           });
       }
@@ -4079,9 +4080,11 @@ async function loadGpAlbums(){
         {headers:{Authorization:'Bearer '+_gpAccessToken}});
       if(r.status===401||r.status===403){
         const msg=await r.json().catch(()=>({}));
-        _gpAccessToken=null;localStorage.removeItem('gp_token');localStorage.removeItem('gp_expiry');
+        const apiErr=(msg.error&&msg.error.message)||'HTTP '+r.status;
+        const dbgScope=localStorage.getItem('gp_scope_debug')||'?';
+        _gpAccessToken=null;localStorage.removeItem('gp_token');localStorage.removeItem('gp_expiry');localStorage.removeItem('gp_scope_debug');
         _gpLoading=false;
-        _gpLastError='אין הרשאת גישה ל-Google Photos. כנס ל-myaccount.google.com/permissions, בטל גישה לאפליקציה, ואז לחץ "התחבר" שוב.';
+        _gpLastError='שגיאת API ('+r.status+'): '+apiErr+' | scope שהיה בטוקן: ['+dbgScope+']';
         renderGPhotoSection();return;
       }
       const d=await r.json();
