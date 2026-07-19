@@ -311,13 +311,7 @@ body:not(.at-home){padding-bottom:140px}
       <button id="notifBtn" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 2px;opacity:.55;line-height:1">🔕</button>
     </div>
     <div class="msg-list" id="msgList" style="max-height:300px;overflow-y:auto;padding:10px 14px 6px"></div>
-    <div style="padding:8px 12px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
-      <input id="chatName" placeholder="שמך" maxlength="20" oninput="localStorage.setItem('chatName',this.value)" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:7px 10px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
-      <div style="display:flex;gap:6px">
-        <input id="chatText" placeholder="כתוב הודעה..." maxlength="300" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg()}" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
-        <button onclick="sendChatMsg()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:8px 16px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח</button>
-      </div>
-    </div>
+    <div id="chatInputArea" style="padding:8px 12px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px"></div>
   </div>
 
   <!-- Calendar -->
@@ -1214,8 +1208,7 @@ function renderFamilyHome(){
   renderMessages();
   renderCalendar();
   renderNotifBtn();
-  const nameEl=document.getElementById('chatName');
-  if(nameEl&&!nameEl.value)nameEl.value=localStorage.getItem('chatName')||'';
+  renderChatInput();
 }
 
 function fmtTs(ts){
@@ -1261,13 +1254,48 @@ function deleteMsg(id){
   save();renderMessages();
 }
 
+function renderChatInput(){
+  const area=document.getElementById('chatInputArea');if(!area)return;
+  const saved=(localStorage.getItem('chatName')||'').trim();
+  if(!saved){
+    area.innerHTML=`
+      <div style="font-size:12px;color:var(--text2);text-align:center;direction:rtl">מה שמך? (פעם אחת בלבד)</div>
+      <div style="display:flex;gap:6px">
+        <input id="chatName" placeholder="שמך" maxlength="20" onkeydown="if(event.key==='Enter')saveChatName()" style="flex:1;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:9px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+        <button onclick="saveChatName()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:9px 16px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">המשך</button>
+      </div>`;
+    setTimeout(()=>{const n=document.getElementById('chatName');if(n)n.focus();},50);
+  } else {
+    area.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <span style="font-size:11px;color:var(--text3)">מחובר כ: <b style="color:var(--text2)">${esc(saved)}</b></span>
+        <button onclick="changeChatName()" style="background:none;border:none;font-size:11px;color:var(--text3);cursor:pointer;text-decoration:underline;font-family:var(--font)">שנה שם</button>
+      </div>
+      <div style="display:flex;gap:6px">
+        <input id="chatText" placeholder="כתוב הודעה..." maxlength="300" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg()}" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+        <button onclick="sendChatMsg()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:8px 16px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח</button>
+      </div>`;
+    setTimeout(()=>{const t=document.getElementById('chatText');if(t)t.focus();},50);
+  }
+}
+
+function saveChatName(){
+  const n=(document.getElementById('chatName')?.value||'').trim();
+  if(!n)return;
+  localStorage.setItem('chatName',n);
+  renderChatInput();
+}
+
+function changeChatName(){
+  localStorage.removeItem('chatName');
+  renderChatInput();
+}
+
 function sendChatMsg(){
-  const nameEl=document.getElementById('chatName');
+  const author=(localStorage.getItem('chatName')||'').trim();
   const textEl=document.getElementById('chatText');
-  const author=(nameEl?.value||'').trim();
   const text=(textEl?.value||'').trim();
-  if(!text)return;
-  if(author)localStorage.setItem('chatName',author);
+  if(!text||!author)return;
   messages.push({id:nxtMsg++,author,text,ts:Date.now()});
   if(textEl){textEl.value='';textEl.focus();}
   save();renderMessages();
@@ -1386,7 +1414,7 @@ function renderMessages(){
     const initials=m.author?(m.author.trim().split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()):'?';
     const hue=m.author?[...m.author].reduce((h,c)=>h+c.charCodeAt(0),0)%360:180;
     const av=`<div style="width:28px;height:28px;border-radius:50%;background:hsl(${hue},45%,45%);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${initials}</div>`;
-    const del=`<button onclick="deleteMsg(${m.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0;opacity:.45;line-height:1">🗑</button>`;
+    const del=mine?`<button onclick="deleteMsg(${m.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0;opacity:.45;line-height:1">🗑</button>`:'';
     if(mine)return dateSep+`<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:8px">
       <div style="display:flex;align-items:flex-end;gap:6px">${av}<div style="background:var(--blue-mid);color:#fff;border-radius:14px 14px 4px 14px;padding:8px 12px;max-width:78%;word-break:break-word;font-size:14px;direction:rtl;line-height:1.4">${esc(m.text)}</div></div>
       <div style="display:flex;align-items:center;gap:4px;margin-top:2px;padding-left:34px;font-size:10px;color:var(--text3)">${timeStr} ${del}</div>
