@@ -893,13 +893,14 @@ const firebaseConfig = {
   appId: "1:789621490367:web:e62376e9d46a86903f7c0a"
 };
 
-let _fb=null;
+let _fb=null,_fbApp=null;
+const FCM_VAPID_KEY='BArxsmOWaMQFdVOKOxFczYqBOHMZxqLofJobilD5zslw5hHByEHpu4VU2PFTuDuqFQlauxjhVAoO4s6ob9vaj6w';
 async function fbInit(){
   if(_fb) return _fb;
   const appMod=await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js");
   const fsMod=await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js");
-  const app=appMod.initializeApp(firebaseConfig);
-  const db=fsMod.getFirestore(app);
+  _fbApp=appMod.initializeApp(firebaseConfig);
+  const db=fsMod.getFirestore(_fbApp);
   _fb={db,doc:fsMod.doc,getDoc:fsMod.getDoc,setDoc:fsMod.setDoc,onSnapshot:fsMod.onSnapshot};
   return _fb;
 }
@@ -1307,6 +1308,22 @@ let _skipNextNotif=false,_initialSync=true,_realtimeUnsub=null;
 
 function _notifOk(){return 'Notification' in window&&Notification.permission==='granted';}
 
+async function registerFCMToken(){
+  try{
+    if(!_fbApp) await fbInit();
+    const msgMod=await import('https://www.gstatic.com/firebasejs/12.14.0/firebase-messaging.js');
+    const messaging=msgMod.getMessaging(_fbApp);
+    const swReg=await navigator.serviceWorker.getRegistration('./sw.js');
+    const token=await msgMod.getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:swReg});
+    if(token){
+      const {db,doc,setDoc}=await fbInit();
+      let did=localStorage.getItem('fcmDeviceId');
+      if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
+      await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now()});
+    }
+  }catch(e){console.warn('FCM token:',e);}
+}
+
 async function requestNotifPerm(){
   if(!('Notification' in window)){alert('הדפדפן שלך לא תומך בהתראות');return;}
   if(Notification.permission==='denied'){alert('הדפדפן חסם התראות. לאיפוס — לחץ על המנעול בסרגל הכתובת.');return;}
@@ -1315,6 +1332,7 @@ async function requestNotifPerm(){
   if(p==='granted'){
     showNotif('ינקלביץ 🔔','התראות הופעלו! תקבלו עדכונים על הודעות, הוצאות וימי הולדת.');
     checkBirthdayNotifs();
+    registerFCMToken();
   }
 }
 
@@ -4080,7 +4098,7 @@ async function _updateCustomTotal(){
 }
 
 applyEditMode();
-load().then(async()=>{await autoUnlockBiometric();if(window.location.hash)handleHash();startRealtimeSync();renderNotifBtn();if(_notifOk())checkBirthdayNotifs();});
+load().then(async()=>{await autoUnlockBiometric();if(window.location.hash)handleHash();startRealtimeSync();renderNotifBtn();if(_notifOk()){checkBirthdayNotifs();registerFCMToken();}});
 loadEjsSettings();
 window.addEventListener('hashchange',handleHash);
 
