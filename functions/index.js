@@ -1,7 +1,7 @@
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
-const functions = require('firebase-functions');
+const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 
 initializeApp();
 
@@ -120,12 +120,11 @@ async function sendViaEmailJS(publicKey, serviceId, templateId, toEmail, toName,
 
 // --- Push Notifications ---
 
-exports.sendPushOnUpdate = functions
-  .region('me-west1')
-  .firestore.document('appData/familyPayments')
-  .onUpdate(async (change) => {
-  const before = change.before.data();
-  const after  = change.after.data();
+exports.sendPushOnUpdate = onDocumentUpdated(
+  {document: 'appData/familyPayments', region: 'me-west1'},
+  async (event) => {
+  const before = event.data.before.data();
+  const after  = event.data.after.data();
   const notifications = [];
 
   // הודעות חדשות
