@@ -1381,7 +1381,7 @@ async function startRealtimeSync(){
       const snapMsgs=d.messages||[];
       const snapEvs=d.events||[];
       const snapExpCount=snapEvs.reduce((s,e)=>s+(e.expenseItems||[]).length,0);
-      if(!_initialSync&&_notifOk()&&!_skipNextNotif){
+      if(!_initialSync&&_notifOk()&&!_skipNextNotif&&!document.hidden){
         const lastMsgId=parseInt(localStorage.getItem('lastMsgId')||'0');
         const lastEvId=parseInt(localStorage.getItem('lastEvId')||'0');
         const lastExpCount=parseInt(localStorage.getItem('lastExpCount')||'0');
