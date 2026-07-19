@@ -1310,18 +1310,22 @@ function _notifOk(){return 'Notification' in window&&Notification.permission==='
 
 async function registerFCMToken(){
   try{
+    if(!('serviceWorker' in navigator)){console.warn('FCM: no SW support');return;}
     if(!_fbApp) await fbInit();
     const msgMod=await import('https://www.gstatic.com/firebasejs/12.14.0/firebase-messaging.js');
     const messaging=msgMod.getMessaging(_fbApp);
-    const swReg=await navigator.serviceWorker.getRegistration('./sw.js');
+    const swReg=await navigator.serviceWorker.ready;
     const token=await msgMod.getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:swReg});
     if(token){
       const {db,doc,setDoc}=await fbInit();
       let did=localStorage.getItem('fcmDeviceId');
       if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
       await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now()});
+      console.log('FCM token saved OK');
+    }else{
+      console.warn('FCM: getToken returned empty token');
     }
-  }catch(e){console.warn('FCM token:',e);}
+  }catch(e){console.error('FCM token error:',e.message||e);}
 }
 
 async function requestNotifPerm(){
