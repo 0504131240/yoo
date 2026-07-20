@@ -610,6 +610,13 @@ body:not(.at-home){padding-bottom:140px}
       </div>
       <div id="ejsStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
     </div>
+    <div id="famDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamDetail()">
+      <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:380px;box-sizing:border-box;max-height:85vh;overflow-y:auto">
+        <div id="famDetailContent"></div>
+        <button onclick="closeFamDetail()" style="width:100%;margin-top:14px;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">סגור</button>
+      </div>
+    </div>
+
     <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">
       <div id="famEditSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px">עריכת משפחה</div>
@@ -1722,7 +1729,7 @@ function renderHome(){
       const amtColor=net>0?'var(--green-mid)':net<0?'var(--red-mid)':'var(--text3)';
       const amtText=net>0?'+₪'+net.toLocaleString():net<0?'-₪'+Math.abs(net).toLocaleString():'מסודר';
       const fundBal=Math.round(famFundBal(f.id));
-      return`<div class="home-fam-pill ${cls}">
+      return`<div class="home-fam-pill ${cls}" onclick="openFamDetail(${f.id})" style="cursor:pointer">
         ${famAva(f, 36)}
         <div style="font-size:11px;font-weight:700;color:var(--text)">${esc(f.name.replace('משפחת','').trim())}</div>
         <div style="font-size:11px;font-weight:700;color:${amtColor}">${amtText}</div>
@@ -2539,6 +2546,76 @@ function openFamEditSheet(fid){
 
   document.getElementById('famEditOverlay').style.display='flex';
 }
+function openFamDetail(famId){
+  const f=getFam(famId);if(!f)return;
+  const name=f.name.replace('משפחת','').trim();
+  const openEvs=events.filter(e=>e.open&&e.participants.includes(famId));
+  const mainBal=Math.round(famFundBal(famId));
+  const myGoals=goalFunds.filter(g=>!g.archived&&(g.contributions[famId]||0)>0);
+
+  let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    ${famAva(f,52)}
+    <div>
+      <div style="font-size:17px;font-weight:800;color:var(--text)">משפחת ${esc(name)}</div>
+      ${f.children?`<div style="font-size:12px;color:var(--text2);margin-top:2px">👶 ${f.children} ילדים</div>`:'<div style="font-size:12px;color:var(--text3);margin-top:2px">ללא ילדים רשומים</div>'}
+    </div>
+  </div>`;
+
+  // מיילים
+  const emails=[f.email,f.email2].filter(Boolean);
+  if(emails.length){
+    html+=`<div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">📧 כתובות מייל</div>
+      ${emails.map(e=>`<div style="font-size:13px;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border)">${esc(e)}</div>`).join('')}
+    </div>`;
+  }
+
+  // יתרת קופה ראשית
+  html+=`<div style="margin-bottom:14px;padding:12px;background:var(--surface2);border-radius:var(--r2);display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:13px;font-weight:600;color:var(--text2)">🏦 קופה ראשית</span>
+    <span style="font-size:15px;font-weight:800;color:${mainBal>=0?'var(--green-mid)':'var(--red-mid)'}">₪${mainBal.toLocaleString()}</span>
+  </div>`;
+
+  // קופות מטרה
+  if(myGoals.length){
+    html+=`<div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">🎯 קופות מטרה</div>
+      ${myGoals.map(g=>{
+        const contrib=Math.round(g.contributions[famId]||0);
+        return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px;color:var(--text)">${esc(g.name)}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--green-mid)">₪${contrib.toLocaleString()}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // אירועים פתוחים
+  if(openEvs.length){
+    html+=`<div style="margin-bottom:6px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">📅 אירועים פעילים</div>
+      ${openEvs.map(ev=>{
+        const bal=evAdjBalance(ev)[famId]||0;
+        const balRound=Math.round(bal);
+        const balColor=balRound>0?'var(--green-mid)':balRound<0?'var(--red-mid)':'var(--text3)';
+        const balText=balRound>0?`+₪${balRound.toLocaleString()}`:balRound<0?`-₪${Math.abs(balRound).toLocaleString()}`:'מסודר';
+        return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px;color:var(--text)">${esc(ev.name)}</span>
+          <span style="font-size:13px;font-weight:700;color:${balColor}">${balText}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }else{
+    html+=`<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px 0">אין אירועים פעילים</div>`;
+  }
+
+  document.getElementById('famDetailContent').innerHTML=html;
+  document.getElementById('famDetailOverlay').style.display='flex';
+}
+function closeFamDetail(){
+  document.getElementById('famDetailOverlay').style.display='none';
+}
+
 function closeFamEditSheet(){
   document.getElementById('famEditOverlay').style.display='none';
   _famEditId=null;
