@@ -1720,7 +1720,8 @@ function renderHome(){
     const bal=evAdjBalance(ev);
     ev.participants.forEach(fid=>{ famNet[fid]=(famNet[fid]||0)+(bal[fid]||0); });
   });
-  document.getElementById('homeFamStrip').innerHTML=families.length?`
+  const famStripEl=document.getElementById('homeFamStrip');
+  famStripEl.innerHTML=families.length?`
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">👥 משפחות</div>
     <div class="home-fam-strip">${families.map(f=>{
       const cl=col(f.id);
@@ -1729,13 +1730,17 @@ function renderHome(){
       const amtColor=net>0?'var(--green-mid)':net<0?'var(--red-mid)':'var(--text3)';
       const amtText=net>0?'+₪'+net.toLocaleString():net<0?'-₪'+Math.abs(net).toLocaleString():'מסודר';
       const fundBal=Math.round(famFundBal(f.id));
-      return`<div class="home-fam-pill ${cls}" onclick="openFamDetail(${f.id})" style="cursor:pointer">
+      return`<div class="home-fam-pill ${cls}" data-famid="${f.id}" style="cursor:pointer;touch-action:manipulation">
         ${famAva(f, 36)}
         <div style="font-size:11px;font-weight:700;color:var(--text)">${esc(f.name.replace('משפחת','').trim())}</div>
         <div style="font-size:11px;font-weight:700;color:${amtColor}">${amtText}</div>
         ${fundBal!==0?`<div style="font-size:10px;font-weight:600;color:${fundBal>0?'var(--green-mid)':'var(--text3)'}">🏦 ₪${Math.abs(fundBal).toLocaleString()}</div>`:''}
       </div>`;
     }).join('')}</div>`:'';
+  famStripEl.querySelectorAll('.home-fam-pill[data-famid]').forEach(el=>{
+    el.addEventListener('click',()=>openFamDetail(parseInt(el.dataset.famid)));
+    el.addEventListener('touchend',e=>{e.preventDefault();openFamDetail(parseInt(el.dataset.famid));},{passive:false});
+  });
 
   // ── Event cards ──
   const splitShort={equal:'שווה',percapita:'לפי נפשות',weighted:'ילד 50%'};
