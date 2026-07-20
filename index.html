@@ -748,6 +748,13 @@ body:not(.at-home){padding-bottom:140px}
 
 </div>
 
+<div id="famDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamDetail()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:380px;box-sizing:border-box;max-height:85vh;overflow-y:auto">
+    <div id="famDetailContent"></div>
+    <button onclick="closeFamDetail()" style="width:100%;margin-top:14px;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">סגור</button>
+  </div>
+</div>
+
 <nav class="bottom-nav">
   <button class="nav-btn active" id="nb-home" onclick="goTab('home',this)">
     <span class="nav-icon">🏠</span>בית
