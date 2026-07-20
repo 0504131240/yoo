@@ -610,13 +610,6 @@ body:not(.at-home){padding-bottom:140px}
       </div>
       <div id="ejsStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
     </div>
-    <div id="famDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamDetail()">
-      <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:380px;box-sizing:border-box;max-height:85vh;overflow-y:auto">
-        <div id="famDetailContent"></div>
-        <button onclick="closeFamDetail()" style="width:100%;margin-top:14px;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">סגור</button>
-      </div>
-    </div>
-
     <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">
       <div id="famEditSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px">עריכת משפחה</div>
@@ -746,6 +739,13 @@ body:not(.at-home){padding-bottom:140px}
     </div>
   </div>
 
+</div>
+
+<div id="famDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamDetail()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:380px;box-sizing:border-box;max-height:85vh;overflow-y:auto">
+    <div id="famDetailContent"></div>
+    <button onclick="closeFamDetail()" style="width:100%;margin-top:14px;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">סגור</button>
+  </div>
 </div>
 
 <nav class="bottom-nav">
