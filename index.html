@@ -1737,10 +1737,7 @@ function renderHome(){
         ${fundBal!==0?`<div style="font-size:10px;font-weight:600;color:${fundBal>0?'var(--green-mid)':'var(--text3)'}">🏦 ₪${Math.abs(fundBal).toLocaleString()}</div>`:''}
       </div>`;
     }).join('')}</div>`:'';
-  famStripEl.querySelectorAll('.home-fam-pill[data-famid]').forEach(el=>{
-    el.addEventListener('click',()=>openFamDetail(parseInt(el.dataset.famid)));
-    el.addEventListener('touchend',e=>{e.preventDefault();openFamDetail(parseInt(el.dataset.famid));},{passive:false});
-  });
+  famStripEl.onclick=e=>{const p=e.target.closest('[data-famid]');if(p)openFamDetail(parseInt(p.dataset.famid));};
 
   // ── Event cards ──
   const splitShort={equal:'שווה',percapita:'לפי נפשות',weighted:'ילד 50%'};
