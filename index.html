@@ -1285,7 +1285,6 @@ function renderChatInput(){
         <input id="chatName" placeholder="שמך" maxlength="20" onkeydown="if(event.key==='Enter')saveChatName()" style="flex:1;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:9px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
         <button onclick="saveChatName()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:9px 16px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">המשך</button>
       </div>`;
-    setTimeout(()=>{const n=document.getElementById('chatName');if(n)n.focus();},50);
   } else {
     area.innerHTML=`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
@@ -1296,7 +1295,6 @@ function renderChatInput(){
         <input id="chatText" placeholder="כתוב הודעה..." maxlength="300" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg()}" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
         <button onclick="sendChatMsg()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:8px 16px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח</button>
       </div>`;
-    setTimeout(()=>{const t=document.getElementById('chatText');if(t)t.focus();},50);
   }
 }
 
