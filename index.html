@@ -1209,7 +1209,7 @@ function switchShell(s){
   document.body.classList.toggle('at-home',s==='home');
   document.getElementById('mn-home').classList.toggle('mn-active',s==='home');
   document.getElementById('mn-pay').classList.toggle('mn-active',s==='pay');
-  if(s==='home')renderFamilyHome();
+  if(s==='home'){renderFamilyHome();setTimeout(()=>{const sh=document.getElementById('shell-home');if(sh)sh.scrollTop=0;},10);}
   if(s==='pay')goTab('home',document.getElementById('nb-home'));
 }
 
@@ -4240,6 +4240,12 @@ window.addEventListener('hashchange',handleHash);
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
 }
+history.scrollRestoration = 'manual';
+window.addEventListener('load', () => {
+  const sh = document.getElementById('shell-home');
+  if (sh) sh.scrollTop = 0;
+  window.scrollTo(0, 0);
+});
 </script>
 
 <!-- Add expense item modal (cumulative events) -->
