@@ -225,6 +225,9 @@ body:not(.at-home){padding-bottom:140px}
 .mn-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:transparent;font-size:10px;font-weight:700;color:var(--text3);cursor:pointer;padding:0;font-family:var(--font);transition:color .15s}
 .mn-btn.mn-active{color:var(--blue-mid)}
 .mn-ico{font-size:22px;line-height:1}
+/* Summer calendar iframe — mobile only */
+.cal-iframe-desktop{display:none}
+@media(min-width:900px){.cal-iframe-mobile{display:none!important}.cal-iframe-desktop{display:block}}
 /* Home page quick-access round buttons */
 .fh-qbtn-round{width:82px;height:82px;border-radius:50%;border:none;font-size:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(0,0,0,0.18);transition:transform .15s;flex-shrink:0}
 .fh-qbtn-round:active{transform:scale(0.88)}
@@ -313,28 +316,18 @@ body:not(.at-home){padding-bottom:140px}
 
   <!-- Summer Calendar embedded -->
   <div class="fh-desktop-iframe" style="margin:14px 14px 6px;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(102,126,234,0.15)">
-    <div id="iframeFallback" style="display:none;padding:32px 20px;text-align:center;background:linear-gradient(135deg,#f7971e22,#ffd20022)">
-      <div style="font-size:32px;margin-bottom:10px">📅</div>
-      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">הפנינג הקיץ של ינקלביץ</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">לא ניתן להציג כאן בגלל הגדרות אבטחה</div>
-      <a href="https://haketz-shel-yankelevitz.vercel.app/" target="_blank" style="display:inline-block;padding:11px 24px;background:linear-gradient(135deg,#f7971e,#ffd200);color:#fff;font-weight:800;font-size:14px;border-radius:20px;text-decoration:none;font-family:var(--font)">פתח את לוח הקיץ ↗</a>
-    </div>
-    <iframe id="calIframe" src="https://haketz-shel-yankelevitz.vercel.app/"
+    <iframe src="https://haketz-shel-yankelevitz.vercel.app/"
+            class="cal-iframe-mobile"
             style="width:100%;height:1050px;border:none;display:block"
             scrolling="yes"
-            loading="eager"
-            onload="window._calOk=true"></iframe>
+            loading="eager"></iframe>
+    <div class="cal-iframe-desktop" style="padding:32px 20px;text-align:center;background:linear-gradient(135deg,#f7971e22,#ffd20022)">
+      <div style="font-size:32px;margin-bottom:10px">📅</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">הפנינג הקיץ של ינקלביץ</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">לא ניתן להציג ישירות בגלל הגדרות האתר</div>
+      <a href="https://haketz-shel-yankelevitz.vercel.app/" target="_blank" style="display:inline-block;padding:11px 24px;background:linear-gradient(135deg,#f7971e,#ffd200);color:#fff;font-weight:800;font-size:14px;border-radius:20px;text-decoration:none;font-family:var(--font)">פתח את לוח הקיץ ↗</a>
+    </div>
   </div>
-  <script>
-    setTimeout(function(){
-      if(!window._calOk){
-        var f=document.getElementById('calIframe');
-        var fb=document.getElementById('iframeFallback');
-        if(f)f.style.display='none';
-        if(fb)fb.style.display='block';
-      }
-    },7000);
-  </script>
 
   <!-- Calendar + side quick buttons -->
   <div style="display:flex;gap:10px;margin:12px 14px 14px;align-items:flex-start">
