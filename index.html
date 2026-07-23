@@ -586,6 +586,7 @@ body:not(.at-home){padding-bottom:140px}
     <div class="metrics" id="metrics"></div>
     <div class="sec-ttl">אירועים פעילים</div>
     <div id="openList"></div>
+    <button onclick="goTab('archive',null)" style="width:100%;margin-top:10px;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🗂️ ארכיון אירועים</button>
   </div>
 
   <!-- ARCHIVE -->
@@ -762,9 +763,6 @@ body:not(.at-home){padding-bottom:140px}
   </button>
   <button class="nav-btn" id="nb-events" onclick="goTab('events',this)">
     <span class="nav-icon">📅</span>אירועים
-  </button>
-  <button class="nav-btn" id="nb-archive" onclick="goTab('archive',this)">
-    <span class="nav-icon">🗂️</span>ארכיון
   </button>
 
   <button class="nav-btn" id="nb-fund" onclick="goTab('fund',this)">
@@ -3101,13 +3099,13 @@ function closeEv(evId){
       sendEmailNotif([{email:f.email,email2:f.email2,name}],'🗂 האירוע נסגר · ינקלביץ',msg,cHtml);
     });
     ev.open=false;ev.closedOn='היום';save();render();
-    goTab('archive',document.getElementById('nb-archive'));
+    goTab('archive',null);
   }
 }
 function archiveEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   ev.open=false;ev.closedOn='היום';save();render();
-  goTab('archive',document.getElementById('nb-archive'));
+  goTab('archive',null);
 }
 function sendEmailToFam(evId,fid){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
@@ -3261,7 +3259,7 @@ function _enterPayShell(){
 function handleHash(){
   const h=(window.location.hash||'').replace('#','');
   if(!h||h==='home'){goTab('home',document.getElementById('nb-home'),true);return;}
-  const tabMap={events:'nb-events',archive:'nb-archive',fund:'nb-fund',families:'nb-families'};
+  const tabMap={events:'nb-events',fund:'nb-fund',families:'nb-families'};
   if(tabMap[h]){_enterPayShell();goTab(h,document.getElementById(tabMap[h]),true);return;}
   if(h.startsWith('event-')){
     const id=parseInt(h.slice(6));if(isNaN(id))return;
@@ -3272,7 +3270,7 @@ function handleHash(){
   } else if(h.startsWith('archive-')){
     const id=parseInt(h.slice(8));if(isNaN(id))return;
     _enterPayShell();
-    goTab('archive',document.getElementById('nb-archive'),true);
+    goTab('archive',null);
     expanded.add(id);renderArchive();
     setTimeout(()=>{const el=document.getElementById('ecard-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},150);
   }
@@ -3462,7 +3460,7 @@ function archiveGoalFund(goalId){
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
   g.archived=true;collapsedGoals.delete(goalId);
   save();render();
-  goTab('archive',document.getElementById('nb-archive'));
+  goTab('archive',null);
 }
 function reopenGoalFund(goalId){
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
@@ -4186,8 +4184,8 @@ window.addEventListener('hashchange',handleHash);
 
 // Swipe between tabs
 (function(){
-  const TABS=['home','events','archive','debts','fund'];
-  const NAV={home:'nb-home',events:'nb-events',archive:'nb-archive',fund:'nb-fund'};
+  const TABS=['home','events','archive','fund'];
+  const NAV={home:'nb-home',events:'nb-events',fund:'nb-fund'};
   const OVERLAYS=['newFormOverlay','famPickOverlay','childOverrideOverlay','expenseOverlay','famEditOverlay','depositOverlay','goalFormOverlay','goalDepositOverlay','addExpItemOverlay','cumPotOverlay'];
   let sx=0,sy=0,st=0,hBlocked=false;
   function _isHScroll(el){while(el&&el!==document.body){const ox=getComputedStyle(el).overflowX;if((ox==='auto'||ox==='scroll')&&el.scrollWidth>el.clientWidth+2)return true;el=el.parentElement;}return false;}
