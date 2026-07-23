@@ -635,12 +635,16 @@ body:not(.at-home){padding-bottom:140px}
         </div>
         <input type="text" id="famEditName" placeholder="שם המשפחה"
           style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <input type="text" id="famEditEmailName" placeholder="שם הנמען של המייל הראשי (למשל: יוסי)"
+          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:4px;box-sizing:border-box">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
           <input type="email" id="famEditEmail" placeholder="מייל ראשי (לקבלת התראות)"
             autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false"
             style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:right">
           <button type="button" id="testBtn1" onclick="testSingleEmail('famEditEmail','testBtn1')" style="flex-shrink:0;padding:8px 10px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-family:var(--font);cursor:pointer;color:var(--text2)">בדוק</button>
         </div>
+        <input type="text" id="famEditEmailName2" placeholder="שם הנמען של המייל הנוסף (למשל: שרה)"
+          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:4px;box-sizing:border-box">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
           <input type="email" id="famEditEmail2" placeholder="מייל נוסף (אופציונלי)"
             autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false"
@@ -2541,7 +2545,9 @@ function openFamEditSheet(fid){
   }
   if(clearBtn) clearBtn.style.display=f.photo?'inline-block':'none';
   document.getElementById('famEditChildren').value=f.children||0;
+  document.getElementById('famEditEmailName').value=f.emailName||'';
   document.getElementById('famEditEmail').value=f.email||'';
+  document.getElementById('famEditEmailName2').value=f.emailName2||'';
   document.getElementById('famEditEmail2').value=f.email2||'';
   const verified=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));
   const b1=document.getElementById('testBtn1');const b2=document.getElementById('testBtn2');
@@ -2635,6 +2641,8 @@ function saveFamEdit(){
   const prevEmail=f.email,prevEmail2=f.email2;
   f.email=_cleanEmail(document.getElementById('famEditEmail').value)||'';
   f.email2=_cleanEmail(document.getElementById('famEditEmail2').value)||'';
+  f.emailName=(document.getElementById('famEditEmailName').value||'').trim()||'';
+  f.emailName2=(document.getElementById('famEditEmailName2').value||'').trim()||'';
   const verified=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));
   if(prevEmail&&prevEmail!==f.email) verified.delete(prevEmail);
   if(prevEmail2&&prevEmail2!==f.email2) verified.delete(prevEmail2);
