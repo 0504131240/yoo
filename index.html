@@ -215,21 +215,33 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
 .hev-tags { display:flex; gap:5px; flex-wrap:wrap; }
 .hev-foot { border-top:1px solid var(--border); padding:9px 14px; display:flex; align-items:center; justify-content:space-between; }
 /* Shell */
-#shell-home{display:none;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);padding-bottom:72px;min-height:calc(100vh - 56px)}
+#shell-home{display:none;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);padding-bottom:110px;min-height:calc(100vh - 56px)}
 body.at-home #shell-home{display:flex}
 body.at-home .topbar,body.at-home .main,body.at-home .bottom-nav{display:none!important}
 body:not(.at-home) .bottom-nav{bottom:56px}
 body:not(.at-home){padding-bottom:140px}
 /* Main nav */
-#main-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:300;padding-bottom:env(safe-area-inset-bottom,0px);height:56px;box-sizing:content-box}
-.mn-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:transparent;font-size:10px;font-weight:700;color:var(--text3);cursor:pointer;padding:0;font-family:var(--font);transition:color .15s}
-.mn-btn.mn-active{color:var(--blue-mid)}
-.mn-ico{font-size:22px;line-height:1}
+#main-nav{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;align-items:flex-end;gap:14px;z-index:300;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 18px);height:auto;background:none;border:none;box-sizing:content-box;pointer-events:none}
+#main-nav>*{pointer-events:all}
+.mn-btn{display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;font-family:var(--font);transition:transform .15s,box-shadow .15s;border-radius:50%;padding:0}
+.mn-btn:active{transform:scale(0.88)}
+#mn-home{width:46px;height:46px;background:var(--surface);box-shadow:0 3px 14px rgba(0,0,0,0.18);font-size:22px;color:var(--text2)}
+#mn-home.mn-active{background:var(--blue-mid);box-shadow:0 4px 18px rgba(30,136,216,0.38)}
+#mn-chat{width:54px;height:54px;background:linear-gradient(135deg,#667eea,#764ba2);box-shadow:0 4px 18px rgba(102,126,234,0.45);font-size:26px}
+#mn-pay{width:66px;height:66px;background:linear-gradient(135deg,#f7971e,#ffd200);box-shadow:0 5px 22px rgba(247,151,30,0.45);font-size:32px}
+#mn-pay.mn-active{box-shadow:0 5px 22px rgba(247,151,30,0.6)}
+.mn-ico{font-size:inherit;line-height:1}
+/* Chat bottom sheet */
+#chatSheet{position:fixed;inset:0;z-index:900;display:none;flex-direction:column}
+#chatSheet.open{display:flex}
+#chatSheetBg{position:absolute;inset:0;background:rgba(0,0,0,0.48)}
+#chatSheetInner{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:20px 20px 0 0;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
 /* Desktop layout */
 @media(min-width:600px){
   html{background:#e8eaf6}
   body{max-width:min(720px,92vw);margin:0 auto;box-shadow:0 0 48px rgba(0,0,0,.18);border-left:1px solid var(--border);border-right:1px solid var(--border)}
   .bottom-nav,#main-nav{left:50%;right:auto;transform:translateX(-50%);width:min(720px,92vw)}
+  #main-nav{width:auto}
   #shell-home{max-width:min(720px,92vw);margin:0 auto}
   .main{max-width:100%}
 }
@@ -237,13 +249,13 @@ body:not(.at-home){padding-bottom:140px}
   html{background:#e8eaf6}
   body{max-width:1100px;box-shadow:none;border:none}
   #shell-home{max-width:1100px;padding-bottom:0}
-  .bottom-nav,#main-nav{width:1100px}
+  .bottom-nav{width:1100px}
+  #main-nav{width:auto}
   .fh-hero{flex-direction:row;justify-content:flex-start;gap:20px;padding:16px 32px;border-bottom:1px solid var(--border)}
   .fh-hero-logo{margin:0;height:80px}
   .fh-hero-sub{text-align:right;font-size:13px}
   .fh-desktop-iframe{margin:16px 24px 0}
-  .fh-desktop-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:14px 24px 24px}
-  .fh-desktop-grid .fh-card{margin:0}
+  #chatSheetInner{max-width:600px;margin:0 auto;left:0;right:0}
 }
 /* Hero */
 .fh-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 20px;background:#fff;flex-shrink:0}
@@ -312,19 +324,8 @@ body:not(.at-home){padding-bottom:140px}
             loading="lazy"></iframe>
   </div>
 
-  <div class="fh-desktop-grid">
-  <!-- Group Chat -->
-  <div class="fh-card" style="overflow:hidden">
-    <div class="fh-card-hdr">
-      <span class="fh-card-title">💬 צ'אט משפחתי</span>
-      <button id="notifBtn" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 2px;opacity:.7;line-height:1;color:#fff">🔕</button>
-    </div>
-    <div class="msg-list" id="msgList" style="max-height:300px;overflow-y:auto;padding:10px 14px 6px"></div>
-    <div id="chatInputArea" style="padding:8px 12px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px"></div>
-  </div>
-
   <!-- Calendar -->
-  <div class="fh-card" style="margin-bottom:14px">
+  <div class="fh-card" style="margin:12px 14px 14px">
     <div class="fh-card-hdr fh-card-hdr-cal">
       <span class="fh-card-title">📅 לוח משפחתי</span>
     </div>
@@ -345,7 +346,6 @@ body:not(.at-home){padding-bottom:140px}
       <button onclick="openCalModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
       <button onclick="openBdayModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #e040fb;background:transparent;color:#e040fb;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
     </div>
-  </div>
   </div>
 
 
@@ -777,11 +777,28 @@ body:not(.at-home){padding-bottom:140px}
 <!-- MAIN SHELL NAV -->
 <div id="main-nav">
   <button id="mn-home" class="mn-btn mn-active" onclick="switchShell('home')">
-    <span class="mn-ico">🏠</span>בית
+    <span class="mn-ico">🏠</span>
   </button>
   <button id="mn-pay" class="mn-btn" onclick="switchShell('pay')">
-    <span class="mn-ico">💰</span>תשלומים
+    <span class="mn-ico">💰</span>
   </button>
+  <button id="mn-chat" class="mn-btn" onclick="openChatSheet()">
+    <span class="mn-ico">💬</span>
+  </button>
+</div>
+
+<!-- Chat bottom sheet -->
+<div id="chatSheet">
+  <div id="chatSheetBg" onclick="closeChatSheet()"></div>
+  <div id="chatSheetInner">
+    <div style="padding:14px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <button onclick="closeChatSheet()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      <span style="font-size:15px;font-weight:800;color:var(--text)">💬 צ'אט משפחתי</span>
+      <button id="notifBtn" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 2px;opacity:.7;line-height:1;color:var(--text2)">🔕</button>
+    </div>
+    <div class="msg-list" id="msgList" style="flex:1;overflow-y:auto;padding:10px 14px 6px;min-height:0"></div>
+    <div id="chatInputArea" style="padding:8px 12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0"></div>
+  </div>
 </div>
 
 <script>
@@ -1201,6 +1218,7 @@ function renderOpenList(){
 }
 function switchShell(s){
   currentShell=s;
+  closeChatSheet();
   document.body.classList.toggle('at-home',s==='home');
   document.getElementById('mn-home').classList.toggle('mn-active',s==='home');
   document.getElementById('mn-pay').classList.toggle('mn-active',s==='pay');
@@ -1230,6 +1248,18 @@ function renderFamilyHome(){
 function fmtTs(ts){
   const d=new Date(ts);
   return d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+}
+
+function openChatSheet(){
+  const s=document.getElementById('chatSheet');
+  if(!s)return;
+  s.classList.add('open');
+  const ml=document.getElementById('msgList');
+  if(ml)setTimeout(()=>ml.scrollTop=ml.scrollHeight,50);
+}
+function closeChatSheet(){
+  const s=document.getElementById('chatSheet');
+  if(s)s.classList.remove('open');
 }
 
 function openMsgModal(){
@@ -4209,6 +4239,7 @@ window.addEventListener('hashchange',handleHash);
     if(Date.now()-st>600||Math.abs(dx)<50||Math.abs(dx)<Math.abs(dy)*1.3)return;
     if(hBlocked&&Math.abs(dx)>Math.abs(dy))return;
     if(OVERLAYS.some(id=>{const o=document.getElementById(id);return o&&o.style.display==='flex';}))return;
+    if(document.getElementById('chatSheet')?.classList.contains('open'))return;
     // Home shell ↔ pay shell
     if(document.body.classList.contains('at-home')){
       if(dx>0){switchShell('pay');goTab('home',document.getElementById('nb-home'));}
