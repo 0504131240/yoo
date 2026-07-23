@@ -225,11 +225,9 @@ body:not(.at-home){padding-bottom:140px}
 .mn-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:transparent;font-size:10px;font-weight:700;color:var(--text3);cursor:pointer;padding:0;font-family:var(--font);transition:color .15s}
 .mn-btn.mn-active{color:var(--blue-mid)}
 .mn-ico{font-size:22px;line-height:1}
-/* Home page quick-access buttons */
-.fh-quick-btns{display:flex;gap:10px;padding:0 14px 16px}
-.fh-qbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:14px 8px;border:none;border-radius:16px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:800;color:#fff;transition:transform .15s,box-shadow .15s}
-.fh-qbtn:active{transform:scale(0.94)}
-.fh-qbtn-ico{font-size:26px;line-height:1}
+/* Home page quick-access round buttons */
+.fh-qbtn-round{width:64px;height:64px;border-radius:50%;border:none;font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(0,0,0,0.18);transition:transform .15s;flex-shrink:0}
+.fh-qbtn-round:active{transform:scale(0.88)}
 /* Chat bottom sheet */
 #chatSheet{position:fixed;inset:0;z-index:900;display:none;flex-direction:column}
 #chatSheet.open{display:flex}
@@ -321,41 +319,42 @@ body:not(.at-home){padding-bottom:140px}
             loading="lazy"></iframe>
   </div>
 
-  <!-- Calendar -->
-  <div class="fh-card" style="margin:12px 14px 14px">
-    <div class="fh-card-hdr fh-card-hdr-cal">
-      <span class="fh-card-title">📅 לוח משפחתי</span>
-    </div>
-    <div class="fh-cal-nav">
-      <button class="fh-cal-arrow" onclick="prevCalMonth()">›</button>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-        <span class="fh-cal-month" id="calTitle"></span>
-        <div style="display:flex;border:1.5px solid var(--border);border-radius:20px;overflow:hidden;font-size:10px;font-weight:700">
-          <button id="calToggleHeb" onclick="setCalMode(true)" style="padding:2px 9px;border:none;font-family:var(--font);cursor:pointer;font-size:10px;font-weight:700;transition:background .15s">עברי</button>
-          <button id="calToggleLat" onclick="setCalMode(false)" style="padding:2px 9px;border:none;font-family:var(--font);cursor:pointer;font-size:10px;font-weight:700;transition:background .15s">לועזי</button>
-        </div>
+  <!-- Calendar + side quick buttons -->
+  <div style="display:flex;gap:10px;margin:12px 14px 14px;align-items:flex-start">
+    <!-- Calendar card -->
+    <div class="fh-card" style="flex:1;margin:0">
+      <div class="fh-card-hdr fh-card-hdr-cal">
+        <span class="fh-card-title">📅 לוח משפחתי</span>
       </div>
-      <button class="fh-cal-arrow" onclick="nextCalMonth()">‹</button>
+      <div class="fh-cal-nav">
+        <button class="fh-cal-arrow" onclick="prevCalMonth()">›</button>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+          <span class="fh-cal-month" id="calTitle"></span>
+          <div style="display:flex;border:1.5px solid var(--border);border-radius:20px;overflow:hidden;font-size:10px;font-weight:700">
+            <button id="calToggleHeb" onclick="setCalMode(true)" style="padding:2px 9px;border:none;font-family:var(--font);cursor:pointer;font-size:10px;font-weight:700;transition:background .15s">עברי</button>
+            <button id="calToggleLat" onclick="setCalMode(false)" style="padding:2px 9px;border:none;font-family:var(--font);cursor:pointer;font-size:10px;font-weight:700;transition:background .15s">לועזי</button>
+          </div>
+        </div>
+        <button class="fh-cal-arrow" onclick="nextCalMonth()">‹</button>
+      </div>
+      <div class="fh-cal-grid" id="calGrid"></div>
+      <div class="fh-cal-evlist" id="calEvList"></div>
+      <div style="padding:0 14px 14px;display:flex;gap:8px">
+        <button onclick="openCalModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
+        <button onclick="openBdayModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #e040fb;background:transparent;color:#e040fb;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
+      </div>
     </div>
-    <div class="fh-cal-grid" id="calGrid"></div>
-    <div class="fh-cal-evlist" id="calEvList"></div>
-    <div style="padding:0 14px 14px;display:flex;gap:8px">
-      <button onclick="openCalModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
-      <button onclick="openBdayModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #e040fb;background:transparent;color:#e040fb;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
+    <!-- Quick-access round buttons -->
+    <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding-top:22px;flex-shrink:0">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <button class="fh-qbtn-round" style="background:linear-gradient(135deg,#667eea,#764ba2);box-shadow:0 4px 18px rgba(102,126,234,0.38)" onclick="openChatSheet()">💬</button>
+        <span style="font-size:10px;font-weight:700;color:var(--text2)">צ'אט</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <button class="fh-qbtn-round" style="background:linear-gradient(135deg,#f7971e,#ffd200);box-shadow:0 4px 18px rgba(247,151,30,0.38)" onclick="switchShell('pay')">💰</button>
+        <span style="font-size:10px;font-weight:700;color:var(--text2)">תשלומים</span>
+      </div>
     </div>
-  </div>
-
-  <!-- Quick access buttons -->
-  <div class="fh-quick-btns">
-    <button class="fh-qbtn" style="background:linear-gradient(135deg,#667eea,#764ba2)" onclick="openChatSheet()">
-      <span class="fh-qbtn-ico">💬</span>צ'אט
-    </button>
-    <button class="fh-qbtn" style="background:linear-gradient(135deg,#f7971e,#ffd200)" onclick="switchShell('pay')">
-      <span class="fh-qbtn-ico">💰</span>תשלומים
-    </button>
-    <button class="fh-qbtn" style="background:linear-gradient(135deg,#0D3A5C,#1E6FA8)" onclick="switchShell('pay');setTimeout(()=>goTab('fund',document.getElementById('nb-fund')),80)">
-      <span class="fh-qbtn-ico">🏦</span>קופה
-    </button>
   </div>
 
 </div>
