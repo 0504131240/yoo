@@ -311,22 +311,17 @@ body:not(.at-home){padding-bottom:140px}
     </div>
   </div>
 
-  <!-- Summer Calendar embedded -->
-  <div class="fh-desktop-iframe" style="margin:14px 14px 6px;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(102,126,234,0.15)">
-    <div id="iframeFallback" style="padding:28px 20px;text-align:center;background:linear-gradient(135deg,#fff8ee,#fffbe6)">
-      <div style="font-size:28px;margin-bottom:8px">☀️</div>
-      <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px">הפנינג הקיץ של ינקלביץ</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:14px">לחץ לפתיחת לוח הקיץ</div>
-      <a href="https://haketz-shel-yankelevitz.vercel.app/" target="_blank"
-         style="display:inline-flex;align-items:center;gap:7px;padding:11px 26px;background:linear-gradient(135deg,#f7971e,#ffd200);color:#fff;font-weight:800;font-size:14px;border-radius:22px;text-decoration:none;font-family:var(--font);box-shadow:0 4px 16px rgba(247,151,30,0.4)">
-        📅 פתח את לוח הקיץ ↗
-      </a>
+  <!-- Summer Calendar link card -->
+  <a href="https://haketz-shel-yankelevitz.vercel.app/" target="_blank"
+     style="display:block;margin:14px 14px 6px;border-radius:16px;overflow:hidden;text-decoration:none;box-shadow:0 4px 20px rgba(247,151,30,0.3)">
+    <div style="background:linear-gradient(135deg,#FF6B6B,#f7971e,#ffd200,#43E97B,#4facfe);padding:20px 20px 18px;display:flex;align-items:center;gap:14px">
+      <div style="font-size:40px;line-height:1;flex-shrink:0">☀️</div>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:3px;text-shadow:0 1px 4px rgba(0,0,0,0.2)">הפנינג הקיץ של ינקלביץ</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.85);font-weight:600">לחץ לפתיחת לוח הקיץ ↗</div>
+      </div>
     </div>
-    <iframe id="calIframe" src="https://haketz-shel-yankelevitz.vercel.app/"
-            style="width:100%;height:1050px;border:none;display:none"
-            scrolling="yes"
-            onload="(function(f){try{f.contentWindow.location.href;/* if no error = blocked */}catch(e){document.getElementById('iframeFallback').style.display='none';f.style.display='block';}})(this)"></iframe>
-  </div>
+  </a>
 
   <!-- Calendar + side quick buttons -->
   <div style="display:flex;gap:10px;margin:12px 14px 14px;align-items:flex-start">
