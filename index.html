@@ -1703,20 +1703,20 @@ function renderHome(){
   const goalBal=goalFunds.filter(g=>!g.archived).reduce((s,g)=>s+goalTotal(g),0);
   const evPotsBal=open.reduce((s,ev)=>s+evPotTotal(ev),0);
   const allBal=mainBal+goalBal+evPotsBal;
+  const bannerStats=[
+    {label:'קופה ראשית',amt:mainBal},
+    ...(goalBal>0?[{label:'קופות מטרה',amt:goalBal}]:[]),
+    ...(evPotsBal>0?[{label:'קופות אירועים',amt:evPotsBal}]:[]),
+  ];
   document.getElementById('homeBanner').innerHTML=`
     <div class="home-banner" onclick="goTab('fund',document.getElementById('nb-fund'))" style="cursor:pointer">
-      <div class="home-banner-lbl">ינקלביץ</div>
-      <div class="home-banner-amt">₪${mainBal.toLocaleString()}</div>
-      <div class="home-banner-row">
+      <div class="home-banner-lbl">סך כל הקופות</div>
+      <div class="home-banner-amt">₪${allBal.toLocaleString()}</div>
+      ${bannerStats.length>1?`<div class="home-banner-row">${bannerStats.map(s=>`
         <div class="home-bstat">
-          <div class="home-bstat-val">₪${mainBal.toLocaleString()}</div>
-          <div class="home-bstat-lbl">קופה ראשית</div>
-        </div>
-        <div class="home-bstat">
-          <div class="home-bstat-val">₪${allBal.toLocaleString()}</div>
-          <div class="home-bstat-lbl">כל הקופות</div>
-        </div>
-      </div>
+          <div class="home-bstat-val">₪${s.amt.toLocaleString()}</div>
+          <div class="home-bstat-lbl">${s.label}</div>
+        </div>`).join('')}</div>`:''}
     </div>`;
 
   // ── Families strip ──
