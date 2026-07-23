@@ -595,11 +595,6 @@ body:not(.at-home){padding-bottom:140px}
     <div id="archGoalList"></div>
   </div>
 
-  <!-- DEBTS -->
-  <div class="view" id="view-debts">
-    <div class="sec-ttl">חובות פתוחים לפי משפחה</div>
-    <div id="debtList"></div>
-  </div>
 
   <!-- FAMILIES -->
   <div class="view" id="view-families">
@@ -771,9 +766,7 @@ body:not(.at-home){padding-bottom:140px}
   <button class="nav-btn" id="nb-archive" onclick="goTab('archive',this)">
     <span class="nav-icon">🗂️</span>ארכיון
   </button>
-  <button class="nav-btn" id="nb-debts" onclick="goTab('debts',this)">
-    <span class="nav-icon">📋</span>חובות
-  </button>
+
   <button class="nav-btn" id="nb-fund" onclick="goTab('fund',this)">
     <span class="nav-icon">🏦</span>קופה
   </button>
@@ -1177,7 +1170,7 @@ function showSyncStatus(msg,hideAfter){
 
 function render(){
   applyEditMode();
-  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderDebts,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome];
+  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome];
   fns.forEach(fn=>{try{fn();}catch(e){console.error(fn.name,e);}});
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
@@ -4194,7 +4187,7 @@ window.addEventListener('hashchange',handleHash);
 // Swipe between tabs
 (function(){
   const TABS=['home','events','archive','debts','fund'];
-  const NAV={home:'nb-home',events:'nb-events',archive:'nb-archive',debts:'nb-debts',fund:'nb-fund'};
+  const NAV={home:'nb-home',events:'nb-events',archive:'nb-archive',fund:'nb-fund'};
   const OVERLAYS=['newFormOverlay','famPickOverlay','childOverrideOverlay','expenseOverlay','famEditOverlay','depositOverlay','goalFormOverlay','goalDepositOverlay','addExpItemOverlay','cumPotOverlay'];
   let sx=0,sy=0,st=0,hBlocked=false;
   function _isHScroll(el){while(el&&el!==document.body){const ox=getComputedStyle(el).overflowX;if((ox==='auto'||ox==='scroll')&&el.scrollWidth>el.clientWidth+2)return true;el=el.parentElement;}return false;}
