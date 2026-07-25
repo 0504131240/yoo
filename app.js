@@ -1,3 +1,4 @@
+const COLORS=[
   {bg:'#EEEDFE',c:'#3C3489'},{bg:'#E1F5EE',c:'#085041'},
   {bg:'#FAECE7',c:'#712B13'},{bg:'#FBEAF0',c:'#72243E'},
   {bg:'#E6F1FB',c:'#0C447C'},{bg:'#EAF3DE',c:'#27500A'},
@@ -3456,6 +3457,8 @@ window.addEventListener('hashchange',handleHash);
 
 // ──────────────────────────────────────────────────────────────────────────
 
+
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
 }
 history.scrollRestoration = 'manual';
