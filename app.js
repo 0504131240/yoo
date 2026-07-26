@@ -278,7 +278,7 @@ function sendEmailNotif(recipients,subject,message,html){
 }
 function sendFundUpdateEmail(famId,changeAmt,desc){
   const f=getFam(famId);
-  if(!f||(!f.email&&!f.email2)){console.warn('sendFundUpdateEmail: no email for family',famId);return;}
+  if(!f||(!f.email&&!f.email2)){showToast('⚠️ לא הוגדר מייל למשפחה זו');return;}
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
