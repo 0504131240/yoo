@@ -136,7 +136,17 @@ async function fbInit(){
 let _saving=false;
 
 // EmailJS settings
-function loadEjsSettings(){
+async function loadEjsSettings(){
+  try{
+    const fb=await fbInit();
+    const snap=await fb.getDoc(fb.doc(fb.db,'settings','emailjs'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(d.publicKey)  localStorage.setItem('ejsPublicKey', d.publicKey);
+      if(d.serviceId)  localStorage.setItem('ejsServiceId', d.serviceId);
+      if(d.templateId) localStorage.setItem('ejsTemplateId', d.templateId);
+    }
+  }catch(e){}
   const keyEl=document.getElementById('ejsPublicKey');
   const svcEl=document.getElementById('ejsServiceId');
   const tplEl=document.getElementById('ejsTemplateId');
@@ -146,7 +156,7 @@ function loadEjsSettings(){
   const key=localStorage.getItem('ejsPublicKey');
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
 }
-function saveEjsSettings(){
+async function saveEjsSettings(){
   const key=document.getElementById('ejsPublicKey').value.trim();
   const svc=document.getElementById('ejsServiceId').value.trim();
   const tpl=document.getElementById('ejsTemplateId').value.trim();
@@ -154,6 +164,10 @@ function saveEjsSettings(){
   localStorage.setItem('ejsServiceId',svc);
   localStorage.setItem('ejsTemplateId',tpl);
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
+  try{
+    const fb=await fbInit();
+    await fb.setDoc(fb.doc(fb.db,'settings','emailjs'),{publicKey:key,serviceId:svc,templateId:tpl});
+  }catch(e){}
   const st=document.getElementById('ejsStatus');
   if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
 }
