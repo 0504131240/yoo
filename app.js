@@ -275,7 +275,12 @@ function sendEmailNotif(recipients,subject,message,html){
   },i*600));
 }
 function sendFundUpdateEmail(famId,changeAmt,desc){
-  const f=getFam(famId);if(!f||(!f.email&&!f.email2))return;
+  const f=getFam(famId);
+  if(!f||(!f.email&&!f.email2)){console.warn('sendFundUpdateEmail: no email for family',famId);return;}
+  const key=localStorage.getItem('ejsPublicKey');
+  const svc=localStorage.getItem('ejsServiceId');
+  const tpl=localStorage.getItem('ejsTemplateId');
+  if(!key||!svc||!tpl){showToast('⚠️ הגדרות מייל חסרות — כנס להגדרות משפחות');return;}
   const name=f.name.replace('משפחת','').trim();
   const newBal=Math.round(fund.famBalances[String(famId)]||0);
   const msg=`${desc}: ₪${Math.round(changeAmt).toLocaleString()}\n\nיתרתך החדשה בקופה הראשית: ₪${newBal.toLocaleString()}`;
