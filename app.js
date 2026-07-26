@@ -271,7 +271,9 @@ function sendEmailNotif(recipients,subject,message,html){
   });
   const message_html=html||_emailWrap(`<p style="white-space:pre-wrap;margin:0">${_esc(message||'')}</p>`,subject,'📬');
   addrs.forEach((a,i)=>setTimeout(()=>{
-    emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject,message,message_html}).catch(()=>{});
+    emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject,message,message_html})
+      .then(()=>console.log('📧 מייל נשלח ל-'+a.email))
+      .catch(e=>{console.error('📧 שגיאת מייל:',e);showToast('❌ שגיאה בשליחת מייל: '+(e?.text||e?.message||JSON.stringify(e)));});
   },i*600));
 }
 function sendFundUpdateEmail(famId,changeAmt,desc){
