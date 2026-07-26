@@ -2850,9 +2850,10 @@ function confirmDeposit(){
     famId:_depositFamId,amount:amt,
     desc:isDeposit?name+' הפקיד לקופה':name+' משך מהקופה',
     date:new Date().toLocaleDateString('he-IL')});
+  const _notifyFamId=_depositFamId;
   closeDepositSheet();
   save();render();
-  sendFundUpdateEmail(_depositFamId,amt,isDeposit?'הפקדה לקופה הראשית':'משיכה מהקופה הראשית');
+  sendFundUpdateEmail(_notifyFamId,amt,isDeposit?'הפקדה לקופה הראשית':'משיכה מהקופה הראשית');
 }
 
 
