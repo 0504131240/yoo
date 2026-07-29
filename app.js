@@ -23,6 +23,7 @@ let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=nu
 let calHebRefDate=new Date();
 let fundTxOpen=false;
 let settleModalEvId=null,potModalEvId=null;
+let _cumPotFromFund=false;
 let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false,_ppPot=false;
 let adminPass='';
 let editMode=false;
@@ -3219,6 +3220,7 @@ function openCumPot(evId){
 }
 function selectCumPotFam(famId){
   cumPotFamId=famId;
+  _cumPotFromFund=false;
   const ev=events.find(e=>e.id===cumPotEvId);if(!ev)return;
   ev.participants.forEach(fid=>{
     const btn=document.getElementById('cumpotfam-'+fid);if(!btn)return;
@@ -3226,10 +3228,32 @@ function selectCumPotFam(famId){
     if(fid===famId){btn.style.background=cl.bg;btn.style.color=cl.c;btn.style.borderColor=cl.c;}
     else{btn.style.background='transparent';btn.style.color='var(--text2)';btn.style.borderColor='var(--border)';}
   });
+  const fundBal=Math.round(famFundBal(famId));
+  const fundLine=document.getElementById('cumPotFundLine');
+  const fundText=document.getElementById('cumPotFundText');
+  if(fundLine&&fundText){
+    if(fundBal>0){
+      fundText.textContent=`🏦 יתרה בקופה הראשית: ₪${fundBal.toLocaleString()}`;
+      fundLine.style.display='flex';
+    } else {
+      fundLine.style.display='none';
+    }
+  }
 }
 function closeCumPot(){
   document.getElementById('cumPotOverlay').style.display='none';
-  cumPotEvId=null; cumPotFamId=null;
+  cumPotEvId=null; cumPotFamId=null; _cumPotFromFund=false;
+  const fl=document.getElementById('cumPotFundLine');if(fl)fl.style.display='none';
+}
+function useFundForCumPot(){
+  if(!cumPotFamId)return;
+  const fundBal=Math.round(famFundBal(cumPotFamId));
+  if(fundBal<=0)return;
+  const el=document.getElementById('cumPotAmt');
+  if(el)el.value=fundBal;
+  _cumPotFromFund=true;
+  const fundText=document.getElementById('cumPotFundText');
+  if(fundText)fundText.textContent=`🏦 יועבר מהקופה הראשית: ₪${fundBal.toLocaleString()} ✓`;
 }
 function doDepositToCumPot(){
   const amt=parseFloat(document.getElementById('cumPotAmt').value)||0;
@@ -3241,6 +3265,16 @@ function doDepositToCumPot(){
   const roundAmt=Math.round(amt);
   const savedFamId=cumPotFamId;
   const savedEvId=cumPotEvId;
+  const fromFund=_cumPotFromFund;
+  if(fromFund){
+    const key=String(savedFamId);
+    const bal=fund.famBalances[key]||0;
+    if(bal<roundAmt){alert('אין מספיק יתרה בקופה הראשית (₪'+Math.round(bal).toLocaleString()+')');return;}
+    fund.famBalances[key]=bal-roundAmt;
+    fund.transactions.push({id:nxtTx++,type:'payout',famId:savedFamId,amount:roundAmt,
+      desc:'העברה לקופת האירוע · '+ev.name,
+      date:new Date().toLocaleDateString('he-IL')});
+  }
   ev.potPayments.push({famId:savedFamId,amt:roundAmt});
   closeCumPot();
   save();render();
