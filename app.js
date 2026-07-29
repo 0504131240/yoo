@@ -3249,11 +3249,14 @@ function useFundForCumPot(){
   if(!cumPotFamId)return;
   const fundBal=Math.round(famFundBal(cumPotFamId));
   if(fundBal<=0)return;
+  const ev=events.find(e=>e.id===cumPotEvId);
+  const share=ev?Math.round(evShares(ev)[cumPotFamId]||0):fundBal;
+  const suggested=Math.min(fundBal,share);
   const el=document.getElementById('cumPotAmt');
-  if(el)el.value=fundBal;
+  if(el)el.value=suggested>0?suggested:fundBal;
   _cumPotFromFund=true;
   const fundText=document.getElementById('cumPotFundText');
-  if(fundText)fundText.textContent=`🏦 יועבר מהקופה הראשית: ₪${fundBal.toLocaleString()} ✓`;
+  if(fundText)fundText.textContent=`🏦 יועבר מהקופה הראשית: ₪${(suggested>0?suggested:fundBal).toLocaleString()} ✓`;
 }
 function doDepositToCumPot(){
   const amt=parseFloat(document.getElementById('cumPotAmt').value)||0;
