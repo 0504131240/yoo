@@ -3233,7 +3233,11 @@ function selectCumPotFam(famId){
   const fundText=document.getElementById('cumPotFundText');
   if(fundLine&&fundText){
     if(fundBal>0){
-      fundText.textContent=`🏦 יתרה בקופה הראשית: ₪${fundBal.toLocaleString()}`;
+      const ev2=events.find(e=>e.id===cumPotEvId);
+      const share=ev2?Math.round(evShares(ev2)[famId]||0):fundBal;
+      const suggested=share>0?Math.min(fundBal,share):fundBal;
+      const extra=fundBal>suggested?` (יתרה: ₪${fundBal.toLocaleString()})` :'';
+      fundText.textContent=`🏦 יועבר מהקופה: ₪${suggested.toLocaleString()}${extra}`;
       fundLine.style.display='flex';
     } else {
       fundLine.style.display='none';
