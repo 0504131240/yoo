@@ -2347,11 +2347,11 @@ function _sendCloseEvEmailOne(ev,fid){
       ev.participants.forEach(p=>{ _pW[p]=famWeight(getFam(p),_pMethod,ev.childOverrides?.[p]); _pTotalW+=_pW[p]; });
       _potExpItems.forEach(it=>{
         const myShare=_pTotalW>0?Math.round(it.amt*(_pW[fid]||0)/_pTotalW):0;
-        itemRows+=`<tr style="border-bottom:1px solid #f0f0f6;background:#FFFBEB">
+        itemRows+=`<tr style="border-bottom:1px solid #EDE9FE;background:#F5F3FF">
           <td style="padding:5px 6px">${_esc(it.name)}</td>
-          <td style="padding:5px 6px;font-size:11px;color:#92400E">קופת האירוע</td>
-          <td style="padding:5px 6px;font-weight:600;color:#D97706">₪${it.amt.toLocaleString()}</td>
-          <td style="padding:5px 6px;font-weight:700;color:#92400E">₪${myShare.toLocaleString()}</td>
+          <td style="padding:5px 6px;font-size:11px;color:#7C3AED">קופת האירוע</td>
+          <td style="padding:5px 6px;font-weight:600;color:#7C3AED">₪${it.amt.toLocaleString()}</td>
+          <td style="padding:5px 6px;font-weight:700;color:#6D28D9">₪${myShare.toLocaleString()}</td>
         </tr>`;
       });
     }
@@ -2451,7 +2451,7 @@ function sendEmailToFam(evId,fid){
         const pf=getFam(f2);const pn=pf?pf.name.replace('משפחת','').trim():'?';
         vis.forEach(it=>{const ms=_rShare(it,fid);_rRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pn)}</td><td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#D97706">${ms?'₪'+ms.toLocaleString():'—'}</td></tr>`;});
       });
-      _rPotExpItems.forEach(it=>{const ms=_rTW>0?Math.round(it.amt*(_rW[fid]||0)/_rTW):0;_rRows+=`<tr style="border-bottom:1px solid #f0f0f6;background:#FFFBEB"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#92400E">קופת האירוע</td><td style="padding:5px 6px;font-weight:600;color:#D97706">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#92400E">₪${ms.toLocaleString()}</td></tr>`;});
+      _rPotExpItems.forEach(it=>{const ms=_rTW>0?Math.round(it.amt*(_rW[fid]||0)/_rTW):0;_rRows+=`<tr style="border-bottom:1px solid #EDE9FE;background:#F5F3FF"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#7C3AED">קופת האירוע</td><td style="padding:5px 6px;font-weight:600;color:#7C3AED">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#6D28D9">₪${ms.toLocaleString()}</td></tr>`;});
       if(_rRows) bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#E0F2FE"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">סכום</th><th style="padding:6px;text-align:right;color:#D97706;font-weight:700;border-bottom:2px solid #7DD3FC">החלק שלך</th></tr>${_rRows}</table>`;
     }
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
