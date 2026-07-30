@@ -2418,7 +2418,31 @@ function sendEmailToFam(evId,fid){
     const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]];
     if(potDep>0.5) cardRows.push(['הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
     let bodyHtml=_eCard(cardRows);
+    // Expense breakdown table
+    const _rAllItems=ev.expenseItems||[];
+    const _rPotExpItems=ev.potExpItems||[];
+    if(_rAllItems.length||_rPotExpItems.length){
+      bodyHtml+=`<p style="font-weight:700;margin:12px 0 8px;color:#333">💳 פירוט הוצאות:</p>`;
+      const _rByFam={};ev.participants.forEach(f2=>{_rByFam[f2]=[];});
+      _rAllItems.forEach(it=>{if(_rByFam[it.famId])_rByFam[it.famId].push(it);});
+      const _rM=ev.splitMethod||'equal';let _rTW=0;const _rW={};
+      ev.participants.forEach(p=>{_rW[p]=famWeight(getFam(p),_rM,ev.childOverrides?.[p]);_rTW+=_rW[p];});
+      const _rShare=(it,rfid)=>{if(it.customSplit)return it.customSplit[String(rfid)]||0;const sw=it.sharedWith?it.sharedWith.filter(p=>ev.participants.includes(p)):ev.participants;if(!sw.includes(rfid))return 0;if(it.sharedWith)return Math.round(it.amt/sw.length);const swW=sw.reduce((s,p)=>s+(_rW[p]||0),0);return swW?Math.round(it.amt*(_rW[rfid]||0)/swW):0;};
+      let _rRows='';
+      ev.participants.forEach(f2=>{
+        const its=_rByFam[f2];if(!its||!its.length)return;
+        const isMine=f2===fid;
+        const vis=isMine?its:its.filter(it=>_rShare(it,fid)>0);if(!vis.length)return;
+        const pf=getFam(f2);const pn=pf?pf.name.replace('משפחת','').trim():'?';
+        vis.forEach(it=>{const ms=_rShare(it,fid);_rRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pn)}</td><td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#D97706">${ms?'₪'+ms.toLocaleString():'—'}</td></tr>`;});
+      });
+      _rPotExpItems.forEach(it=>{const ms=_rTW>0?Math.round(it.amt*(_rW[fid]||0)/_rTW):0;_rRows+=`<tr style="border-bottom:1px solid #f0f0f6;background:#FFFBEB"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#92400E">קופת האירוע</td><td style="padding:5px 6px;font-weight:600;color:#D97706">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#92400E">₪${ms.toLocaleString()}</td></tr>`;});
+      if(_rRows) bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#E0F2FE"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">סכום</th><th style="padding:6px;text-align:right;color:#D97706;font-weight:700;border-bottom:2px solid #7DD3FC">החלק שלך</th></tr>${_rRows}</table>`;
+    }
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+    // Other debts
+    const _otherDebts=events.filter(e=>e.id!==ev.id&&e.open&&(e.participants||[]).includes(fid)).map(e=>{const _d=Math.round(-(evAdjBalance(e)[fid]||0));return _d>0.5?{name:e.name,owe:_d}:null;}).filter(Boolean);
+    if(_otherDebts.length){bodyHtml+=`<div style="margin-top:14px;padding:10px 14px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA">${_otherDebts.map(d=>`<div style="font-size:12px;color:#991B1B;margin-bottom:2px">⚠️ תזכורת: קיים גם חוב של ₪${d.owe.toLocaleString()} עבור "${_esc(d.name)}"</div>`).join('')}</div>`;}
     const html=_emailWrap(bodyHtml,ev.name,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id,f.name);
     sendEmailNotif([{email:f.email,email2:f.email2,name}],`⚠️ תזכורת: חוב ב"${ev.name}" · ינקלביץ`,msg,html);
   } else if(Math.abs(b)<=0.5){
@@ -2489,6 +2513,8 @@ function sendDebtReminderEmails(evId){
     const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]]);
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+    const _otherDebts2=events.filter(e=>e.id!==ev.id&&e.open&&(e.participants||[]).includes(fid)).map(e=>{const _d=Math.round(-(evAdjBalance(e)[fid]||0));return _d>0.5?{name:e.name,owe:_d}:null;}).filter(Boolean);
+    if(_otherDebts2.length){bodyHtml+=`<div style="margin-top:14px;padding:10px 14px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA">${_otherDebts2.map(d=>`<div style="font-size:12px;color:#991B1B;margin-bottom:2px">⚠️ תזכורת: קיים גם חוב של ₪${d.owe.toLocaleString()} עבור "${_esc(d.name)}"</div>`).join('')}</div>`;}
     const html=_emailWrap(bodyHtml,ev.name,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id,f.name);
     sendEmailNotif([{email:f.email,email2:f.email2,name}],`⚠️ תזכורת: חוב ב"${ev.name}" · ינקלביץ`,msg,html);
   });
