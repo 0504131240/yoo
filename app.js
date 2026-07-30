@@ -219,6 +219,23 @@ function _eTable(headers,rows){
   return`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE">${headers.map(h=>`<th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">${_esc(h)}</th>`).join('')}</tr>${rows.map(r=>`<tr style="border-bottom:1px solid #f0f0f6">${r.map((c,i)=>`<td style="padding:7px 10px${i>0?';font-weight:600':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`;
 }
 function _eBadge(text,color){return`<div style="display:inline-block;background:${color}1a;border:1px solid ${color}55;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:700;color:${color}">${_esc(text)}</div>`;}
+function _splitMethodBlock(ev){
+  const method=ev.splitMethod||'equal';
+  const label=SPLIT_LABELS[method]||method;
+  let html=`<div style="margin:0 0 12px;padding:8px 12px;background:#F0F9FF;border-radius:8px;border:1px solid #BAE6FD;font-size:12px;color:#0369A1">`;
+  html+=`<div style="font-weight:700;margin-bottom:${method==='equal'?0:4}px">📊 שיטת חלוקה: ${_esc(label)}</div>`;
+  if(method!=='equal'){
+    ev.participants.forEach(fid2=>{
+      const pf=getFam(fid2);if(!pf)return;
+      const ch=ev.childOverrides?.[fid2]!=null?ev.childOverrides[fid2]:(pf.children||0);
+      const pname=pf.name.replace('משפחת','').trim();
+      const compStr=ch>0?`הורים + ${ch} ילד${ch===1?'':'ים'}`:'הורים';
+      html+=`<div style="margin-top:2px;color:#075985">• ${_esc(pname)}: ${compStr}</div>`;
+    });
+  }
+  html+=`</div>`;
+  return html;
+}
 function sendSettledEmail(ev,famId){
   const f=getFam(famId);
   if(!f||(!f.email&&!f.email2)) return;
@@ -2282,6 +2299,7 @@ function _sendCloseEvEmailOne(ev,fid){
   const _cRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(fundBal>0) _cRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(_cRows);
+  bodyHtml+=_splitMethodBlock(ev);
   const allItems=ev.expenseItems||[];
   if(allItems.length||(ev.potExpItems||[]).length){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 פירוט כל ההוצאות:</p>`;
@@ -2418,6 +2436,7 @@ function sendEmailToFam(evId,fid){
     const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]];
     if(potDep>0.5) cardRows.push(['הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
     let bodyHtml=_eCard(cardRows);
+    bodyHtml+=_splitMethodBlock(ev);
     // Expense breakdown table
     const _rAllItems=ev.expenseItems||[];
     const _rPotExpItems=ev.potExpItems||[];
@@ -2512,6 +2531,7 @@ function sendDebtReminderEmails(evId){
     const owe=Math.round(Math.abs(adjBal[fid]||0));
     const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\nשילמת: ₪${spent.toLocaleString()}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]]);
+    bodyHtml+=_splitMethodBlock(ev);
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
     const _otherDebts2=events.filter(e=>e.id!==ev.id&&e.open&&(e.participants||[]).includes(fid)).map(e=>{const _d=Math.round(-(evAdjBalance(e)[fid]||0));return _d>0.5?{name:e.name,owe:_d}:null;}).filter(Boolean);
     if(_otherDebts2.length){bodyHtml+=`<div style="margin-top:14px;padding:10px 14px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA">${_otherDebts2.map(d=>`<div style="font-size:12px;color:#991B1B;margin-bottom:2px">⚠️ תזכורת: קיים גם חוב של ₪${d.owe.toLocaleString()} עבור "${_esc(d.name)}"</div>`).join('')}</div>`;}
