@@ -2228,9 +2228,19 @@ function _sendCloseEvEmailOne(ev,fid){
   const _myPotDist=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
   const _excessToFund=Math.round((fund.transactions||[]).filter(t=>t.famId===fid&&t.type==='deposit'&&(t.desc||'').includes('החזר עודף מקופת האירוע')&&(t.desc||'').includes(ev.name)).reduce((s,t)=>s+t.amount,0));
   const _myTotalPot=_myPotPend+_myPotDist+_excessToFund;
+  const _fromFundToPot=Math.round((fund.transactions||[])
+    .filter(t=>Number(t.famId)===Number(fid)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.desc||'').includes(ev.name))
+    .reduce((s,t)=>s+t.amount,0));
   if(_myTotalPot>0.5){
-    settleLines.push(`הפקדת לקופת האירוע: ₪${_myTotalPot.toLocaleString()}`);
+    if(_fromFundToPot>0.5&&_fromFundToPot===_myTotalPot){
+      settleLines.push(`הפקדת לקופת האירוע: ₪${_myTotalPot.toLocaleString()} (מהקופה הראשית)`);
+    } else {
+      settleLines.push(`הפקדת לקופת האירוע: ₪${_myTotalPot.toLocaleString()}`);
+      if(_fromFundToPot>0.5) settleLines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} הועברו מהקופה הראשית`);
+    }
     if(_excessToFund>0.5) settleLines.push(`היתרה ₪${_excessToFund.toLocaleString()} עברה לקופה הראשית`);
+  } else if(_fromFundToPot>0.5){
+    settleLines.push(`העברת מהקופה הראשית ₪${_fromFundToPot.toLocaleString()} לתשלום האירוע`);
   }
   const _myPotRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&s.toFid===fid).reduce((s,t)=>s+t.amt,0));
   if(_myPotRec>0.5) settleLines.push(`קיבלת ₪${_myPotRec.toLocaleString()} מקופת האירוע`);
