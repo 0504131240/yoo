@@ -237,7 +237,7 @@ function _paymentBlock(owe,evName){
   const cleanPhone=p.bit.replace(/\D/g,'');
   const bitUrl=`https://www.bit.co.il/send?phone=${cleanPhone}&amount=${owe}&note=${encodeURIComponent('ינקלביץ · '+evName)}`;
   let html=`<div style="margin-top:14px;padding:12px 14px;background:#F0FDF4;border-radius:8px;border:1px solid #BBF7D0">`;
-  html+=`<div style="font-weight:700;font-size:13px;color:#15803D;margin-bottom:8px">💸 לתשלום${p.name?` ל${_esc(p.name)}`:''}:</div>`;
+  html+=`<div style="font-weight:700;font-size:13px;color:#15803D;margin-bottom:8px">💸 לתשלום:</div>`;
   if(hasBank){
     html+=`<div style="font-size:12px;color:#166534;line-height:1.8">`;
     html+=`🏦 <b>${_esc(p.bank)}</b>`;
