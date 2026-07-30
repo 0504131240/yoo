@@ -2328,16 +2328,16 @@ function _sendCloseEvEmailOne(ev,fid){
     });
     const _potExpItems=ev.potExpItems||[];
     if(_potExpItems.length){
-      const _totalPotDep=(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
-      const _famPotDep=(ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0);
-      const _famPotRatio=_totalPotDep>0?_famPotDep/_totalPotDep:0;
+      const _pMethod=ev.splitMethod||'equal';
+      let _pTotalW=0; const _pW={};
+      ev.participants.forEach(p=>{ _pW[p]=famWeight(getFam(p),_pMethod,ev.childOverrides?.[p]); _pTotalW+=_pW[p]; });
       _potExpItems.forEach(it=>{
-        const myShare=_famPotRatio>0?Math.round(it.amt*_famPotRatio):0;
+        const myShare=_pTotalW>0?Math.round(it.amt*(_pW[fid]||0)/_pTotalW):0;
         itemRows+=`<tr style="border-bottom:1px solid #f0f0f6;background:#FFFBEB">
           <td style="padding:5px 6px">${_esc(it.name)}</td>
           <td style="padding:5px 6px;font-size:11px;color:#92400E">קופת האירוע</td>
           <td style="padding:5px 6px;font-weight:600;color:#D97706">₪${it.amt.toLocaleString()}</td>
-          <td style="padding:5px 6px;font-weight:700;color:#92400E">${myShare?'₪'+myShare.toLocaleString():'—'}</td>
+          <td style="padding:5px 6px;font-weight:700;color:#92400E">₪${myShare.toLocaleString()}</td>
         </tr>`;
       });
     }
