@@ -1282,10 +1282,9 @@ function evCard(ev){
     const share=shares[fid]||0;
     const tagClass=b>0.5?'exp-tag-neg':b<-0.5?'exp-tag-pos':'exp-tag-zero';
     const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
-    const isDebtor=b<-0.5;
-    const tagTag=isDebtor?'button':'span';
-    const tagClick=isDebtor?` onclick="payToPot(${ev.id},${fid})"` : '';
-    const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
+    const tagTag='span';
+    const tagClick='';
+    const tagCls='exp-tag '+tagClass;
     const key=ev.id+'-'+fid;
     const isExpanded=expandedCumFamilies.has(key);
     const shareKey=ev.id+'-share-'+fid;
