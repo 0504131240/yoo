@@ -189,7 +189,7 @@ function getPaymentSettings(){
     bank:localStorage.getItem('payBankName')||'',
     branch:localStorage.getItem('payBranch')||'',
     account:localStorage.getItem('payAccount')||'',
-    bit:localStorage.getItem('payBitPhone')||''
+    bit:localStorage.getItem('payBitLink')||''
   };
 }
 async function loadPaymentSettings(){
@@ -205,8 +205,8 @@ async function loadPaymentSettings(){
       if(d.bit)     localStorage.setItem('payBitPhone',d.bit);
     }
   }catch(e){}
-  const ids=['payTreasurerName','payBankName','payBranch','payAccount','payBitPhone'];
-  const keys=['payTreasurerName','payBankName','payBranch','payAccount','payBitPhone'];
+  const ids=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
+  const keys=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
   ids.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.value=localStorage.getItem(keys[i])||'';});
 }
 async function savePaymentSettings(){
@@ -215,13 +215,13 @@ async function savePaymentSettings(){
     bank:(document.getElementById('payBankName').value||'').trim(),
     branch:(document.getElementById('payBranch').value||'').trim(),
     account:(document.getElementById('payAccount').value||'').trim(),
-    bit:(document.getElementById('payBitPhone').value||'').trim()
+    bit:(document.getElementById('payBitLink').value||'').trim()
   };
   localStorage.setItem('payTreasurerName',p.name);
   localStorage.setItem('payBankName',p.bank);
   localStorage.setItem('payBranch',p.branch);
   localStorage.setItem('payAccount',p.account);
-  localStorage.setItem('payBitPhone',p.bit);
+  localStorage.setItem('payBitLink',p.bit);
   try{
     const fb=await fbInit();
     await fb.setDoc(fb.doc(fb.db,'settings','payment'),p);
@@ -244,10 +244,8 @@ function _paymentBlock(owe,evName){
     html+=`</div>`;
   }
   if(hasBit){
-    const fmt=p.bit.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3');
     html+=`<div style="margin-top:${hasBank?10:0}px">`;
-    html+=`<div style="font-size:12px;color:#166534;margin-bottom:6px">💙 ביט · מספר: <b style="direction:ltr;display:inline-block;letter-spacing:1px">${_esc(fmt||p.bit)}</b> · סכום: <b>₪${owe.toLocaleString()}</b></div>`;
-    html+=`<a href="https://bit.co.il" style="display:inline-block;background:#0057FF;color:#fff;text-decoration:none;padding:8px 18px;border-radius:20px;font-size:13px;font-weight:700">💙 פתח ביט לתשלום</a>`;
+    html+=`<a href="${_esc(p.bit)}" style="display:inline-block;background:#1A3C40;color:#3BFFF0;text-decoration:none;padding:10px 22px;border-radius:20px;font-size:14px;font-weight:700">💙 שלם בביט · ₪${owe.toLocaleString()}</a>`;
     html+=`</div>`;
   }
   html+=`</div>`;
