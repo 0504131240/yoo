@@ -234,8 +234,6 @@ function _paymentBlock(owe,evName){
   const hasBank=p.bank&&p.account;
   const hasBit=p.bit;
   if(!hasBank&&!hasBit)return'';
-  const cleanPhone=p.bit.replace(/\D/g,'');
-  const bitUrl=`https://www.bit.co.il/send?phone=${cleanPhone}&amount=${owe}&note=${encodeURIComponent('ינקלביץ · '+evName)}`;
   let html=`<div style="margin-top:14px;padding:12px 14px;background:#F0FDF4;border-radius:8px;border:1px solid #BBF7D0">`;
   html+=`<div style="font-weight:700;font-size:13px;color:#15803D;margin-bottom:8px">💸 לתשלום:</div>`;
   if(hasBank){
@@ -246,7 +244,13 @@ function _paymentBlock(owe,evName){
     html+=`</div>`;
   }
   if(hasBit){
-    html+=`<div style="margin-top:${hasBank?10:0}px"><a href="${bitUrl}" style="display:inline-block;background:#0057FF;color:#fff;text-decoration:none;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:700">💙 שלם עכשיו בביט · ₪${owe.toLocaleString()}</a></div>`;
+    const fmt=p.bit.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3');
+    html+=`<div style="margin-top:${hasBank?10:0}px;display:flex;align-items:center;gap:8px">`;
+    html+=`<div style="background:#0057FF;border-radius:10px;padding:6px 10px;display:inline-flex;align-items:center;gap:6px">`;
+    html+=`<span style="font-size:16px">💙</span><span style="color:#fff;font-weight:700;font-size:13px">ביט</span>`;
+    html+=`</div>`;
+    html+=`<span style="font-size:15px;font-weight:700;color:#166534;letter-spacing:1px;direction:ltr">${_esc(fmt||p.bit)}</span>`;
+    html+=`</div>`;
   }
   html+=`</div>`;
   return html;
