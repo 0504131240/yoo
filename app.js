@@ -10,7 +10,7 @@ let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
-let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null;
+let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null,addExpItemFromPot=false;
 const expandedExpItems=new Set();
 const expandedFamShares=new Set();
 let cumPotEvId=null,cumPotFamId=null;
@@ -96,6 +96,17 @@ const evShares=ev=>{
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
 const evPotTotal=ev=>(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
+const evPotExpTotal=ev=>(ev.potExpItems||[]).reduce((s,it)=>s+it.amt,0);
+function evEffectivePotPayments(ev){
+  const payments=ev.potPayments||[];
+  const expTotal=evPotExpTotal(ev);
+  if(!expTotal)return payments;
+  const total=payments.reduce((s,p)=>s+p.amt,0);
+  if(!total)return payments;
+  if(expTotal>=total)return payments.map(p=>({...p,amt:0}));
+  const factor=(total-expTotal)/total;
+  return payments.map(p=>({...p,amt:Math.round(p.amt*factor)}));
+}
 function evAdjBalance(ev){
   const adjBal=evBalance(ev);
   (ev.settled||[]).forEach(s=>{
@@ -104,7 +115,7 @@ function evAdjBalance(ev){
     if(fromFid!=null) adjBal[fromFid]=(adjBal[fromFid]||0)+s.amt;
     if(toFid!=null) adjBal[toFid]=(adjBal[toFid]||0)-s.amt;
   });
-  (ev.potPayments||[]).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
+  evEffectivePotPayments(ev).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
   return adjBal;
 }
 const shareLabel=ev=>{
@@ -1232,6 +1243,7 @@ function evCard(ev){
   const transfers=calcTransfers(ev);
   const potPayments=ev.potPayments||[];
   const potTotal=evPotTotal(ev);
+  const potExpTotalCard=evPotExpTotal(ev);
   const hasPot=potTotal>0;
   const balanced=cost>0&&!ev.participants.some(fid=>(adjBal[fid]||0)<-0.5);
   const shares=evShares(ev);
@@ -1423,7 +1435,7 @@ function evCard(ev){
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
       ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
-      ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${potTotal.toLocaleString()}</button>`:''}
+      ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${(potTotal-potExpTotalCard).toLocaleString()}${potExpTotalCard>0?` <span style="font-size:10px;opacity:.7">(הוצאות ₪${potExpTotalCard.toLocaleString()})</span>`:''}</button>`:''}
       ${ev.cumulative&&cost>0?ev.closed?`<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:6px;background:var(--surface2);border:1.5px solid var(--border);font-size:12px;color:var(--text2);font-weight:600">🏁 הסתיים</span>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}` :`<button class="action-btn blue edit-only" onclick="openCloseEvModal(${ev.id})">🏁 סיים אירוע</button>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}`:balanced&&cost>0?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}
       ${cost>0?`<button class="action-btn edit-only" onclick="openEmailModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 מיילים</button>`:''}
       <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
@@ -1443,7 +1455,7 @@ function payToPot(evId,famId,amt){
 }
 
 function calcPotTransfers(ev){
-  const pots=ev.potPayments||[];if(!pots.length)return[];
+  const pots=evEffectivePotPayments(ev);if(!pots.length)return[];
   const baseBal=evAdjBalance({...ev,potPayments:[]});
   const creds=ev.participants.filter(fid=>(baseBal[fid]||0)>0.5)
     .map(fid=>({name:getFam(fid).name.replace('משפחת','').trim(),fid,amt:baseBal[fid]}));
@@ -1472,7 +1484,7 @@ function calcPotTransfers(ev){
   return out;
 }
 function calcPotExcessByFamily(ev){
-  const pots=ev.potPayments||[];if(!pots.length)return{};
+  const pots=evEffectivePotPayments(ev);if(!pots.length)return{};
   // Group total pot per family
   const potByFam={};
   pots.forEach(p=>{potByFam[p.famId]=(potByFam[p.famId]||0)+p.amt;});
@@ -1490,7 +1502,7 @@ function calcPotExcessByFamily(ev){
 }
 function releasePot(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const pots=ev.potPayments||[];if(!pots.length)return;
+  const pots=evEffectivePotPayments(ev);if(!pots.length)return;
   const baseBal=evAdjBalance({...ev,potPayments:[]});
   const creditors=ev.participants.filter(fid=>(baseBal[fid]||0)>0.5)
     .map(fid=>({name:getFam(fid).name.replace('משפחת','').trim(),fid,amt:baseBal[fid]}));
@@ -2872,7 +2884,13 @@ function openAddExpItem(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   addExpItemEvId=evId; addExpItemFamId=null;
   addExpItemSharedWith=new Set(ev.participants);
-  addExpItemSplitMode='equal'; _editExpItemId=null;
+  addExpItemSplitMode='equal'; _editExpItemId=null; addExpItemFromPot=false;
+  const potWrap=document.getElementById('expFromPotToggleWrap');
+  if(potWrap)potWrap.style.display=evPotTotal(ev)>0?'block':'none';
+  const potBtn=document.getElementById('expFromPotToggle');
+  if(potBtn){potBtn.style.background='transparent';potBtn.style.color='var(--text2)';potBtn.style.borderColor='var(--border)';}
+  const famSec=document.getElementById('expItemFamSection');if(famSec)famSec.style.display='block';
+  const splitSec=document.getElementById('expItemSplitSection');if(splitSec)splitSec.style.display='block';
   const titleEl=document.getElementById('addExpItemTitle');
   if(titleEl)titleEl.textContent='➕ הוסף הוצאה';
   document.getElementById('expItemName').value='';
@@ -2920,9 +2938,24 @@ function selectAddExpFam(famId){
     else{btn.style.background='transparent';btn.style.color='var(--text2)';btn.style.borderColor='var(--border)';}
   });
 }
+function toggleExpFromPot(){
+  addExpItemFromPot=!addExpItemFromPot;
+  const btn=document.getElementById('expFromPotToggle');
+  const famSec=document.getElementById('expItemFamSection');
+  const splitSec=document.getElementById('expItemSplitSection');
+  const shareWrap=document.getElementById('expItemSharePickerWrap');
+  if(btn){btn.style.background=addExpItemFromPot?'var(--amber-mid)':'transparent';btn.style.color=addExpItemFromPot?'#fff':'var(--text2)';btn.style.borderColor=addExpItemFromPot?'var(--amber-mid)':'var(--border)';}
+  if(famSec)famSec.style.display=addExpItemFromPot?'none':'block';
+  if(splitSec)splitSec.style.display=addExpItemFromPot?'none':'block';
+  if(shareWrap)shareWrap.style.display=addExpItemFromPot?'none':'block';
+  if(addExpItemFromPot){
+    document.getElementById('expItemSplitEqualDiv').style.display='block';
+    document.getElementById('expItemSplitCustomDiv').style.display='none';
+  }
+}
 function closeAddExpItem(){
   document.getElementById('addExpItemOverlay').style.display='none';
-  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal'; _editExpItemId=null;
+  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal'; _editExpItemId=null; addExpItemFromPot=false;
 }
 function setExpItemSplitMode(mode){
   addExpItemSplitMode=mode;
@@ -2945,6 +2978,17 @@ async function doAddExpItem(){
   const name=document.getElementById('expItemName').value.trim();
   const errEl=document.getElementById('expItemErr');
   const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
+  if(addExpItemFromPot){
+    const rawAmt=parseFloat(document.getElementById('expItemAmt').value)||0;
+    if(!name||rawAmt<=0){if(errEl)errEl.style.display='block';return;}
+    if(errEl)errEl.style.display='none';
+    const amt=await _toILS('expItemAmt','expItemCurHint','expItemCur');
+    if(!ev.potExpItems)ev.potExpItems=[];
+    ev.potExpItemId=(ev.potExpItemId||0)+1;
+    ev.potExpItems.push({id:ev.potExpItemId,name,amt:Math.round(amt),date:new Date().toLocaleDateString('he-IL')});
+    closeAddExpItem();save();render();
+    return;
+  }
   if(addExpItemSplitMode==='custom'){
     if(!name||!addExpItemFamId){if(errEl)errEl.style.display='block';return;}
     const customSplit={};let total=0;
@@ -3118,6 +3162,9 @@ function renderPotModal(ev){
   const el=document.getElementById('potModalContent');if(!el)return;
   const potPayments=ev.potPayments||[];
   const potTotal=evPotTotal(ev);
+  const potExpItems=ev.potExpItems||[];
+  const potExpTot=evPotExpTotal(ev);
+  const effBal=Math.round(potTotal-potExpTot);
   const potTransfers=calcPotTransfers(ev);
   const adjBal=evAdjBalance(ev);
   const creditorFids=ev.participants.filter(fid=>(adjBal[fid]||0)>0.5);
@@ -3147,15 +3194,29 @@ function renderPotModal(ev){
     const fromLabel=s.method==='pot'?'קופת האירוע':s.from;
     return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span style="flex:1"><b style="color:var(--text)">${esc(fromLabel)}</b> העביר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
   }).join('')+'</div></div>':'';
+  const expRows=potExpItems.length?`<div style="border-bottom:1px solid var(--border)">
+    <div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">הוצאות מהקופה:</div>
+    ${potExpItems.map(it=>`<div style="border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:10px 16px">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--amber-bg);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🛒</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(it.name)}</div>${it.date?`<div style="font-size:11px;color:var(--text2);margin-top:1px">${esc(it.date)}</div>`:''}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--amber)">₪${it.amt.toLocaleString()}</div>
+      <button class="edit-only" onclick="deletePotExpItem(${ev.id},${it.id})" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:14px;padding:0 4px;font-family:var(--font)" title="מחק">🗑</button>
+    </div>`).join('')}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-top:1px solid var(--border);background:var(--surface2)">
+      <span style="font-size:12px;font-weight:700;color:var(--text2)">יתרה אחרי הוצאות</span>
+      <span style="font-size:13px;font-weight:700;color:var(--amber)">₪${effBal.toLocaleString()}</span>
+    </div>
+  </div>`:'';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-      <div><div style="font-size:14px;font-weight:700">💰 קופת האירוע</div><div style="font-size:11px;color:var(--text2);margin-top:2px">₪${potTotal.toLocaleString()} · ${esc(ev.name)}</div></div>
+      <div><div style="font-size:14px;font-weight:700">💰 קופת האירוע</div><div style="font-size:11px;color:var(--text2);margin-top:2px">₪${potTotal.toLocaleString()}${potExpTot>0?` · הוצאות ₪${potExpTot.toLocaleString()} · יתרה ₪${effBal.toLocaleString()}`:''} · ${esc(ev.name)}</div></div>
       <button onclick="closePotModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
     </div>
     <div style="border-bottom:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">הפקדות:</div>
       ${(()=>{const byFam={};potPayments.forEach(p=>{if(!byFam[p.famId])byFam[p.famId]=[];byFam[p.famId].push(p);});(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid!=null).forEach(s=>{if(!byFam[s.fromFid])byFam[s.fromFid]=[];});const ord=families.map(f=>f.id).filter(fid=>byFam[fid]);return ord.map(fid=>{const pmnts=byFam[fid]||[];const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const distFromThis=(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const tot=pmnts.reduce((s,p)=>s+p.amt,0)+distFromThis;const multi=pmnts.length>1;const key=ev.id+'-pot-'+fid;const isExp=expandedPotFamilies.has(key);const delBtn=(i)=>`<button class="edit-only" onclick="deletePotDeposit(${ev.id},${fid},${i})" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:14px;padding:0 4px;font-family:var(--font)" title="מחק">🗑</button>`;const details=multi&&isExp?'<div style="background:var(--surface2);padding:6px 16px 6px 32px">'+pmnts.map((p,i)=>`<div style="font-size:12px;color:var(--text2);padding:3px 0;display:flex;justify-content:space-between;align-items:center"><span>תשלום ${i+1} · ₪${p.amt.toLocaleString()}</span>${delBtn(i)}</div>`).join('')+'</div>':'';return`<div style="border-top:1px solid var(--border)"><div style="display:flex;align-items:center;gap:10px;padding:10px 16px"><div style="width:32px;height:32px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">✓</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div><div style="font-size:12px;color:var(--green-mid);font-weight:600;margin-top:1px">₪${tot.toLocaleString()}</div></div>${multi?`<button onclick="togglePotModalFamily(${ev.id},${fid})" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:pointer;padding:3px 8px;font-weight:700;font-family:var(--font)">${isExp?'▲ סגור':'▼ '+pmnts.length+' תשלומים'}</button>`:delBtn(0)}</div>${details}</div>`;}).join('');})()}
     </div>
+    ${expRows}
     ${potTransfers.length?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
     ${excessRows}
     ${!creditorFids.length&&potPayments.length&&potExcess<=0.5?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
@@ -3209,6 +3270,15 @@ function deletePotDeposit(evId,famId,localIdx){
   ev.potPayments.splice(gi,1);
   save();render();
   // refresh pot modal if open
+  const modal=document.getElementById('potModal');
+  if(modal&&modal.style.display==='flex'){
+    if(evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+  }
+}
+function deletePotExpItem(evId,itemId){
+  const ev=events.find(e=>e.id===evId);if(!ev||!ev.potExpItems)return;
+  ev.potExpItems=ev.potExpItems.filter(it=>it.id!==itemId);
+  save();render();
   const modal=document.getElementById('potModal');
   if(modal&&modal.style.display==='flex'){
     if(evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();

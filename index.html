@@ -534,19 +534,26 @@
       <label class="field-lbl">שם ההוצאה</label>
       <input type="text" id="expItemName" placeholder="לדוגמה: ארוחת ערב, כרטיסים..." style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
     </div>
-    <div class="field" style="margin-top:12px">
-      <label class="field-lbl">מי שילם</label>
-      <div id="expItemFamPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    <div id="expFromPotToggleWrap" style="display:none;margin-top:10px">
+      <button id="expFromPotToggle" onclick="toggleExpFromPot()" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🛒 הוצאה מהקופה</button>
     </div>
-    <div class="field" style="margin-top:12px">
-      <label class="field-lbl">חלוקת הסכום</label>
-      <div style="display:flex;gap:6px;margin-top:6px">
-        <button type="button" id="expSplitEqualBtn" onclick="setExpItemSplitMode('equal')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">שווה</button>
-        <button type="button" id="expSplitCustomBtn" onclick="setExpItemSplitMode('custom')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ידנית לכל משפחה</button>
+    <div id="expItemFamSection">
+      <div class="field" style="margin-top:12px">
+        <label class="field-lbl">מי שילם</label>
+        <div id="expItemFamPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+      </div>
+    </div>
+    <div id="expItemSplitSection">
+      <div class="field" style="margin-top:12px">
+        <label class="field-lbl">חלוקת הסכום</label>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button type="button" id="expSplitEqualBtn" onclick="setExpItemSplitMode('equal')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">שווה</button>
+          <button type="button" id="expSplitCustomBtn" onclick="setExpItemSplitMode('custom')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ידנית לכל משפחה</button>
+        </div>
       </div>
     </div>
     <div id="expItemSplitEqualDiv">
-      <div class="field" style="margin-top:12px">
+      <div id="expItemSharePickerWrap" class="field" style="margin-top:12px">
         <label class="field-lbl">מי משתתף בחלוקה</label>
         <div id="expItemSharePicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
       </div>
