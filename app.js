@@ -202,7 +202,7 @@ async function loadPaymentSettings(){
       if(d.bank)    localStorage.setItem('payBankName',d.bank);
       if(d.branch)  localStorage.setItem('payBranch',d.branch);
       if(d.account) localStorage.setItem('payAccount',d.account);
-      if(d.bit)     localStorage.setItem('payBitPhone',d.bit);
+      if(d.bit)     localStorage.setItem('payBitLink',d.bit);
     }
   }catch(e){}
   const ids=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
