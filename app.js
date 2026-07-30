@@ -245,11 +245,9 @@ function _paymentBlock(owe,evName){
   }
   if(hasBit){
     const fmt=p.bit.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3');
-    html+=`<div style="margin-top:${hasBank?10:0}px;display:flex;align-items:center;gap:8px">`;
-    html+=`<div style="background:#0057FF;border-radius:10px;padding:6px 10px;display:inline-flex;align-items:center;gap:6px">`;
-    html+=`<span style="font-size:16px">💙</span><span style="color:#fff;font-weight:700;font-size:13px">ביט</span>`;
-    html+=`</div>`;
-    html+=`<span style="font-size:15px;font-weight:700;color:#166534;letter-spacing:1px;direction:ltr">${_esc(fmt||p.bit)}</span>`;
+    html+=`<div style="margin-top:${hasBank?10:0}px">`;
+    html+=`<div style="font-size:12px;color:#166534;margin-bottom:6px">💙 ביט · מספר: <b style="direction:ltr;display:inline-block;letter-spacing:1px">${_esc(fmt||p.bit)}</b> · סכום: <b>₪${owe.toLocaleString()}</b></div>`;
+    html+=`<a href="https://bit.co.il" style="display:inline-block;background:#0057FF;color:#fff;text-decoration:none;padding:8px 18px;border-radius:20px;font-size:13px;font-weight:700">💙 פתח ביט לתשלום</a>`;
     html+=`</div>`;
   }
   html+=`</div>`;
