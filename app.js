@@ -3305,7 +3305,7 @@ function renderPotModal(ev){
   const potDistributed=potTransfers.reduce((s,t)=>s+t.amt,0);
   const potExcess=Math.round(potTotal-potDistributed);
   const excessByFam=calcPotExcessByFamily(ev);
-  const excessRows=Object.entries(excessByFam).map(([fidStr,exc])=>{
+  const excessRows=Object.entries(excessByFam).filter(([fidStr])=>(adjBal[parseInt(fidStr)]||0)>=-0.5).map(([fidStr,exc])=>{
     const fid=parseInt(fidStr);const pf=getFam(fid);if(!pf)return'';
     const name=pf.name.replace('משפחת','').trim();
     return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--blue-bg)">
