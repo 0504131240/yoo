@@ -183,6 +183,74 @@ async function saveEjsSettings(){
   const st=document.getElementById('ejsStatus');
   if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
 }
+function getPaymentSettings(){
+  return{
+    name:localStorage.getItem('payTreasurerName')||'',
+    bank:localStorage.getItem('payBankName')||'',
+    branch:localStorage.getItem('payBranch')||'',
+    account:localStorage.getItem('payAccount')||'',
+    bit:localStorage.getItem('payBitPhone')||''
+  };
+}
+async function loadPaymentSettings(){
+  try{
+    const fb=await fbInit();
+    const snap=await fb.getDoc(fb.doc(fb.db,'settings','payment'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(d.name)    localStorage.setItem('payTreasurerName',d.name);
+      if(d.bank)    localStorage.setItem('payBankName',d.bank);
+      if(d.branch)  localStorage.setItem('payBranch',d.branch);
+      if(d.account) localStorage.setItem('payAccount',d.account);
+      if(d.bit)     localStorage.setItem('payBitPhone',d.bit);
+    }
+  }catch(e){}
+  const ids=['payTreasurerName','payBankName','payBranch','payAccount','payBitPhone'];
+  const keys=['payTreasurerName','payBankName','payBranch','payAccount','payBitPhone'];
+  ids.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.value=localStorage.getItem(keys[i])||'';});
+}
+async function savePaymentSettings(){
+  const p={
+    name:(document.getElementById('payTreasurerName').value||'').trim(),
+    bank:(document.getElementById('payBankName').value||'').trim(),
+    branch:(document.getElementById('payBranch').value||'').trim(),
+    account:(document.getElementById('payAccount').value||'').trim(),
+    bit:(document.getElementById('payBitPhone').value||'').trim()
+  };
+  localStorage.setItem('payTreasurerName',p.name);
+  localStorage.setItem('payBankName',p.bank);
+  localStorage.setItem('payBranch',p.branch);
+  localStorage.setItem('payAccount',p.account);
+  localStorage.setItem('payBitPhone',p.bit);
+  try{
+    const fb=await fbInit();
+    await fb.setDoc(fb.doc(fb.db,'settings','payment'),p);
+  }catch(e){}
+  const st=document.getElementById('payStatus');
+  if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
+}
+function _paymentBlock(owe,evName){
+  const p=getPaymentSettings();
+  const hasBank=p.bank&&p.account;
+  const hasBit=p.bit;
+  if(!hasBank&&!hasBit)return'';
+  const cleanPhone=p.bit.replace(/\D/g,'');
+  const bitUrl=`https://www.bit.co.il/send?phone=${cleanPhone}&amount=${owe}&note=${encodeURIComponent('ינקלביץ · '+evName)}`;
+  let html=`<div style="margin-top:14px;padding:12px 14px;background:#F0FDF4;border-radius:8px;border:1px solid #BBF7D0">`;
+  html+=`<div style="font-weight:700;font-size:13px;color:#15803D;margin-bottom:8px">💸 לתשלום${p.name?` ל${_esc(p.name)}`:''}:</div>`;
+  if(hasBank){
+    html+=`<div style="font-size:12px;color:#166534;line-height:1.8">`;
+    html+=`🏦 <b>${_esc(p.bank)}</b>`;
+    if(p.branch) html+=` · סניף <b>${_esc(p.branch)}</b>`;
+    html+=`<br>מספר חשבון: <b style="letter-spacing:1px;direction:ltr;display:inline-block">${_esc(p.account)}</b>`;
+    html+=`</div>`;
+  }
+  if(hasBit){
+    html+=`<div style="margin-top:${hasBank?10:0}px"><a href="${bitUrl}" style="display:inline-block;background:#0057FF;color:#fff;text-decoration:none;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:700">💙 שלם עכשיו בביט · ₪${owe.toLocaleString()}</a></div>`;
+  }
+  html+=`</div>`;
+  return html;
+}
 function testEjsEmail(){
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
@@ -2455,6 +2523,7 @@ function sendEmailToFam(evId,fid){
       if(_rRows) bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#E0F2FE"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">סכום</th><th style="padding:6px;text-align:right;color:#D97706;font-weight:700;border-bottom:2px solid #7DD3FC">החלק שלך</th></tr>${_rRows}</table>`;
     }
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+    bodyHtml+=_paymentBlock(owe,ev.name);
     // Other debts
     const _otherDebts=events.filter(e=>e.id!==ev.id&&e.open&&(e.participants||[]).includes(fid)).map(e=>{const _d=Math.round(-(evAdjBalance(e)[fid]||0));return _d>0.5?{name:e.name,owe:_d}:null;}).filter(Boolean);
     if(_otherDebts.length){bodyHtml+=`<div style="margin-top:14px;padding:10px 14px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA">${_otherDebts.map(d=>`<div style="font-size:12px;color:#991B1B;margin-bottom:2px">⚠️ תזכורת: קיים גם חוב של ₪${d.owe.toLocaleString()} עבור "${_esc(d.name)}"</div>`).join('')}</div>`;}
@@ -2529,6 +2598,7 @@ function sendDebtReminderEmails(evId){
     let bodyHtml=_eCard([['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true],['שילמת',`₪${spent.toLocaleString()}`]]);
     bodyHtml+=_splitMethodBlock(ev,fid);
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+    bodyHtml+=_paymentBlock(owe,ev.name);
     const _otherDebts2=events.filter(e=>e.id!==ev.id&&e.open&&(e.participants||[]).includes(fid)).map(e=>{const _d=Math.round(-(evAdjBalance(e)[fid]||0));return _d>0.5?{name:e.name,owe:_d}:null;}).filter(Boolean);
     if(_otherDebts2.length){bodyHtml+=`<div style="margin-top:14px;padding:10px 14px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA">${_otherDebts2.map(d=>`<div style="font-size:12px;color:#991B1B;margin-bottom:2px">⚠️ תזכורת: קיים גם חוב של ₪${d.owe.toLocaleString()} עבור "${_esc(d.name)}"</div>`).join('')}</div>`;}
     const html=_emailWrap(bodyHtml,ev.name,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id,f.name);
@@ -2565,7 +2635,7 @@ function goTab(tab,el,skipHash,swipeDir){
   document.querySelectorAll('.view').forEach(v=>{v.classList.remove('active');v.style.cssText='';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
-  if(tab==='families') loadEjsSettings();
+  if(tab==='families'){loadEjsSettings();loadPaymentSettings();}
   if(!skipHash) history.replaceState(null,'','#'+tab);
   if(!swipeDir||!prev||prev===next){next.classList.add('active');return;}
   const DUR=260,EASE='cubic-bezier(0.4,0,0.2,1)';
@@ -3613,6 +3683,7 @@ async function _updateCustomTotal(){
 applyEditMode();
 load().then(async()=>{await autoUnlockBiometric();if(window.location.hash)handleHash();startRealtimeSync();renderNotifBtn();if(_notifOk()){checkBirthdayNotifs();registerFCMToken();}});
 loadEjsSettings();
+loadPaymentSettings();
 window.addEventListener('hashchange',handleHash);
 
 // Swipe between tabs
