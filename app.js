@@ -189,7 +189,7 @@ function getPaymentSettings(){
     bank:localStorage.getItem('payBankName')||'',
     branch:localStorage.getItem('payBranch')||'',
     account:localStorage.getItem('payAccount')||'',
-    bit:localStorage.getItem('payBitLink')||localStorage.getItem('payBitPhone')||''
+    bit:localStorage.getItem('payBitLink')||''
   };
 }
 async function loadPaymentSettings(){
@@ -205,6 +205,7 @@ async function loadPaymentSettings(){
       if(d.bit)     localStorage.setItem('payBitLink',d.bit);
     }
   }catch(e){}
+  localStorage.removeItem('payBitPhone'); // remove old key
   const ids=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
   const keys=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
   ids.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.value=localStorage.getItem(keys[i])||'';});
