@@ -1538,20 +1538,21 @@ function payToPot(evId,famId,amt){
 function calcPotTransfers(ev){
   const pots=evEffectivePotPayments(ev);if(!pots.length)return[];
   const baseBal=evAdjBalance({...ev,potPayments:[]});
-  const creds=ev.participants.filter(fid=>(baseBal[fid]||0)>0.5)
+  const credFids=new Set(ev.participants.filter(fid=>(baseBal[fid]||0)>0.5));
+  const creds=ev.participants.filter(fid=>credFids.has(fid))
     .map(fid=>({name:getFam(fid).name.replace('משפחת','').trim(),fid,amt:baseBal[fid]}));
   if(!creds.length)return[];
-  // Group pot payments by family and cap each at their actual debt
-  // so overpayers don't distribute excess to creditors (it stays in pot for return)
+  // All non-creditor depositors contribute their full effective payment toward creditors.
+  // No individual debt cap — settled families (baseBal=0) also flow to creditors, not back to themselves.
   const potByFam={};
   pots.forEach(p=>{potByFam[p.famId]=(potByFam[p.famId]||0)+p.amt;});
   const nCopy=Object.entries(potByFam).map(([fidStr,potAmt])=>{
     const fid=parseInt(fidStr);
-    const debt=Math.max(0,-(baseBal[fid]||0));
-    const eff=Math.min(potAmt,debt);
+    if(potAmt<=0.5)return null;
+    if(credFids.has(fid))return null; // creditors receive, they don't contribute
     const f=getFam(fid);if(!f)return null;
-    return {name:f.name.replace('משפחת','').trim(),fid,amt:eff};
-  }).filter(n=>n&&n.amt>0.5);
+    return {name:f.name.replace('משפחת','').trim(),fid,amt:potAmt};
+  }).filter(n=>n);
   if(!nCopy.length)return[];
   const out=[],pCopy=creds.map(x=>({...x}));
   let pi=0,ni=0;
@@ -3305,7 +3306,7 @@ function renderPotModal(ev){
   const potDistributed=potTransfers.reduce((s,t)=>s+t.amt,0);
   const potExcess=Math.round(potTotal-potDistributed);
   const excessByFam=calcPotExcessByFamily(ev);
-  const excessRows=Object.entries(excessByFam).filter(([fidStr])=>(adjBal[parseInt(fidStr)]||0)>=-0.5).map(([fidStr,exc])=>{
+  const excessRows=Object.entries(excessByFam).filter(([fidStr])=>(adjBal[parseInt(fidStr)]||0)>0.5).map(([fidStr,exc])=>{
     const fid=parseInt(fidStr);const pf=getFam(fid);if(!pf)return'';
     const name=pf.name.replace('משפחת','').trim();
     return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--blue-bg)">
