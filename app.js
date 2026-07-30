@@ -52,7 +52,7 @@ const col=id=>COLORS[(id-1)%COLORS.length];
 const ini=n=>n.replace('משפחת','').trim().slice(0,2);
 const getFam=id=>families.find(f=>f.id===id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const evCost=ev=>(ev.totalCost!=null?ev.totalCost:ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0))+evPotExpTotal(ev);
+const evCost=ev=>(ev.totalCost!=null?ev.totalCost:ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0));
 const evShare=ev=>{ const n=ev.participants.length; return n?Math.round(evCost(ev)/n):0; };
 const FAM_ADULTS=2;
 const SPLIT_LABELS={equal:'שווה לכל משפחה',percapita:'לפי נפשות',weighted:'ילד = 50% ממבוגר'};
