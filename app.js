@@ -1540,7 +1540,6 @@ function evCard(ev){
     ${ev.cumulative?addExpBtn:`<div style="padding:0 14px 10px" class="edit-only">
       <button onclick="openCumPot(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופת האירוע</button>
     </div>`}
-    ${cost>0&&(settleLines||doneHtml)?`<div style="padding:4px 14px 6px">${settleLines}${doneHtml}</div>`:''}
     ${exclLine}
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
