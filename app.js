@@ -3384,7 +3384,7 @@ function renderPotModal(ev){
     const calc=Math.min(Math.round(adjBal[fid]||0),fromOthers+ownExcess);
     return calc>0.5?calc:Math.round(adjBal[fid]||0);
   };
-  const potTransferForm=creditorFids.length?`<div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+  const potTransferForm=creditorFids.length?`<div class="edit-only" style="padding:12px 16px;border-bottom:1px solid var(--border)">
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">↗ העברה מהקופה</div>
     <select id="potToFid-${ev.id}" onchange="_potFillAmt('potToFid-${ev.id}','potTrAmt-${ev.id}')" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:var(--font);margin-bottom:8px;direction:rtl">
       <option value="">👈 בחר זכאי...</option>
@@ -3392,15 +3392,21 @@ function renderPotModal(ev){
     </select>
     <div style="display:flex;gap:8px;align-items:center">
       <input type="number" id="potTrAmt-${ev.id}" placeholder="₪" min="1" style="flex:1;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;font-family:var(--font);font-weight:700;text-align:center" />
-      <button class="edit-only" onclick="potManualTransfer(${ev.id},false)" style="padding:9px 16px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
-      <button class="edit-only" onclick="potManualTransfer(${ev.id},true)" style="padding:9px 16px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
+      <button onclick="potManualTransfer(${ev.id},false)" style="padding:9px 16px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
+      <button onclick="potManualTransfer(${ev.id},true)" style="padding:9px 16px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
     </div>
   </div>`:'';
 
   const potDistributed=potTransfers.reduce((s,t)=>s+t.amt,0)+Object.entries(excessByFam).filter(([fidStr])=>(adjBal[parseInt(fidStr)]||0)>0.5).reduce((s,[,e])=>s+e,0);
   const potExcess=Math.round(potTotal-potDistributed);
   const settledList=ev.settled||[];
-  const doneRows=settledList.length?`<div style="border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">העברות שבוצעו:</div><div style="padding:0 16px 4px">`+settledList.map(s=>{
+  const _potByTo={};const _nonPot=[];
+  settledList.forEach(s=>{
+    if(s.method==='pot'){const k=s.toFid!=null?String(s.toFid):s.to;if(!_potByTo[k])_potByTo[k]={to:s.to,amt:0};_potByTo[k].amt+=s.amt;}
+    else _nonPot.push(s);
+  });
+  const _mergedDone=[...Object.values(_potByTo).map(p=>({method:'pot',to:p.to,amt:p.amt})),..._nonPot];
+  const doneRows=_mergedDone.length?`<div style="border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">העברות שבוצעו:</div><div style="padding:0 16px 4px">`+_mergedDone.map(s=>{
     const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
     const badge=s.method==='fund'?`<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>`:s.method==='pot'?`<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>`:`<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>`;
     const fromLabel=s.method==='pot'?'קופת האירוע':s.from;
