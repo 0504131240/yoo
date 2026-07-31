@@ -316,26 +316,43 @@ function sendSettledEmail(ev,famId){
   const share=Math.round(shares[famId]||0);
   const spent=Math.round(ev.expenses?(ev.expenses[famId]||0):(ev.expenseItems||[]).filter(it=>it.famId===famId).reduce((s,it)=>s+it.amt,0));
   const lines=[];
+  const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
   const _potTotal=Math.round((ev.potPayments||[]).filter(p=>p.famId===famId).reduce((s,p)=>s+p.amt,0));
   if(_potTotal>0.5) lines.push(`הפקדת לקופת האירוע: ₪${_potTotal.toLocaleString()}`);
-  (ev.settled||[]).filter(s=>s.fromFid!=null?Number(s.fromFid)===Number(famId):(families.find(x=>x.name===s.from||x.name.replace(/^משפחת\s*/,'')===s.from)||{}).id===famId).forEach(s=>{
+  const _potRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.toFid)===Number(famId)).reduce((s,t)=>s+t.amt,0));
+  if(_potRec>0.5) lines.push(`קיבלת ₪${_potRec.toLocaleString()} מקופת האירוע`);
+  (ev.settled||[]).forEach(s=>{
     if(s.method==='pot') return;
-    if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית ל${s.to}`);
-    else lines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${s.to}`);
+    const isFrom=s.fromFid!=null?Number(s.fromFid)===Number(famId):(_sfByName(s.from)||{}).id===famId;
+    const isTo=s.toFid!=null?Number(s.toFid)===Number(famId):(_sfByName(s.to)||{}).id===famId;
+    const sTo=(getFam(s.toFid)||{}).name?(getFam(s.toFid).name.replace('משפחת','').trim()):s.to;
+    const sFrom=(getFam(s.fromFid)||{}).name?(getFam(s.fromFid).name.replace('משפחת','').trim()):s.from;
+    if(isFrom){
+      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית ל${sTo}`);
+      else lines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${sTo}`);
+    } else if(isTo){
+      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועבר לקופה הראשית`);
+      else lines.push(`קיבלת ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
+    }
   });
+  const fundBal=Math.round(fund.famBalances[String(famId)]||0);
   // plain text
   let msg=`האירוע "${ev.name}" – הסיכום שלך:\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
   if(spent>0) msg+=`הוצאת: ₪${spent.toLocaleString()}\n`;
   if(lines.length) msg+=`\nאיך סודר:\n${lines.map(l=>'• '+l).join('\n')}`;
+  if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
   // HTML
   const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
+  if(fundBal>0) cardRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(cardRows);
+  bodyHtml+=_splitMethodBlock(ev,famId);
   if(lines.length){
-    bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${lines.map(l=>`<li style="margin-bottom:4px">${_esc(l)}</li>`).join('')}</ul>`;
+    bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">⚖️ איך סודר:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${lines.map(l=>`<li style="margin-bottom:4px">${_esc(l)}</li>`).join('')}</ul>`;
   }
   bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('✅ החשבון שלך מסודר','#16a34a')}</div>`;
-  const html=_emailWrap(bodyHtml,ev.name,'✅',_ejsUrl()+'#event-'+ev.id,f.name);
+  const _evUrl=_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id;
+  const html=_emailWrap(bodyHtml,ev.name,'✅',_evUrl,f.name);
   sendEmailNotif([{email:f.email,email2:f.email2,name}],`✅ סידרת את חלקך ב"${ev.name}" · ינקלביץ`,msg,html);
 }
 function testSingleEmail(inputId,btnId){
@@ -2726,8 +2743,14 @@ function handleHash(){
   if(h.startsWith('event-')){
     const id=parseInt(h.slice(6));if(isNaN(id))return;
     _enterPayShell();
-    goTab('events',document.getElementById('nb-events'),true);
-    collapsedEvents.delete(id);renderOpenList();
+    const _hEv=events.find(e=>e.id===id);
+    if(_hEv&&!_hEv.open){
+      goTab('archive',null,true);
+      expanded.add(id);renderArchive();
+    } else {
+      goTab('events',document.getElementById('nb-events'),true);
+      collapsedEvents.delete(id);renderOpenList();
+    }
     setTimeout(()=>{const el=document.getElementById('ecard-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},150);
   } else if(h.startsWith('archive-')){
     const id=parseInt(h.slice(8));if(isNaN(id))return;
