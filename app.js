@@ -1541,13 +1541,16 @@ function payToPot(evId,famId,amt){
 
 function calcPotTransfers(ev){
   const pots=evEffectivePotPayments(ev);if(!pots.length)return[];
-  const baseBal=evAdjBalance({...ev,potPayments:[]});
-  const credFids=new Set(ev.participants.filter(fid=>(baseBal[fid]||0)>0.5));
+  const adjBal=evAdjBalance(ev);
+  const effByFam={};
+  pots.forEach(p=>{effByFam[p.famId]=(effByFam[p.famId]||0)+p.amt;});
+  const credFids=new Set(ev.participants.filter(fid=>(adjBal[fid]||0)>0.5));
+  // Each creditor's amount = what they still need from non-creditors beyond their own effective pot
   const creds=ev.participants.filter(fid=>credFids.has(fid))
-    .map(fid=>({name:getFam(fid).name.replace('משפחת','').trim(),fid,amt:baseBal[fid]}));
+    .map(fid=>({name:getFam(fid).name.replace('משפחת','').trim(),fid,
+      amt:Math.max(0,Math.round((adjBal[fid]||0)-(effByFam[fid]||0)))}))
+    .filter(c=>c.amt>0.5);
   if(!creds.length)return[];
-  // All non-creditor depositors contribute their full effective payment toward creditors.
-  // No individual debt cap — settled families (baseBal=0) also flow to creditors, not back to themselves.
   const potByFam={};
   pots.forEach(p=>{potByFam[p.famId]=(potByFam[p.famId]||0)+p.amt;});
   const nCopy=Object.entries(potByFam).map(([fidStr,potAmt])=>{
@@ -3307,23 +3310,23 @@ function renderPotModal(ev){
   const creditorFids=ev.participants.filter(fid=>(adjBal[fid]||0)>0.5);
   const potByCreditor={};
   potTransfers.forEach(t=>{if(!potByCreditor[t.toFid])potByCreditor[t.toFid]={name:t.to,fid:t.toFid,amt:0};potByCreditor[t.toFid].amt+=t.amt;});
-  const credRows=Object.values(potByCreditor).map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
-    <div style="font-size:13px;flex:1">👈 <b>${esc(c.name)}</b> יקבל ₪${c.amt.toLocaleString()}</div>
-    <button class="edit-only" onclick="releasePotToOneM(${ev.id},${c.fid},false)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
-    <button class="edit-only" onclick="releasePotToOneM(${ev.id},${c.fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
-  </div>`).join('');
-  const potDistributed=potTransfers.reduce((s,t)=>s+t.amt,0);
-  const potExcess=Math.round(potTotal-potDistributed);
   const excessByFam=calcPotExcessByFamily(ev);
-  const excessRows=Object.entries(excessByFam).filter(([fidStr])=>(adjBal[parseInt(fidStr)]||0)>0.5).map(([fidStr,exc])=>{
-    const fid=parseInt(fidStr);const pf=getFam(fid);if(!pf)return'';
+  // Merge pot-transfer amount + creditor's own excess into one row per creditor
+  const credRows=creditorFids.map(fid=>{
+    const pf=getFam(fid);if(!pf)return'';
     const name=pf.name.replace('משפחת','').trim();
-    return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--blue-bg)">
-      <div style="font-size:13px;flex:1">↩ <b>${esc(name)}</b> מקבל החזר ₪${exc.toLocaleString()}</div>
-      <button class="edit-only" onclick="releasePotExcessToOneM(${ev.id},${fid},false)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
-      <button class="edit-only" onclick="releasePotExcessToOneM(${ev.id},${fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
+    const fromOthers=(potByCreditor[fid]||{amt:0}).amt;
+    const ownExcess=excessByFam[fid]||0;
+    const total=fromOthers+ownExcess;
+    if(total<0.5)return'';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
+      <div style="font-size:13px;flex:1">👈 <b>${esc(name)}</b> יקבל ₪${total.toLocaleString()}</div>
+      <button class="edit-only" onclick="releasePotCombinedM(${ev.id},${fid},false)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
+      <button class="edit-only" onclick="releasePotCombinedM(${ev.id},${fid},true)" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
     </div>`;
   }).join('');
+  const potDistributed=potTransfers.reduce((s,t)=>s+t.amt,0)+Object.entries(excessByFam).filter(([fidStr])=>(adjBal[parseInt(fidStr)]||0)>0.5).reduce((s,[,e])=>s+e,0);
+  const potExcess=Math.round(potTotal-potDistributed);
   const settledList=ev.settled||[];
   const doneRows=settledList.length?`<div style="border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">העברות שבוצעו:</div><div style="padding:0 16px 4px">`+settledList.map(s=>{
     const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
@@ -3354,8 +3357,7 @@ function renderPotModal(ev){
       ${(()=>{const byFam={};potPayments.forEach(p=>{if(!byFam[p.famId])byFam[p.famId]=[];byFam[p.famId].push(p);});(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid!=null).forEach(s=>{if(!byFam[s.fromFid])byFam[s.fromFid]=[];});const ord=families.map(f=>f.id).filter(fid=>byFam[fid]);return ord.map(fid=>{const pmnts=byFam[fid]||[];const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const distFromThis=(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const tot=pmnts.reduce((s,p)=>s+p.amt,0)+distFromThis;const multi=pmnts.length>1;const key=ev.id+'-pot-'+fid;const isExp=expandedPotFamilies.has(key);const delBtn=(i)=>`<button class="edit-only" onclick="deletePotDeposit(${ev.id},${fid},${i})" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:14px;padding:0 4px;font-family:var(--font)" title="מחק">🗑</button>`;const details=multi&&isExp?'<div style="background:var(--surface2);padding:6px 16px 6px 32px">'+pmnts.map((p,i)=>`<div style="font-size:12px;color:var(--text2);padding:3px 0;display:flex;justify-content:space-between;align-items:center"><span>תשלום ${i+1} · ₪${p.amt.toLocaleString()}</span>${delBtn(i)}</div>`).join('')+'</div>':'';return`<div style="border-top:1px solid var(--border)"><div style="display:flex;align-items:center;gap:10px;padding:10px 16px"><div style="width:32px;height:32px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">✓</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div><div style="font-size:12px;color:var(--green-mid);font-weight:600;margin-top:1px">₪${tot.toLocaleString()}</div></div>${multi?`<button onclick="togglePotModalFamily(${ev.id},${fid})" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:pointer;padding:3px 8px;font-weight:700;font-family:var(--font)">${isExp?'▲ סגור':'▼ '+pmnts.length+' תשלומים'}</button>`:delBtn(0)}</div>${details}</div>`;}).join('');})()}
     </div>
     ${expRows}
-    ${potTransfers.length?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
-    ${excessRows}
+    ${credRows?`<div style="padding:8px 16px 0;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:2px">יש להעביר לזוכים:</div></div>${credRows}`:''}
     ${!creditorFids.length&&potPayments.length&&potExcess<=0.5?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
     ${doneRows}
     <div style="padding:4px 16px 10px">
@@ -3393,6 +3395,12 @@ function releasePotExcessToOne(evId,famId,toFund){
 }
 function releasePotExcessToOneM(evId,famId,toFund){
   releasePotExcessToOne(evId,famId,toFund);
+  const ev=events.find(e=>e.id===evId);
+  if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+}
+function releasePotCombinedM(evId,creditorFid,toFund){
+  releasePotToOne(evId,creditorFid,toFund);
+  releasePotExcessToOne(evId,creditorFid,toFund);
   const ev=events.find(e=>e.id===evId);
   if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
 }
