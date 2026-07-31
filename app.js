@@ -1523,10 +1523,7 @@ function evCard(ev){
     ${ev.cumulative?addExpBtn:`<div style="padding:0 14px 10px" class="edit-only">
       <button onclick="openCumPot(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופת האירוע</button>
     </div>`}
-    ${!ev.cumulative&&(Object.values(potByCreditor).length||_dPotRows.length)?`<div style="padding:2px 14px 6px">
-      ${Object.values(potByCreditor).map(c=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--amber)">💰</span><span><b style="color:var(--text)">קופת האירוע</b> תעביר ל<b style="color:var(--text)">${esc(c.name)}</b> ₪${c.amt.toLocaleString()}</span></div>`).join('')}
-      ${_dPotRows.join('')}
-    </div>`:''}
+    ${!ev.cumulative&&_dPotRows.length?`<div style="padding:2px 14px 6px">${_dPotRows.join('')}</div>`:''}
     ${exclLine}
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
@@ -1568,9 +1565,11 @@ function calcPotTransfers(ev){
     const fid=parseInt(fidStr);
     if(potAmt<=0.5)return null;
     const f=getFam(fid);if(!f)return null;
-    // Creditors whose effective pot exceeds their adjBal contribute only the surplus
-    // (the part above their own credit) to other creditors
-    const contrib=credFids.has(fid)?Math.round(potAmt-(adjBal[fid]||0)):potAmt;
+    // Creditors who over-deposited (potAmt > adjBal) contribute only the surplus;
+    // creditors who under/exact-deposited contribute their full deposit so other
+    // creditors get maximally covered from the pot (they collect their adjBal via direct).
+    const adj=adjBal[fid]||0;
+    const contrib=credFids.has(fid)?(potAmt>adj?Math.round(potAmt-adj):Math.round(potAmt)):Math.round(potAmt);
     if(contrib<=0.5)return null;
     return {name:f.name.replace('משפחת','').trim(),fid,amt:contrib};
   }).filter(n=>n);
@@ -1578,6 +1577,7 @@ function calcPotTransfers(ev){
   const out=[],pCopy=creds.map(x=>({...x}));
   let pi=0,ni=0;
   while(pi<pCopy.length&&ni<nCopy.length){
+    if(nCopy[ni].fid===pCopy[pi].fid){ni++;continue;} // skip self-routing
     const give=Math.min(pCopy[pi].amt,nCopy[ni].amt);
     if(give>0.5) out.push({from:nCopy[ni].name,fromFid:nCopy[ni].fid,to:pCopy[pi].name,toFid:pCopy[pi].fid,amt:Math.round(give)});
     pCopy[pi].amt-=give; nCopy[ni].amt-=give;
