@@ -1518,7 +1518,9 @@ function evCard(ev){
     <button class="exp-btn" onclick="toggleEvCollapse(${ev.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
     ${collapsed?'':`
     <div class="members-list" id="mlist-${ev.id}">${ev.cumulative?cumRows:mems}</div>
-    ${ev.cumulative?addExpBtn:''}
+    ${ev.cumulative?addExpBtn:`<div style="padding:0 14px 10px" class="edit-only">
+      <button onclick="openCumPot(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופת האירוע</button>
+    </div>`}
     ${exclLine}
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
