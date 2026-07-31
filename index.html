@@ -232,8 +232,8 @@
         </div>
       </div>
       <div class="field" id="childOverrideSection" style="display:none">
-        <label>מספר ילדים באירוע</label>
-        <button type="button" class="action-btn" style="width:100%;box-sizing:border-box" onclick="openChildOverridePicker()">👶 <span id="childPickSummary">הגדר ילדים לפי משפחה</span></button>
+        <label>הרכב משתתפים באירוע</label>
+        <button type="button" class="action-btn" style="width:100%;box-sizing:border-box" onclick="openChildOverridePicker()">👥 <span id="childPickSummary">הגדר הרכב לפי משפחה</span></button>
       </div>
       <div class="field" id="expensesSection" style="display:none">
         <!-- Mode toggle -->
@@ -282,7 +282,7 @@
     <!-- Child override picker modal -->
     <div id="childOverrideOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeChildOverridePicker()">
       <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
-        <div style="font-size:14px;font-weight:700;margin-bottom:12px">כמה ילדים הגיעו לאירוע</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px">הרכב משתתפים לפי משפחה</div>
         <div id="childOverrideInputs"></div>
         <div class="form-btns">
           <button class="save-btn" onclick="closeChildOverridePicker()">✓ אישור</button>

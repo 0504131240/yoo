@@ -56,11 +56,12 @@ const evCost=ev=>(ev.totalCost!=null?ev.totalCost:ev.participants.reduce((s,fid)
 const evShare=ev=>{ const n=ev.participants.length; return n?Math.round(evCost(ev)/n):0; };
 const FAM_ADULTS=2;
 const SPLIT_LABELS={equal:'שווה לכל משפחה',percapita:'לפי נפשות',weighted:'ילד = 50% ממבוגר'};
-const famWeight=(f,method,childOverride)=>{
+const famWeight=(f,method,childOverride,parentOverride)=>{
   if(!f) return 1;
   const ch=childOverride!=null?childOverride:(f.children||0);
-  if(method==='percapita') return FAM_ADULTS+ch;
-  if(method==='weighted') return FAM_ADULTS+ch*0.5;
+  const adults=parentOverride!=null?parentOverride:FAM_ADULTS;
+  if(method==='percapita') return adults+ch;
+  if(method==='weighted') return adults+ch*0.5;
   return 1;
 };
 const evShares=ev=>{
@@ -73,7 +74,7 @@ const evShares=ev=>{
   const partialAmt=partialItems.reduce((s,it)=>s+it.amt,0);
   const globalCost=totalCost-partialAmt;
   let totalW=0; const w={};
-  ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method,ev.childOverrides?.[fid]); totalW+=w[fid]; });
+  ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method,ev.childOverrides?.[fid],ev.parentOverrides?.[fid]); totalW+=w[fid]; });
   if(!totalW) return Object.fromEntries(ev.participants.map(fid=>[fid,0]));
   const exact={};
   ev.participants.forEach(fid=>{ exact[fid]=globalCost*(w[fid]/totalW); });
@@ -296,7 +297,9 @@ function _splitMethodBlock(ev,fid){
     const pf=getFam(fid);
     if(pf){
       const ch=ev.childOverrides?.[fid]!=null?ev.childOverrides[fid]:(pf.children||0);
-      compLine=ch>0?` · הורים + ${ch} ילד${ch===1?'':'ים'}`:'· הורים';
+      const adults=ev.parentOverrides?.[fid]!=null?ev.parentOverrides[fid]:FAM_ADULTS;
+      const aLabel=adults===0?'0 הורים':adults===1?'הורה 1':'2 הורים';
+      compLine=ch>0?` · ${aLabel} + ${ch} ילד${ch===1?'':'ים'}`:` · ${aLabel}`;
     }
   }
   return`<div style="margin:0 0 12px;padding:8px 12px;background:#F0F9FF;border-radius:8px;border:1px solid #BAE6FD;font-size:12px;color:#0369A1"><span style="font-weight:700">📊 שיטת חלוקה: ${_esc(label)}</span>${compLine?`<span style="color:#075985"> ${_esc(compLine)}</span>`:''}</div>`;
@@ -1334,7 +1337,7 @@ function evCard(ev){
   const shares=evShares(ev);
   const _sMethod=ev.splitMethod||'equal';
   let _sTotalW=0;const _sW={};
-  ev.participants.forEach(fid=>{_sW[fid]=famWeight(getFam(fid),_sMethod,ev.childOverrides?.[fid]);_sTotalW+=_sW[fid];});
+  ev.participants.forEach(fid=>{_sW[fid]=famWeight(getFam(fid),_sMethod,ev.childOverrides?.[fid],ev.parentOverrides?.[fid]);_sTotalW+=_sW[fid];});
   const famItemBreakdown=fid=>{
     if(!ev.expenseItems||!ev.expenseItems.length)return[];
     return ev.expenseItems.flatMap(it=>{
@@ -2026,22 +2029,48 @@ function formChildOverride(fid){
   if(inp&&inp.value!=='') return Math.max(0,parseInt(inp.value)||0);
   return undefined;
 }
+function formParentOverride(fid){
+  const inp=document.getElementById('fparent-'+fid);
+  if(inp&&inp.value!=='') return Math.min(2,Math.max(0,parseInt(inp.value)||0));
+  return undefined;
+}
+function stepParent(id,delta){
+  const inp=document.getElementById(id);if(!inp)return;
+  inp.value=Math.min(2,Math.max(0,(parseInt(inp.value)||0)+delta));
+  if(expMode==='total')updateTotalPreview();updateChildPickSummary();
+}
 function updateChildOverrideInputs(){
   const sec=document.getElementById('childOverrideSection');
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   if(splitMethod==='equal'||!selected.length){ sec.style.display='none'; return; }
   sec.style.display='block';
   const ev=editingId!=null?events.find(e=>e.id===editingId):null;
+  const btnStyle='width:30px;height:30px;border:none;background:var(--bg);color:var(--text);font-size:17px;font-weight:300;cursor:pointer;font-family:var(--font)';
+  const inpStyle='border:none;border-right:1.5px solid var(--border);border-left:1.5px solid var(--border);border-radius:0;width:36px;height:30px;padding:0';
+  const stepperWrap='display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden';
   document.getElementById('childOverrideInputs').innerHTML=selected.map(f=>{
-    const cl=col(f.id);
-    const val=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:(f.children||0);
-    return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      ${famAva(f, 30, 'flex-shrink:0')}
-      <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
-      <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
-        <button type="button" onclick="stepChild('fchild-${f.id}',-1)" style="width:30px;height:30px;border:none;background:var(--bg);color:var(--text);font-size:17px;font-weight:300;cursor:pointer;font-family:var(--font)">−</button>
-        <input class="children-inp" type="number" min="0" inputmode="numeric" id="fchild-${f.id}" value="${val}" oninput="if(expMode==='total')updateTotalPreview();updateChildPickSummary()" style="border:none;border-right:1.5px solid var(--border);border-left:1.5px solid var(--border);border-radius:0;width:36px;height:30px;padding:0">
-        <button type="button" onclick="stepChild('fchild-${f.id}',1)" style="width:30px;height:30px;border:none;background:var(--bg);color:var(--text);font-size:17px;font-weight:300;cursor:pointer;font-family:var(--font)">+</button>
+    const valCh=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:(f.children||0);
+    const valPa=ev&&ev.parentOverrides&&ev.parentOverrides[f.id]!=null?ev.parentOverrides[f.id]:FAM_ADULTS;
+    return`<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r2)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        ${famAva(f, 28, 'flex-shrink:0')}
+        <span style="flex:1;font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text2);width:44px">הורים</span>
+        <div style="${stepperWrap}">
+          <button type="button" onclick="stepParent('fparent-${f.id}',-1)" style="${btnStyle}">−</button>
+          <input class="children-inp" type="number" min="0" max="2" inputmode="numeric" id="fparent-${f.id}" value="${valPa}" oninput="if(expMode==='total')updateTotalPreview();updateChildPickSummary()" style="${inpStyle}">
+          <button type="button" onclick="stepParent('fparent-${f.id}',1)" style="${btnStyle}">+</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--text2);width:44px">ילדים</span>
+        <div style="${stepperWrap}">
+          <button type="button" onclick="stepChild('fchild-${f.id}',-1)" style="${btnStyle}">−</button>
+          <input class="children-inp" type="number" min="0" inputmode="numeric" id="fchild-${f.id}" value="${valCh}" oninput="if(expMode==='total')updateTotalPreview();updateChildPickSummary()" style="${inpStyle}">
+          <button type="button" onclick="stepChild('fchild-${f.id}',1)" style="${btnStyle}">+</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -2058,8 +2087,10 @@ function closeChildOverridePicker(){
 function updateChildPickSummary(){
   const el=document.getElementById('childPickSummary');if(!el)return;
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
-  const total=selected.reduce((s,f)=>{ const v=formChildOverride(f.id); return s+(v!=null?v:(f.children||0)); },0);
-  el.textContent=total>0?`${selected.length} משפחות · ${total} ילדים בסה"כ`:'הגדר ילדים לפי משפחה';
+  if(!selected.length){el.textContent='הגדר הרכב לפי משפחה';return;}
+  const totalCh=selected.reduce((s,f)=>{ const v=formChildOverride(f.id); return s+(v!=null?v:(f.children||0)); },0);
+  const totalPa=selected.reduce((s,f)=>{ const v=formParentOverride(f.id); return s+(v!=null?v:FAM_ADULTS); },0);
+  el.textContent=`${totalPa} הורים · ${totalCh} ילדים`;
 }
 function openExpensePicker(){
   document.getElementById('expenseOverlay').style.display='flex';
@@ -2095,7 +2126,7 @@ function updateTotalPreview(){
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   if(!selected.length||!total){ document.getElementById('totalPreview').innerHTML=''; return; }
   let totalW=0; const w={};
-  selected.forEach(f=>{ w[f.id]=famWeight(f,splitMethod,formChildOverride(f.id)); totalW+=w[f.id]; });
+  selected.forEach(f=>{ w[f.id]=famWeight(f,splitMethod,formChildOverride(f.id),formParentOverride(f.id)); totalW+=w[f.id]; });
   document.getElementById('totalPreview').innerHTML=
     '<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px">'
     +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">'+SPLIT_LABELS[splitMethod]+'</div>'
@@ -2230,17 +2261,20 @@ async function doCreate(){
   if(!ok)return;
   const totalCost=expMode==='total'?(await _toILS('f-total','fTotalCur')):null;
   const isCumulative=expMode==='cumulative';
-  const childOverrides={};
-  if(splitMethod!=='equal') participants.forEach(fid=>{ childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0); });
+  const childOverrides={};const parentOverrides={};
+  if(splitMethod!=='equal') participants.forEach(fid=>{
+    childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0);
+    parentOverrides[fid]=formParentOverride(fid)??FAM_ADULTS;
+  });
   if(editingId!=null){
     const ev=events.find(e=>e.id===editingId);
     if(ev){
       ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded;
-      ev.splitMethod=splitMethod; ev.childOverrides=childOverrides;
+      ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; ev.parentOverrides=parentOverrides;
       if(!ev.cumulative){ ev.expenses=expenses; ev.totalCost=totalCost; }
     }
   } else {
-    const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides};
+    const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides,parentOverrides};
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
     events.unshift(newEv);
     // notify participants only for non-cumulative events (personalized per family)
