@@ -1561,9 +1561,12 @@ function calcPotTransfers(ev){
   const nCopy=Object.entries(potByFam).map(([fidStr,potAmt])=>{
     const fid=parseInt(fidStr);
     if(potAmt<=0.5)return null;
-    if(credFids.has(fid))return null; // creditors receive, they don't contribute
     const f=getFam(fid);if(!f)return null;
-    return {name:f.name.replace('משפחת','').trim(),fid,amt:potAmt};
+    // Creditors whose effective pot exceeds their adjBal contribute only the surplus
+    // (the part above their own credit) to other creditors
+    const contrib=credFids.has(fid)?Math.round(potAmt-(adjBal[fid]||0)):potAmt;
+    if(contrib<=0.5)return null;
+    return {name:f.name.replace('משפחת','').trim(),fid,amt:contrib};
   }).filter(n=>n);
   if(!nCopy.length)return[];
   const out=[],pCopy=creds.map(x=>({...x}));
@@ -3353,7 +3356,7 @@ function renderPotModal(ev){
     const name=pf.name.replace('משפחת','').trim();
     const fromOthers=(potByCreditor[fid]||{amt:0}).amt;
     const ownExcess=excessByFam[fid]||0;
-    const total=fromOthers+ownExcess;
+    const total=Math.min(Math.round(adjBal[fid]||0),fromOthers+ownExcess);
     if(total<0.5)return'';
     return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
       <div style="font-size:13px;flex:1">👈 <b>${esc(name)}</b> יקבל ₪${total.toLocaleString()}</div>
