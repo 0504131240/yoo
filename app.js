@@ -1179,7 +1179,10 @@ function calcTransfers(ev){
     // Subtract each pot payer's excess from their adjBal so it doesn't create spurious
     // direct transfers — the excess is returned to them from the pot separately
     const excess=calcPotExcessByFamily(ev);
-    Object.entries(excess).forEach(([fid,exc])=>{ adjBal[parseInt(fid)]=(adjBal[parseInt(fid)]||0)-exc; });
+    Object.entries(excess).forEach(([fid,exc])=>{
+      const fidNum=parseInt(fid);const adj=adjBal[fidNum]||0;
+      if(adj>0.5) adjBal[fidNum]=Math.max(0,adj-exc);
+    });
   }
   const pos=[],neg=[];
   ev.participants.forEach(fid=>{
