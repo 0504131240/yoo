@@ -98,6 +98,7 @@ const evShares=ev=>{
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
 const evPotTotal=ev=>(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
 const evPotExpTotal=ev=>(ev.potExpItems||[]).reduce((s,it)=>s+it.amt,0);
+const evNetPotBal=ev=>Math.max(0,evPotTotal(ev)-evPotExpTotal(ev));
 function evEffectivePotPayments(ev){
   const payments=ev.potPayments||[];
   const expTotal=evPotExpTotal(ev);
@@ -1062,7 +1063,7 @@ function renderHome(){
   // ── Banner ──
   const mainBal=fundTotal();
   const goalBal=goalFunds.filter(g=>!g.archived).reduce((s,g)=>s+goalTotal(g),0);
-  const evPotsBal=open.reduce((s,ev)=>s+evPotTotal(ev),0);
+  const evPotsBal=open.reduce((s,ev)=>s+evNetPotBal(ev),0);
   const allBal=mainBal+goalBal+evPotsBal;
   const bannerStats=[
     {label:'קופה ראשית',amt:mainBal},
@@ -1124,7 +1125,7 @@ function renderHome(){
       const balanced=!pending.length;
       const tags=[
         !balanced?`<span class="badge badge-amber">↔ ${pending.length} העברות</span>`:`<span class="badge badge-green">✅ מאוזן</span>`,
-        hasPot?`<span class="badge" style="background:var(--amber-bg);color:var(--amber)">💰 ₪${evPotTotal(ev).toLocaleString()}</span>`:''
+        hasPot?`<span class="badge" style="background:var(--amber-bg);color:var(--amber)">💰 ₪${evNetPotBal(ev).toLocaleString()}</span>`:''
       ].filter(Boolean).join('');
       const meta=[ev.date&&ev.date!=='לא צוין'?esc(ev.date):'',ev.participants.length+' משפחות',splitShort[ev.splitMethod||'equal']].filter(Boolean).join(' · ');
       return`<div class="hev" onclick="goToEvent(${ev.id})">
@@ -2763,7 +2764,7 @@ function handleHash(){
 function renderFund(){
   const mainTotal=fundTotal();
   const goalTotal2=goalFunds.filter(g=>!g.archived&&!g.closed).reduce((s,g)=>s+goalTotal(g),0);
-  const evPotsTotal=events.filter(e=>e.open).reduce((s,ev)=>s+evPotTotal(ev),0);
+  const evPotsTotal=events.filter(e=>e.open).reduce((s,ev)=>s+evNetPotBal(ev),0);
   const grandTotal=mainTotal+goalTotal2+evPotsTotal;
 
   // Grand total card
