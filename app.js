@@ -1509,14 +1509,14 @@ function evCard(ev){
       <span style="flex:1;color:var(--text2)"><b style="color:var(--text)">${esc(pf.name.replace('משפחת','').trim())}</b> החזר ₪${exc.toLocaleString()}</span>
     </div>`;
   }).join('');
+  const _potHasPending=potTransfers.length>0||Object.keys(evExcessByFam).length>0;
   const potHtml=hasPot?`<div style="margin:8px 0 0;background:var(--amber-bg);border-radius:var(--r2);padding:8px 10px">
     <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:4px">💰 קופת האירוע · ₪${potTotal.toLocaleString()}</div>
     ${famPayRows}
-    ${potTransfers.length||excessRowsCard?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(180,130,0,0.2)">
-      ${potTransfers.length?`<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:4px">יש להעביר לזוכים:</div>${creditorRowsHtml}`:''}
-      ${excessRowsCard?`<div style="font-size:10px;font-weight:700;color:var(--blue);margin-top:${potTransfers.length?'6':'0'}px;margin-bottom:4px">יש להחזיר:</div>${excessRowsCard}`:''}
+    ${_potHasPending?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(180,130,0,0.2)">
+      <button class="edit-only" onclick="openPotModal(${ev.id})" style="width:100%;padding:7px 10px;border-radius:6px;border:none;background:var(--amber);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר לזכאים${creditorFids.length>1?' ('+creditorFids.length+')':''}</button>
     </div>`:''}
-    ${!creditorFids.length&&!Object.keys(evExcessByFam).length?`<button onclick="releasePot(${ev.id})" style="margin-top:6px;padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button>`:''}
+    ${!_potHasPending&&potPayments.length?`<button onclick="releasePot(${ev.id})" style="margin-top:6px;padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button>`:''}
   </div>`:'';
   const collapsed=collapsedEvents.has(ev.id);
   return`<div class="ecard" id="ecard-${ev.id}">
