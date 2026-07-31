@@ -1333,6 +1333,8 @@ function evCard(ev){
   const potTotal=evPotTotal(ev);
   const potExpTotalCard=evPotExpTotal(ev);
   const hasPot=potTotal>0;
+  const potByFam={};
+  potPayments.forEach(p=>{if(!potByFam[p.famId])potByFam[p.famId]=[];potByFam[p.famId].push(p);});
   const balanced=cost>0&&!ev.participants.some(fid=>(adjBal[fid]||0)<-0.5);
   const shares=evShares(ev);
   const _sMethod=ev.splitMethod||'equal';
@@ -1361,11 +1363,13 @@ function evCard(ev){
     const tagTag=isDebtor?'button':'span';
     const tagClick=isDebtor?` onclick="openPotPayModal(${ev.id},${fid})"` : '';
     const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
+    const famPotAmt=(potByFam[fid]||[]).reduce((s,p)=>s+p.amt,0);
     return`<div class="exp-input-row">
       ${famAva(f)}
       <div style="flex:1;min-width:0">
         <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
         ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+        ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
       </div>
       <div style="flex-shrink:0;text-align:center;min-width:56px">
         ${spent>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
@@ -1461,8 +1465,6 @@ function evCard(ev){
     <button onclick="releasePotToOne(${ev.id},${c.fid},false)" style="padding:3px 7px;border-radius:5px;border:none;background:var(--blue-mid);color:#fff;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העבר</button>
     <button onclick="releasePotToOne(${ev.id},${c.fid},true)" style="padding:3px 7px;border-radius:5px;border:none;background:var(--green-mid);color:#fff;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 לקופה</button>
   </div>`).join('');
-  const potByFam={};
-  potPayments.forEach(p=>{if(!potByFam[p.famId])potByFam[p.famId]=[];potByFam[p.famId].push(p);});
   const famPayRows=families.filter(f=>potByFam[f.id]).map(f=>{
     const fid=f.id;const payments=potByFam[fid];const pf=getFam(fid);if(!pf)return'';
     const name=pf.name.replace('משפחת','').trim();
@@ -1521,6 +1523,10 @@ function evCard(ev){
     ${ev.cumulative?addExpBtn:`<div style="padding:0 14px 10px" class="edit-only">
       <button onclick="openCumPot(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופת האירוע</button>
     </div>`}
+    ${!ev.cumulative&&(Object.values(potByCreditor).length||_dPotRows.length)?`<div style="padding:2px 14px 6px">
+      ${Object.values(potByCreditor).map(c=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--amber)">💰</span><span><b style="color:var(--text)">קופת האירוע</b> תעביר ל<b style="color:var(--text)">${esc(c.name)}</b> ₪${c.amt.toLocaleString()}</span></div>`).join('')}
+      ${_dPotRows.join('')}
+    </div>`:''}
     ${exclLine}
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
