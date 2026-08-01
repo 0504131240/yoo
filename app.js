@@ -1986,8 +1986,8 @@ function openFamDetail(famId){
       ${openEvs.map(ev=>{
         const bal=evAdjBalance(ev)[famId]||0;
         const balRound=Math.round(bal);
-        const balColor=balRound>0?'var(--green-mid)':balRound<0?'var(--red-mid)':'var(--text3)';
-        const balText=balRound>0?`+₪${balRound.toLocaleString()}`:balRound<0?`-₪${Math.abs(balRound).toLocaleString()}`:'מסודר';
+        const balColor=bal>0.5?'var(--green-mid)':bal<-0.5?'var(--red-mid)':'var(--text3)';
+        const balText=bal>0.5?`+₪${balRound.toLocaleString()}`:bal<-0.5?`-₪${Math.abs(balRound).toLocaleString()}`:'מסודר';
         return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
           <span style="font-size:13px;color:var(--text)">${esc(ev.name)}</span>
           <span style="font-size:13px;font-weight:700;color:${balColor}">${balText}</span>
