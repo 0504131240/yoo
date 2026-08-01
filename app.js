@@ -1118,9 +1118,10 @@ function renderHome(){
       const cl=col(ev.id);
       const cost=evCost(ev);
       const pending=calcTransfers(ev);
-      const settled=(ev.settled||[]).length;
-      const total=pending.length+settled;
-      const pct=total?Math.round(settled/total*100):100;
+      const adjBals=evAdjBalance(ev);
+      const settledFams=ev.participants.filter(fid=>Math.abs(adjBals[fid]||0)<=0.5).length;
+      const total=ev.participants.length;
+      const pct=total?Math.round(settledFams/total*100):100;
       const hasPot=evPotTotal(ev)>0;
       const balanced=!pending.length;
       const tags=[
