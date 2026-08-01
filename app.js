@@ -3682,8 +3682,10 @@ function doDepositToCumPot(){
   closeCumPot();
   save();render();
   const _potF=getFam(savedFamId);
-  if(!fromFund&&_potF&&(_potF.email||_potF.email2)){
-    const _potEv=events.find(e=>e.id===savedEvId);if(!_potEv)return;
+  const _potEv=events.find(e=>e.id===savedEvId);
+  // If deposit settles the family's balance, skip deposit email — the close email covers it
+  const _isSettled=_potEv&&(evAdjBalance(_potEv)[savedFamId]||0)>=-0.5;
+  if(!fromFund&&!_isSettled&&_potEv&&_potF&&(_potF.email||_potF.email2)){
     const _potTotal=(_potEv.potPayments||[]).filter(p=>p.famId===savedFamId).reduce((s,p)=>s+p.amt,0);
     const _potShare=Math.round(evShares(_potEv)[savedFamId]||0);
     const _potMsg=`הפקדה של ₪${roundAmt.toLocaleString()} לקופת האירוע "${_potEv.name}" נרשמה.\n\nסה"כ הפקדות שלך לקופה זו: ₪${_potTotal.toLocaleString()}\n\n💓 נכון להיום, החלק שלך לפי ההוצאות הנוכחיות: ₪${_potShare.toLocaleString()}`;
