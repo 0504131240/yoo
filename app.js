@@ -1391,7 +1391,7 @@ function evCard(ev){
         ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
         ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
       </div>
-      <div style="flex-shrink:0;text-align:center;min-width:56px">
+      <div style="width:56px;flex-shrink:0;text-align:center">
         ${spent>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
       </div>
       <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
@@ -1449,8 +1449,8 @@ function evCard(ev){
           ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
           ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
         </div>
-        <div style="flex-shrink:0;text-align:center;min-width:56px">
-          ${spent>0?`<div style="font-size:12px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
+        <div style="width:56px;flex-shrink:0;text-align:center">
+          ${spent>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
           ${items.length?`<button onclick="toggleCumFamily(${ev.id},${fid})" style="margin-top:${spent>0?'2':'0'}px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer">${isExpanded?'▲':'▼ '+items.length}</button>`:''}
         </div>
         <${tagTag} class="${tagCls}"${tagClick}>${tagText}</${tagTag}>
