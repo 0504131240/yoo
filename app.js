@@ -1406,9 +1406,11 @@ function evCard(ev){
     const share=shares[fid]||0;
     const tagClass=b>0.5?'exp-tag-neg':b<-0.5?'exp-tag-pos':'exp-tag-zero';
     const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
-    const tagTag='span';
-    const tagClick='';
-    const tagCls='exp-tag '+tagClass;
+    const isDebtor=b<-0.5;
+    const tagTag=isDebtor?'button':'span';
+    const tagClick=isDebtor?` onclick="openPotPayModal(${ev.id},${fid})"` : '';
+    const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
+    const famPotAmt=(potByFam[fid]||[]).reduce((s,p)=>s+p.amt,0);
     const key=ev.id+'-'+fid;
     const isExpanded=expandedCumFamilies.has(key);
     const shareKey=ev.id+'-share-'+fid;
@@ -1439,12 +1441,13 @@ function evCard(ev){
           ${breakdownHtml}
         </div>`;}).join('')}
     </div>`:'';
-    return`<div class="exp-input-row"${isExpanded?' style="flex-direction:column;align-items:stretch"':''}>
+    return`<div class="exp-input-row" style="flex-direction:column;align-items:stretch">
       <div style="display:flex;align-items:center;gap:8px">
         ${famAva(f)}
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
           ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+          ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
         </div>
         <div style="flex-shrink:0;text-align:center;min-width:56px">
           ${spent>0?`<div style="font-size:12px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
