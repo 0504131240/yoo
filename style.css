@@ -230,6 +230,8 @@ body:not(.at-home){padding-bottom:140px}
 @media(min-width:600px){
   html{background:#e8eaf6}
   body{max-width:min(720px,92vw);margin:0 auto;box-shadow:0 0 48px rgba(0,0,0,.18);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  #openList{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  #openList .ecard{margin-bottom:0}
   .bottom-nav,#main-nav{left:50%;right:auto;transform:translateX(-50%);width:min(720px,92vw)}
   #shell-home{max-width:min(720px,92vw);margin:0 auto}
   .main{max-width:100%}
