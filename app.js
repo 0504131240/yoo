@@ -2808,7 +2808,7 @@ function renderFund(){
     } else {
       evPotsEl.innerHTML=`<div class="fund-section-title">📅 קופות אירועים</div>`+
         potsWithFunds.map(ev=>{
-          const pot=evPotTotal(ev);
+          const pot=evNetPotBal(ev);
           const cl=col(ev.id);
           return`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--amber);padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openPotModal(${ev.id})">
             <div class="ava" style="background:${cl.bg};color:${cl.c};width:32px;height:32px;font-size:11px;flex-shrink:0">📅</div>
