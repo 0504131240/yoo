@@ -1093,10 +1093,11 @@ function renderHome(){
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">👥 משפחות</div>
     <div class="home-fam-strip">${families.map(f=>{
       const cl=col(f.id);
-      const net=Math.round(famNet[f.id]||0);
-      const cls=net>0?'pill-get':net<0?'pill-owe':'';
-      const amtColor=net>0?'var(--green-mid)':net<0?'var(--red-mid)':'var(--text3)';
-      const amtText=net>0?'+₪'+net.toLocaleString():net<0?'-₪'+Math.abs(net).toLocaleString():'מסודר';
+      const netRaw=famNet[f.id]||0;
+      const net=Math.round(netRaw);
+      const cls=netRaw>0.5?'pill-get':netRaw<-0.5?'pill-owe':'';
+      const amtColor=netRaw>0.5?'var(--green-mid)':netRaw<-0.5?'var(--red-mid)':'var(--text3)';
+      const amtText=netRaw>0.5?'+₪'+net.toLocaleString():netRaw<-0.5?'-₪'+Math.abs(net).toLocaleString():'מסודר';
       const fundBal=Math.round(famFundBal(f.id));
       return`<div class="home-fam-pill ${cls}" data-famid="${f.id}" style="cursor:pointer;touch-action:manipulation">
         ${famAva(f, 36)}
