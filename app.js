@@ -22,7 +22,7 @@ let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
 let calHebRefDate=new Date();
 let fundTxOpen=false;
-let settleModalEvId=null,potModalEvId=null;
+let settleModalEvId=null,potModalEvId=null,potTrModalEvId=null;
 let _cumPotFromFund=false;
 let _ppEvId=null,_ppFrom=null,_ppFromFid=null,_ppTo=null,_ppToFid=null,_ppMax=0,_ppFund=false,_ppSettle=false,_ppPot=false;
 let adminPass='';
@@ -3416,6 +3416,72 @@ function closePotModal(){
   document.getElementById('potModal').style.display='none';
   potModalEvId=null;
 }
+function openPotTransferModal(evId){
+  potTrModalEvId=evId;
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  renderPotTransferModal(ev);
+  document.getElementById('potTrModal').style.display='flex';
+}
+function closePotTransferModal(){
+  document.getElementById('potTrModal').style.display='none';
+  potTrModalEvId=null;
+}
+function _refreshPotTransferModal(evId){
+  if(potTrModalEvId!==evId)return;
+  const te=events.find(e=>e.id===evId);if(!te||evPotTotal(te)<=0)return closePotTransferModal();
+  const adjBal=evAdjBalance(te);
+  if(te.participants.some(fid=>(adjBal[fid]||0)>0.5))renderPotTransferModal(te);else closePotTransferModal();
+}
+function renderPotTransferModal(ev){
+  const el=document.getElementById('potTrModalContent');if(!el)return;
+  const adjBal=evAdjBalance(ev);
+  const potTransfers=calcPotTransfers(ev);
+  const excessByFam=calcPotExcessByFamily(ev);
+  const creditorFids=ev.participants.filter(fid=>(adjBal[fid]||0)>0.5);
+  if(!creditorFids.length){closePotTransferModal();return;}
+  const potByCreditor={};
+  potTransfers.forEach(t=>{if(!potByCreditor[t.toFid])potByCreditor[t.toFid]={amt:0};potByCreditor[t.toFid].amt+=t.amt;});
+  const _sug=fid=>{const fromOthers=(potByCreditor[fid]||{amt:0}).amt;const ownExc=excessByFam[fid]||0;const c=Math.min(Math.round(adjBal[fid]||0),fromOthers+ownExc);return c>0.5?c:Math.round(adjBal[fid]||0);};
+  const creditorRows=creditorFids.map(fid=>{
+    const pf=getFam(fid);if(!pf)return'';
+    const name=pf.name.replace('משפחת','').trim();
+    const sug=_sug(fid);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">${esc(name)}</div>
+        <div style="font-size:11px;color:var(--text2)">מגיע לו ₪${sug.toLocaleString()}</div>
+      </div>
+      <button onclick="releasePotToOneM(${ev.id},${fid},false)" style="padding:7px 12px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
+      <button onclick="releasePotToOneM(${ev.id},${fid},true)" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
+    </div>`;
+  }).join('');
+  const manualSection=`<div style="padding:12px 16px;border-top:1px solid var(--border)">
+    <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">העברה בסכום אחר</div>
+    <select id="potToFid-${ev.id}" onchange="_potFillAmt('potToFid-${ev.id}','potTrAmt-${ev.id}')" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:var(--font);margin-bottom:8px;direction:rtl">
+      <option value="">👈 בחר זכאי...</option>
+      ${creditorFids.map(fid=>{const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const sug=_sug(fid);return`<option value="${fid}" data-max="${sug}">${esc(name)} — ₪${sug.toLocaleString()}</option>`;}).join('')}
+    </select>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="number" id="potTrAmt-${ev.id}" placeholder="₪" min="1" style="flex:1;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;font-family:var(--font);font-weight:700;text-align:center" />
+      <button onclick="potManualTransfer(${ev.id},false)" style="padding:9px 14px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
+      <button onclick="potManualTransfer(${ev.id},true)" style="padding:9px 14px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
+    </div>
+  </div>`;
+  el.innerHTML=`
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:14px;font-weight:700">↗ העברה מהקופה</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${esc(ev.name)}</div>
+      </div>
+      <button onclick="closePotTransferModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
+    </div>
+    <div style="padding:8px 16px 0"><div style="font-size:11px;font-weight:700;color:var(--text2)">זכאים לקבל</div></div>
+    ${creditorRows}
+    ${manualSection}
+    <div style="padding:8px 16px 12px">
+      <button onclick="closePotTransferModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+    </div>`;
+}
 function renderPotModal(ev){
   const el=document.getElementById('potModalContent');if(!el)return;
   const potPayments=ev.potPayments||[];
@@ -3435,17 +3501,8 @@ function renderPotModal(ev){
     const calc=Math.min(Math.round(adjBal[fid]||0),fromOthers+ownExcess);
     return calc>0.5?calc:Math.round(adjBal[fid]||0);
   };
-  const potTransferForm=creditorFids.length?`<div class="edit-only" style="padding:12px 16px;border-bottom:1px solid var(--border)">
-    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">↗ העברה מהקופה</div>
-    <select id="potToFid-${ev.id}" onchange="_potFillAmt('potToFid-${ev.id}','potTrAmt-${ev.id}')" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:var(--font);margin-bottom:8px;direction:rtl">
-      <option value="">👈 בחר זכאי...</option>
-      ${creditorFids.map(fid=>{const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const sug=_potSuggest(fid);return`<option value="${fid}" data-max="${sug}">${esc(name)} — ₪${sug.toLocaleString()}</option>`;}).join('')}
-    </select>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input type="number" id="potTrAmt-${ev.id}" placeholder="₪" min="1" style="flex:1;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;font-family:var(--font);font-weight:700;text-align:center" />
-      <button onclick="potManualTransfer(${ev.id},false)" style="padding:9px 16px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
-      <button onclick="potManualTransfer(${ev.id},true)" style="padding:9px 16px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
-    </div>
+  const potTransferBtn=creditorFids.length?`<div class="edit-only" style="padding:10px 16px;border-bottom:1px solid var(--border)">
+    <button onclick="openPotTransferModal(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העברה לזכאים${creditorFids.length>1?' ('+creditorFids.length+')':''}</button>
   </div>`:'';
 
   const potDistributed=potTransfers.reduce((s,t)=>s+t.amt,0)+Object.entries(excessByFam).filter(([fidStr])=>(adjBal[parseInt(fidStr)]||0)>0.5).reduce((s,[,e])=>s+e,0);
@@ -3486,7 +3543,7 @@ function renderPotModal(ev){
       ${(()=>{const byFam={};potPayments.forEach(p=>{if(!byFam[p.famId])byFam[p.famId]=[];byFam[p.famId].push(p);});(ev.settled||[]).filter(s=>(s.method==='pot'||s.method==='pot-refund')&&s.fromFid!=null).forEach(s=>{if(!byFam[s.fromFid])byFam[s.fromFid]=[];});const ord=families.map(f=>f.id).filter(fid=>byFam[fid]);return ord.map(fid=>{const pmnts=byFam[fid]||[];const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const distFromThis=(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const refundFromThis=(ev.settled||[]).filter(s=>s.method==='pot-refund'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const tot=pmnts.reduce((s,p)=>s+p.amt,0)+distFromThis+refundFromThis;const multi=pmnts.length>1;const key=ev.id+'-pot-'+fid;const isExp=expandedPotFamilies.has(key);const delBtn=(i)=>`<button class="edit-only" onclick="deletePotDeposit(${ev.id},${fid},${i})" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:14px;padding:0 4px;font-family:var(--font)" title="מחק">🗑</button>`;const details=multi&&isExp?'<div style="background:var(--surface2);padding:6px 16px 6px 32px">'+pmnts.map((p,i)=>`<div style="font-size:12px;color:var(--text2);padding:3px 0;display:flex;justify-content:space-between;align-items:center"><span>תשלום ${i+1} · ₪${p.amt.toLocaleString()}</span>${delBtn(i)}</div>`).join('')+'</div>':'';return`<div style="border-top:1px solid var(--border)"><div style="display:flex;align-items:center;gap:10px;padding:10px 16px"><div style="width:32px;height:32px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">✓</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div><div style="font-size:12px;color:var(--green-mid);font-weight:600;margin-top:1px">₪${tot.toLocaleString()}</div>${refundFromThis>0.5?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${refundFromThis.toLocaleString()}</div>`:''}</div>${multi?`<button onclick="togglePotModalFamily(${ev.id},${fid})" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:pointer;padding:3px 8px;font-weight:700;font-family:var(--font)">${isExp?'▲ סגור':'▼ '+pmnts.length+' תשלומים'}</button>`:delBtn(0)}</div>${details}</div>`;}).join('');})()}
     </div>
     ${expRows}
-    ${potTransferForm}
+    ${potTransferBtn}
     ${!creditorFids.length&&potPayments.length&&potExcess<=0.5?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
     ${doneRows}
     <div style="padding:4px 16px 10px">
@@ -3530,15 +3587,18 @@ function potManualTransfer(evId,toFund){
   if(ev.closed){const adjA=evAdjBalance(ev);ev.participants.forEach(fid=>{if(Math.abs(adjA[fid]||0)<=0.5)_sendCloseEvEmailOne(ev,fid);});}
   const newEv=events.find(e=>e.id===evId);
   if(newEv&&evPotTotal(newEv)>0)renderPotModal(newEv);else closePotModal();
+  _refreshPotTransferModal(evId);
 }
 function releasePotToOneM(evId,creditorFid,toFund){
   releasePotToOne(evId,creditorFid,toFund);
   const ev=events.find(e=>e.id===evId);
   if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+  _refreshPotTransferModal(evId);
 }
 function releasePotM(evId){
   releasePot(evId);
   closePotModal();
+  closePotTransferModal();
 }
 function releasePotExcessToOne(evId,famId,toFund){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
@@ -3569,12 +3629,14 @@ function releasePotExcessToOneM(evId,famId,toFund){
   releasePotExcessToOne(evId,famId,toFund);
   const ev=events.find(e=>e.id===evId);
   if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+  _refreshPotTransferModal(evId);
 }
 function releasePotCombinedM(evId,creditorFid,toFund){
   releasePotToOne(evId,creditorFid,toFund);
   releasePotExcessToOne(evId,creditorFid,toFund);
   const ev=events.find(e=>e.id===evId);
   if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+  _refreshPotTransferModal(evId);
 }
 function deletePotDeposit(evId,famId,localIdx){
   const ev=events.find(e=>e.id===evId);if(!ev||!ev.potPayments)return;
