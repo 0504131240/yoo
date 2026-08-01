@@ -1385,16 +1385,20 @@ function evCard(ev){
     const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
     const famPotAmt=(potByFam[fid]||[]).reduce((s,p)=>s+p.amt,0);
     return`<div class="exp-input-row">
-      ${famAva(f)}
-      <div style="flex:1;min-width:0">
-        <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-        ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
-        ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
+      <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
+        ${famAva(f)}
+        <div style="flex:1;min-width:0">
+          <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
+          ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+          ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
+        </div>
       </div>
-      <div style="width:56px;flex-shrink:0;text-align:center">
+      <div style="width:64px;flex-shrink:0;text-align:center">
         ${spent>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
       </div>
-      <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
+      <div style="flex:1;display:flex;align-items:center;justify-content:flex-end">
+        <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
+      </div>
     </div>`;
   }).join('');
   const cumRows=ev.participants.map(fid=>{
@@ -1443,17 +1447,21 @@ function evCard(ev){
     </div>`:'';
     return`<div class="exp-input-row" style="flex-direction:column;align-items:stretch">
       <div style="display:flex;align-items:center;gap:8px">
-        ${famAva(f)}
-        <div style="flex:1;min-width:0">
-          <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-          ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
-          ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
+        <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
+          ${famAva(f)}
+          <div style="flex:1;min-width:0">
+            <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
+            ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+            ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
+          </div>
         </div>
-        <div style="width:56px;flex-shrink:0;text-align:center">
+        <div style="width:64px;flex-shrink:0;text-align:center">
           ${spent>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
           ${items.length?`<button onclick="toggleCumFamily(${ev.id},${fid})" style="margin-top:${spent>0?'2':'0'}px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer">${isExpanded?'▲':'▼ '+items.length}</button>`:''}
         </div>
-        <${tagTag} class="${tagCls}"${tagClick}>${tagText}</${tagTag}>
+        <div style="flex:1;display:flex;align-items:center;justify-content:flex-end">
+          <${tagTag} class="${tagCls}"${tagClick}>${tagText}</${tagTag}>
+        </div>
       </div>
       ${detailList}
     </div>`;
