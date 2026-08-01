@@ -3682,7 +3682,7 @@ function doDepositToCumPot(){
   closeCumPot();
   save();render();
   const _potF=getFam(savedFamId);
-  if(_potF&&(_potF.email||_potF.email2)){
+  if(!fromFund&&_potF&&(_potF.email||_potF.email2)){
     const _potEv=events.find(e=>e.id===savedEvId);if(!_potEv)return;
     const _potTotal=(_potEv.potPayments||[]).filter(p=>p.famId===savedFamId).reduce((s,p)=>s+p.amt,0);
     const _potShare=Math.round(evShares(_potEv)[savedFamId]||0);
