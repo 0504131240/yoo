@@ -1086,7 +1086,7 @@ function renderHome(){
   families.forEach(f=>{ famNet[f.id]=0; });
   open.forEach(ev=>{
     const bal=evAdjBalance(ev);
-    ev.participants.forEach(fid=>{ famNet[fid]=(famNet[fid]||0)+(bal[fid]||0); });
+    ev.participants.forEach(fid=>{ const b=bal[fid]||0; if(Math.abs(b)>0.5) famNet[fid]=(famNet[fid]||0)+b; });
   });
   const famStripEl=document.getElementById('homeFamStrip');
   famStripEl.innerHTML=families.length?`
