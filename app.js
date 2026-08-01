@@ -3348,13 +3348,17 @@ function renderSettleModal(ev){
   const _potBadge='<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>';
   const _potRows=Object.values(_potByTo).map(p=>_rowHtml('💰',_potBadge,'קופת האירוע',p.to,p.amt));
   const _nonPotRows=_nonPot.map(s=>{const icon=s.method==='fund'?'🏦':'✓';const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';return _rowHtml(icon,badge,s.from,s.to,s.amt);});
-  const doneRows=settledList.length?'<div style="padding:6px 16px 2px">'+[..._nonPotRows,..._potRows].join('')+'</div>':'';
+  const doneRows=settledList.length?
+    `<div style="padding:12px 16px 4px;border-top:2px solid var(--border);margin-top:${transfers.length?'8':'0'}px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">✅ בוצעו</div>
+      ${[..._nonPotRows,..._potRows].join('')}
+    </div>`:'';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div><div style="font-size:14px;font-weight:700">📊 העברות לאיזון</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${shareLabel(ev)} · ${esc(ev.name)}</div></div>
       <button onclick="closeSettleModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
     </div>
-    ${transfers.length?settleLines:`<div style="padding:20px;text-align:center;font-size:15px;color:var(--green)">✅ כולם מסודרים!</div>`}
+    ${transfers.length?`<div style="padding:4px 0 4px">${settleLines}</div>`:`<div style="padding:20px;text-align:center;font-size:15px;color:var(--green)">✅ כולם מסודרים!</div>`}
     ${doneRows}
     <div style="padding:10px 16px">
       <button onclick="closeSettleModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
