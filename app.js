@@ -93,11 +93,25 @@ const evShares=ev=>{
   ev.participants.forEach(fid=>{ floors[fid]=Math.floor(exact[fid]||0); });
   let remainder=Math.round(totalCost-ev.participants.reduce((s,fid)=>s+floors[fid],0));
   const sorted=[...ev.participants].sort((a,b)=>((exact[b]||0)-floors[b])-((exact[a]||0)-floors[a]));
+  const hasSavings=!!(ev.savingsTotal||ev.savingsAmt);
   const shares={...floors};
-  for(let i=0;i<remainder&&i<sorted.length;i++) shares[sorted[i]]++;
+  if(hasSavings){
+    // When savings are set, round everyone up; the surplus over totalCost goes to the savings pot
+    ev.participants.forEach(fid=>{ shares[fid]=Math.ceil(exact[fid]||0); });
+  }else{
+    for(let i=0;i<remainder&&i<sorted.length;i++) shares[sorted[i]]++;
+  }
   const savingsPerFam=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
   if(savingsPerFam>0) ev.participants.forEach(fid=>{shares[fid]=(shares[fid]||0)+savingsPerFam;});
   return shares;
+};
+// Returns the extra shekels from ceiling-rounding that flow into the savings pot for this event
+const evSavingsSurplus=ev=>{
+  if(!ev.savingsTotal&&!ev.savingsAmt)return 0;
+  const _sh=evShares(ev);
+  const _spf=ev.savingsTotal?Math.round(ev.savingsTotal/((ev.participants||[]).length||1)):(ev.savingsAmt||0);
+  const _sum=(ev.participants||[]).reduce((s,fid)=>s+(_sh[fid]||0),0);
+  return Math.max(0,Math.round(_sum-_spf*(ev.participants||[]).length-evCost(ev)));
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
 const evPotTotal=ev=>(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
@@ -123,7 +137,7 @@ const evPotRefundByFam=ev=>{
   return r;
 };
 // Savings pot helpers
-const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length)+(ev.potToSavings||[]).reduce((ss,p)=>ss+p.amt,0),0);
+const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length)+evSavingsSurplus(ev)+(ev.potToSavings||[]).reduce((ss,p)=>ss+p.amt,0),0);
 const savingsPotExpTotal=()=>(savingsPot.expenses||[]).reduce((s,e)=>s+e.amt,0);
 const savingsPotBal=()=>savingsPotContrib()-savingsPotExpTotal();
 function evEffectivePotPayments(ev){
@@ -1247,10 +1261,10 @@ function calcTransfers(ev){
     if(adjBal[fid]>0.5) pos.push({name,fid,amt:adjBal[fid]});
     else if(adjBal[fid]<-0.5) neg.push({name,fid,amt:-adjBal[fid]});
   });
-  // Add savings pot as virtual creditor (collects savings from debtors instead of going to other families)
+  // Add savings pot as virtual creditor (collects savings + ceiling-rounding surplus from debtors)
   const _savingsTotal=ev.savingsTotal||(ev.savingsAmt||0)*ev.participants.length;
   const _savingsPaidTotal=(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0);
-  const _savingsOwed=Math.round(_savingsTotal-_savingsPaidTotal);
+  const _savingsOwed=Math.round(_savingsTotal+evSavingsSurplus(ev)-_savingsPaidTotal);
   if(_savingsOwed>0.5) pos.push({name:'קופת חיסכון',fid:'__savings__',amt:_savingsOwed,isSavings:true});
   const transfers=[];
   // Sort largest first so big debtors match big creditors → fewer splits per person
