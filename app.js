@@ -3603,25 +3603,7 @@ function renderPotTransferModal(ev){
       <button onclick="releasePotToOneM(${ev.id},${fid},true)" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
     </div>`;
   }).join('');
-  const manualSection=`<div style="padding:12px 16px;border-top:1px solid var(--border)">
-    <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">העברה בסכום אחר</div>
-    <select id="potToFid-${ev.id}" onchange="_potFillAmt('potToFid-${ev.id}','potTrAmt-${ev.id}')" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:var(--font);margin-bottom:8px;direction:rtl">
-      <option value="">👈 בחר זכאי...</option>
-      ${creditorFids.map(fid=>{const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const sug=_sug(fid);return`<option value="${fid}" data-max="${sug}">${esc(name)} — ₪${sug.toLocaleString()}</option>`;}).join('')}
-    </select>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input type="number" id="potTrAmt-${ev.id}" placeholder="₪" min="1" style="flex:1;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;font-family:var(--font);font-weight:700;text-align:center" />
-      <button onclick="potManualTransfer(${ev.id},false)" style="padding:9px 14px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
-      <button onclick="potManualTransfer(${ev.id},true)" style="padding:9px 14px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
-    </div>
-    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">העבר לקופת חיסכון</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="number" id="potSavAmt-${ev.id}" placeholder="₪" min="1" style="flex:1;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;font-family:var(--font);font-weight:700;text-align:center" />
-        <button onclick="(()=>{const a=parseFloat(document.getElementById('potSavAmt-${ev.id}').value)||0;if(a>0)releasePotToSavings(${ev.id},a);})()" style="padding:9px 14px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">💎 לחיסכון</button>
-      </div>
-    </div>
-  </div>`;
+  const manualSection='';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div>
