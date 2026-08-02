@@ -566,6 +566,23 @@ async function load(){
       ev._pot2savFixed=true;
       _migFixed=true;
     });
+    // targeted fix: מנגל בין הזמנים — restore original pot deposits and savings transfer
+    (()=>{
+      if(localStorage.getItem('_mankalPotFixed')==='1')return;
+      const ev=events.find(e=>e.name==='מנגל בין הזמנים');if(!ev)return;
+      const _famAmt=[['הרשברג',13],['שוירץ',100],['ינקלביץ',40]];
+      const newPot=[];
+      _famAmt.forEach(([nm,amt])=>{
+        const f=families.find(f=>f.name.includes(nm));
+        if(f)newPot.push({famId:f.id,amt});
+      });
+      if(newPot.length){ev.potPayments=newPot;}
+      if(!(ev.potToSavings||[]).some(p=>p.amt===34))
+        {if(!ev.potToSavings)ev.potToSavings=[];ev.potToSavings.push({amt:34,date:'02/08/2026'});}
+      ev._pot2savFixed=true;
+      localStorage.setItem('_mankalPotFixed','1');
+      _migFixed=true;
+    })();
     if(_migFixed)save();
     render();setTimeout(handleHash,100);
   }
