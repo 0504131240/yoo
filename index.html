@@ -262,8 +262,10 @@
         <div class="err-txt" id="e-cost">נא להזין סכום</div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
           <label style="font-size:12px;font-weight:700;color:var(--text2);display:block;margin-bottom:6px">💎 תרומה לקופת חיסכון (אופציונלי)</label>
-          <input type="number" min="0" inputmode="numeric" id="f-savings" placeholder="₪ לכל משפחה"
-            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+          <input type="number" min="0" inputmode="numeric" id="f-savings" placeholder="₪ סכום כולל"
+            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box"
+            oninput="(()=>{const n=document.querySelectorAll('#famChips .chip.on').length;const v=parseFloat(this.value)||0;const el=document.getElementById('savingsHint');if(el)el.textContent=n>0&&v>0?'≈ ₪'+Math.round(v/n)+' לכל משפחה':'';})()" >
+          <div id="savingsHint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:4px;min-height:14px"></div>
         </div>
       </div>
       <div class="form-btns">
