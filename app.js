@@ -2526,9 +2526,21 @@ function _sendCloseEvEmailOne(ev,fid){
   if(_savingsPerFam>0) _cRows.push(['💎 לקופת חיסכון',`₪${_savingsPerFam.toLocaleString()}`]);
   if(fundBal>0) _cRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(_cRows);
-  bodyHtml+=_splitMethodBlock(ev,fid);
+  const _isPerFam=!ev.cumulative&&ev.totalCost==null;
+  if(_isPerFam){
+    const _famExpRows=ev.participants.map(fid2=>{
+      const amt=Math.round((ev.expenses||{})[fid2]||0);if(!amt)return'';
+      const pf=getFam(fid2);if(!pf)return'';
+      const pname=_esc(pf.name.replace('משפחת','').trim());
+      const isMine=fid2===fid;
+      return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:7px 10px${isMine?';font-weight:700':''}">${pname}</td><td style="padding:7px 10px;font-weight:700;text-align:left${isMine?';color:#D97706':''}">₪${amt.toLocaleString()}</td></tr>`;
+    }).join('');
+    if(_famExpRows)bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 הוצאות לפי משפחה:</p><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">משפחה</th><th style="padding:8px 10px;text-align:left;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">הוצאה</th></tr>${_famExpRows}</table>`;
+  } else {
+    bodyHtml+=_splitMethodBlock(ev,fid);
+  }
   const allItems=ev.expenseItems||[];
-  if(allItems.length||(ev.potExpItems||[]).length){
+  if(!_isPerFam&&(allItems.length||(ev.potExpItems||[]).length)){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 פירוט כל ההוצאות:</p>`;
     const itemsByFam={};
     ev.participants.forEach(fid2=>{itemsByFam[fid2]=[];});
