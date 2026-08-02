@@ -137,7 +137,9 @@ const evPotRefundByFam=ev=>{
   return r;
 };
 // Savings pot helpers
-const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length)+evSavingsSurplus(ev)+(ev.potToSavings||[]).reduce((ss,p)=>ss+p.amt,0),0);
+const savingsPotContrib=()=>events.reduce((s,ev)=>
+  s+(ev.savingsPaid||[]).reduce((ss,p)=>ss+p.amt,0)
+   +(ev.potToSavings||[]).reduce((ss,p)=>ss+p.amt,0),0);
 const savingsPotExpTotal=()=>(savingsPot.expenses||[]).reduce((s,e)=>s+e.amt,0);
 const savingsPotBal=()=>savingsPotContrib()-savingsPotExpTotal();
 function evEffectivePotPayments(ev){
