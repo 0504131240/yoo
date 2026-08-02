@@ -381,13 +381,16 @@ function sendSettledEmail(ev,famId){
     }
   });
   const fundBal=Math.round(fund.famBalances[String(famId)]||0);
+  const _savPF=ev.savingsTotal?Math.round(ev.savingsTotal/((ev.participants||[]).length||1)):(ev.savingsAmt||0);
   // plain text
   let msg=`האירוע "${ev.name}" – הסיכום שלך:\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}\n`;
+  if(_savPF>0) msg+=`מתוכם ₪${_savPF.toLocaleString()} לקופת חיסכון 💎\n`;
   if(spent>0) msg+=`הוצאת: ₪${spent.toLocaleString()}\n`;
   if(lines.length) msg+=`\nאיך סודר:\n${lines.map(l=>'• '+l).join('\n')}`;
   if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
   // HTML
   const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
+  if(_savPF>0) cardRows.push(['💎 מתוכם לקופת חיסכון',`₪${_savPF.toLocaleString()}`]);
   if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
   if(fundBal>0) cardRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(cardRows);
@@ -1449,6 +1452,7 @@ function evCard(ev){
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
           ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+          ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">מתוכם ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} לקופת חיסכון 💎</div>`:''}
           ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
           ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
         </div>
@@ -1514,6 +1518,7 @@ function evCard(ev){
           <div style="flex:1;min-width:0">
             <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
             ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+            ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">מתוכם ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} לקופת חיסכון 💎</div>`:''}
             ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
             ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
           </div>
