@@ -260,6 +260,11 @@
           <button type="button" class="action-btn" style="width:100%;box-sizing:border-box" onclick="openExpensePicker()">💰 <span id="expensePickSummary">כמה כל משפחה שילמה</span></button>
         </div>
         <div class="err-txt" id="e-cost">נא להזין סכום</div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <label style="font-size:12px;font-weight:700;color:var(--text2);display:block;margin-bottom:6px">💎 תרומה לקופת חיסכון (אופציונלי)</label>
+          <input type="number" min="0" inputmode="numeric" id="f-savings" placeholder="₪ לכל משפחה"
+            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+        </div>
       </div>
       <div class="form-btns">
         <button class="save-btn" id="formSaveBtn" onclick="doCreate()">✓ צור אירוע</button>
@@ -439,6 +444,9 @@
 
     <!-- Event pots section -->
     <div id="eventPotsSection" style="margin-bottom:18px"></div>
+
+    <!-- Savings pot section -->
+    <div id="savingsPotSection" style="margin-bottom:18px"></div>
 
     <!-- Deposit/Withdraw modal -->
     <div id="depositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeDepositSheet()">
