@@ -2689,9 +2689,11 @@ function sendEmailToFam(evId,fid){
     const owe=Math.round(Math.abs(b));
     const potDep=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
     const msgPot=potDep>0.5?`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`:'';
-    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
+    const _savPerFam1=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
+    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot}${_savPerFam1>0?`\n💎 לקופת חיסכון: ₪${_savPerFam1.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
     if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
+    if(_savPerFam1>0) cardRows.push(['💎 לקופת חיסכון',`₪${_savPerFam1.toLocaleString()}`]);
     if(potDep>0.5) cardRows.push(['הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
     let bodyHtml=_eCard(cardRows);
     bodyHtml+=_splitMethodBlock(ev,fid);
@@ -2788,9 +2790,11 @@ function sendDebtReminderEmails(evId){
     const share=Math.round(shares[fid]||0);
     const spent=Math.round(ev.expenses[fid]||0);
     const owe=Math.round(Math.abs(adjBal[fid]||0));
-    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}  \n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
+    const _savPerFam2=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
+    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${_savPerFam2>0?`\n💎 לקופת חיסכון: ₪${_savPerFam2.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     const _cRows2=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
     if(spent>0) _cRows2.push(['שילמת',`₪${spent.toLocaleString()}`]);
+    if(_savPerFam2>0) _cRows2.push(['💎 לקופת חיסכון',`₪${_savPerFam2.toLocaleString()}`]);
     let bodyHtml=_eCard(_cRows2);
     bodyHtml+=_splitMethodBlock(ev,fid);
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
