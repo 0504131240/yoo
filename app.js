@@ -2508,7 +2508,7 @@ function _sendCloseEvEmailOne(ev,fid){
     .reduce((s,t)=>s+t.amount,0));
   if(_myTotalPot>0.5){
     if(_fromFundToPot>0.5&&_fromFundToPot===_myTotalPot){
-      settleLines.push(`הפקדת לקופת האירוע: ₪${_myTotalPot.toLocaleString()} (מהקופה הראשית)`);
+      settleLines.push(`העברת מהקופה הראשית ₪${_myTotalPot.toLocaleString()} לקופת האירוע`);
     } else {
       settleLines.push(`הפקדת לקופת האירוע: ₪${_myTotalPot.toLocaleString()}`);
       if(_fromFundToPot>0.5) settleLines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} הועברו מהקופה הראשית`);
@@ -2695,13 +2695,15 @@ function sendEmailToFam(evId,fid){
     const spent=Math.round(ev.expenses[fid]||0);
     const owe=Math.round(Math.abs(b));
     const potDep=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
-    const msgPot=potDep>0.5?`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`:'';
+    const _fromFundToPot1=potDep>0.5?Math.round((fund.transactions||[]).filter(t=>Number(t.famId)===Number(fid)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.desc||'').includes(ev.name)).reduce((s,t)=>s+t.amount,0)):0;
+    const _potIsFromFund1=_fromFundToPot1>0.5&&Math.abs(_fromFundToPot1-potDep)<1;
+    const msgPot=potDep>0.5?(_potIsFromFund1?`\nהעברת מהקופה הראשית ₪${potDep.toLocaleString()} לקופת האירוע`:`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`):'';
     const _savPerFam1=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
     const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot}${_savPerFam1>0?`\n💎 לקופת חיסכון: ₪${_savPerFam1.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
     if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
     if(_savPerFam1>0) cardRows.push(['💎 לקופת חיסכון',`₪${_savPerFam1.toLocaleString()}`]);
-    if(potDep>0.5) cardRows.push(['הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
+    if(potDep>0.5) cardRows.push([_potIsFromFund1?'העברת מהקופה הראשית':'הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
     let bodyHtml=_eCard(cardRows);
     bodyHtml+=_splitMethodBlock(ev,fid);
     // Expense breakdown table
@@ -2797,11 +2799,16 @@ function sendDebtReminderEmails(evId){
     const share=Math.round(shares[fid]||0);
     const spent=Math.round(ev.expenses[fid]||0);
     const owe=Math.round(Math.abs(adjBal[fid]||0));
+    const potDep2=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
+    const _fromFundToPot2=potDep2>0.5?Math.round((fund.transactions||[]).filter(t=>Number(t.famId)===Number(fid)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.desc||'').includes(ev.name)).reduce((s,t)=>s+t.amount,0)):0;
+    const _potIsFromFund2=_fromFundToPot2>0.5&&Math.abs(_fromFundToPot2-potDep2)<1;
+    const msgPot2=potDep2>0.5?(_potIsFromFund2?`\nהעברת מהקופה הראשית ₪${potDep2.toLocaleString()} לקופת האירוע`:`\nהפקדת לקופת האירוע: ₪${potDep2.toLocaleString()}`):'';
     const _savPerFam2=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
-    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${_savPerFam2>0?`\n💎 לקופת חיסכון: ₪${_savPerFam2.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
+    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot2}${_savPerFam2>0?`\n💎 לקופת חיסכון: ₪${_savPerFam2.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
     const _cRows2=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
     if(spent>0) _cRows2.push(['שילמת',`₪${spent.toLocaleString()}`]);
     if(_savPerFam2>0) _cRows2.push(['💎 לקופת חיסכון',`₪${_savPerFam2.toLocaleString()}`]);
+    if(potDep2>0.5) _cRows2.push([_potIsFromFund2?'העברת מהקופה הראשית':'הפקדת לקופת האירוע',`₪${potDep2.toLocaleString()}`]);
     let bodyHtml=_eCard(_cRows2);
     bodyHtml+=_splitMethodBlock(ev,fid);
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
@@ -3695,7 +3702,7 @@ function renderPotModal(ev){
     </div>
     ${expRows}
     ${potTransferBtn}
-    ${(()=>{const _sTotal=(ev.savingsTotal||(ev.savingsAmt||0)*ev.participants.length);const _sPaid=(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0);const _sOwed=Math.round(_sTotal+evSavingsSurplus(ev)-_sPaid);const _sAmt=Math.min(effBal,Math.max(0,_sOwed));return _sAmt>0?`<div class="edit-only" style="padding:10px 16px;border-bottom:1px solid var(--border)"><button onclick="releasePotToSavings(${ev.id},${_sAmt})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💎 העבר לקופת חיסכון (₪${_sAmt.toLocaleString()})</button></div>`:'';})()
+    ${(()=>{const _sTotal=(ev.savingsTotal||(ev.savingsAmt||0)*ev.participants.length);const _sPaid=(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0);const _sOwed=Math.round(_sTotal+evSavingsSurplus(ev)-_sPaid);const _sAmt=Math.min(effBal,Math.max(0,_sOwed));return _sAmt>0?`<div class="edit-only" style="padding:10px 16px;border-bottom:1px solid var(--border)"><button onclick="releasePotToSavings(${ev.id},${_sAmt})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💎 העבר לקופת חיסכון (₪${_sAmt.toLocaleString()})</button></div>`:'';})()}
     ${!creditorFids.length&&potPayments.length&&potExcess<=0.5?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
     ${doneRows}
     <div style="padding:4px 16px 10px">
