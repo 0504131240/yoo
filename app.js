@@ -95,7 +95,7 @@ const evShares=ev=>{
   const sorted=[...ev.participants].sort((a,b)=>((exact[b]||0)-floors[b])-((exact[a]||0)-floors[a]));
   const shares={...floors};
   for(let i=0;i<remainder&&i<sorted.length;i++) shares[sorted[i]]++;
-  const savingsAmt=ev.savingsAmt||0;
+  const savingsAmt=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
   if(savingsAmt>0) ev.participants.forEach(fid=>{shares[fid]=(shares[fid]||0)+savingsAmt;});
   return shares;
 };
@@ -123,7 +123,7 @@ const evPotRefundByFam=ev=>{
   return r;
 };
 // Savings pot helpers
-const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsAmt||0)*(ev.participants||[]).length,0);
+const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length),0);
 const savingsPotExpTotal=()=>(savingsPot.expenses||[]).reduce((s,e)=>s+e.amt,0);
 const savingsPotBal=()=>savingsPotContrib()-savingsPotExpTotal();
 function evEffectivePotPayments(ev){
@@ -1427,7 +1427,7 @@ function evCard(ev){
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
           ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
-          ${ev.savingsAmt?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 כולל ₪${ev.savingsAmt.toLocaleString()} לחיסכון</div>`:''}
+          ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 כולל ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} לחיסכון</div>`:''}
           ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
           ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
         </div>
@@ -1493,7 +1493,7 @@ function evCard(ev){
           <div style="flex:1;min-width:0">
             <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
             ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
-            ${ev.savingsAmt?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 כולל ₪${ev.savingsAmt.toLocaleString()} לחיסכון</div>`:''}
+            ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 כולל ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} לחיסכון</div>`:''}
             ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
             ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
           </div>
@@ -2274,7 +2274,10 @@ function editEv(evId){
     updateFormTotal();
   }
   const savEl=document.getElementById('f-savings');
-  if(savEl)savEl.value=ev.savingsAmt||'';
+  const savTotal=ev.savingsTotal||((ev.savingsAmt||0)*ev.participants.length)||0;
+  if(savEl)savEl.value=savTotal||'';
+  const savHint=document.getElementById('savingsHint');
+  if(savHint)savHint.textContent=savTotal&&ev.participants.length?'≈ ₪'+Math.round(savTotal/ev.participants.length)+' לכל משפחה':'';
   document.getElementById('newFormOverlay').style.display='flex';
   goTab('events',document.getElementById('nb-events'));
 }
@@ -2285,6 +2288,7 @@ function hideForm(){
   document.getElementById('formTitle').textContent='➕ אירוע חדש';
   document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
   const savEl=document.getElementById('f-savings');if(savEl)savEl.value='';
+  const savHint=document.getElementById('savingsHint');if(savHint)savHint.textContent='';
 }
 function toggleChip(fid){
   const el=document.getElementById('chip-'+fid);
@@ -2353,7 +2357,7 @@ async function doCreate(){
   if(!ok)return;
   const totalCost=expMode==='total'?(await _toILS('f-total','fTotalCur')):null;
   const isCumulative=expMode==='cumulative';
-  const savingsAmt=Math.round(parseFloat(document.getElementById('f-savings')?.value)||0);
+  const savingsTotal=Math.round(parseFloat(document.getElementById('f-savings')?.value)||0);
   const childOverrides={};const parentOverrides={};
   if(splitMethod!=='equal') participants.forEach(fid=>{
     childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0);
@@ -2365,12 +2369,12 @@ async function doCreate(){
       ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded;
       ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; ev.parentOverrides=parentOverrides;
       if(!ev.cumulative){ ev.expenses=expenses; ev.totalCost=totalCost; }
-      if(savingsAmt>0)ev.savingsAmt=savingsAmt;else delete ev.savingsAmt;
+      if(savingsTotal>0){ev.savingsTotal=savingsTotal;delete ev.savingsAmt;}else{delete ev.savingsTotal;delete ev.savingsAmt;}
     }
   } else {
     const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides,parentOverrides};
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
-    if(savingsAmt>0)newEv.savingsAmt=savingsAmt;
+    if(savingsTotal>0)newEv.savingsTotal=savingsTotal;
     events.unshift(newEv);
     // notify participants only for non-cumulative events (personalized per family)
     (()=>{
@@ -2834,7 +2838,7 @@ function renderSavingsPot(){
   const contrib=savingsPotContrib();
   const expTotal=savingsPotExpTotal();
   const bal=contrib-expTotal;
-  const contribEvs=events.filter(ev=>(ev.savingsAmt||0)>0);
+  const contribEvs=events.filter(ev=>(ev.savingsTotal||ev.savingsAmt)>0);
   if(!contrib&&!expTotal&&!contribEvs.length){el.innerHTML='';return;}
   const expRows=(savingsPot.expenses||[]).map(e=>
     `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -2855,7 +2859,7 @@ function renderSavingsPot(){
     <div style="font-size:11px;color:var(--text2);margin-bottom:6px">תרומות מאירועים</div>
     ${contribEvs.map(ev=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
       <span style="color:var(--text)">${esc(ev.name)}</span>
-      <span style="font-weight:700;color:var(--green-mid)">+₪${((ev.savingsAmt||0)*(ev.participants||[]).length).toLocaleString()}</span>
+      <span style="font-weight:700;color:var(--green-mid)">+₪${(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length).toLocaleString()}</span>
     </div>`).join('')}
   </div>`:'';
   el.innerHTML=`<div class="fund-section-title">💎 קופת חיסכון</div>
