@@ -95,8 +95,6 @@ const evShares=ev=>{
   const sorted=[...ev.participants].sort((a,b)=>((exact[b]||0)-floors[b])-((exact[a]||0)-floors[a]));
   const shares={...floors};
   for(let i=0;i<remainder&&i<sorted.length;i++) shares[sorted[i]]++;
-  const savingsAmt=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
-  if(savingsAmt>0) ev.participants.forEach(fid=>{shares[fid]=(shares[fid]||0)+savingsAmt;});
   return shares;
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
@@ -1427,7 +1425,7 @@ function evCard(ev){
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
           ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
-          ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 כולל ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} לחיסכון</div>`:''}
+          ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 חיסכון: ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} (בנפרד)</div>`:''}
           ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
           ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
         </div>
@@ -1493,7 +1491,7 @@ function evCard(ev){
           <div style="flex:1;min-width:0">
             <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
             ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
-            ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 כולל ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} לחיסכון</div>`:''}
+            ${(ev.savingsTotal||ev.savingsAmt)?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 חיסכון: ₪${(ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0)).toLocaleString()} (בנפרד)</div>`:''}
             ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
             ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
           </div>
