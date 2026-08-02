@@ -123,7 +123,7 @@ const evPotRefundByFam=ev=>{
   return r;
 };
 // Savings pot helpers
-const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length),0);
+const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length)+(ev.potToSavings||[]).reduce((ss,p)=>ss+p.amt,0),0);
 const savingsPotExpTotal=()=>(savingsPot.expenses||[]).reduce((s,e)=>s+e.amt,0);
 const savingsPotBal=()=>savingsPotContrib()-savingsPotExpTotal();
 function evEffectivePotPayments(ev){
@@ -1731,6 +1731,21 @@ function releasePotToOne(evId,creditorFid,toFund){
   ev.potPayments=Object.entries(potMap).filter(([,a])=>a>0.5).map(([fid,amt])=>({famId:+fid,amt:Math.round(amt)}));
   save();render();
   if(ev.closed){const adjA=evAdjBalance(ev);ev.participants.forEach(fid=>{if(Math.abs(adjA[fid]||0)<=0.5)_sendCloseEvEmailOne(ev,fid);});}
+}
+function releasePotToSavings(evId,amt){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  amt=Math.round(amt);if(amt<=0)return;
+  const potTotal=evPotTotal(ev);
+  const toReduce=Math.min(amt,potTotal);
+  if(toReduce>0.5){
+    const ratio=toReduce/potTotal;
+    ev.potPayments=(ev.potPayments||[]).map(p=>({...p,amt:Math.round(p.amt*(1-ratio))})).filter(p=>p.amt>0.5);
+  }
+  if(!ev.potToSavings)ev.potToSavings=[];
+  ev.potToSavings.push({amt,date:new Date().toLocaleDateString('he-IL')});
+  save();render();
+  if(potModalEvId===evId){const te=events.find(e=>e.id===evId);if(te)renderPotModal(te);}
+  if(potTrModalEvId===evId){const te=events.find(e=>e.id===evId);if(te&&evPotTotal(te)>0)renderPotTransferModal(te);else closePotTransferModal();}
 }
 function renderArchiveGoals(){
   const el=document.getElementById('archGoalList');
@@ -3572,6 +3587,13 @@ function renderPotTransferModal(ev){
       <button onclick="potManualTransfer(${ev.id},false)" style="padding:9px 14px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
       <button onclick="potManualTransfer(${ev.id},true)" style="padding:9px 14px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
     </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">העבר לקופת חיסכון</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="potSavAmt-${ev.id}" placeholder="₪" min="1" style="flex:1;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;font-family:var(--font);font-weight:700;text-align:center" />
+        <button onclick="(()=>{const a=parseFloat(document.getElementById('potSavAmt-${ev.id}').value)||0;if(a>0)releasePotToSavings(${ev.id},a);})()" style="padding:9px 14px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">💎 לחיסכון</button>
+      </div>
+    </div>
   </div>`;
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
@@ -3619,12 +3641,13 @@ function renderPotModal(ev){
     if(s.method==='pot'){const k=s.toFid!=null?String(s.toFid):s.to;if(!_potByTo[k])_potByTo[k]={to:s.to,amt:0};_potByTo[k].amt+=s.amt;}
     else _nonPot.push(s);
   });
-  const _mergedDone=[...Object.values(_potByTo).map(p=>({method:'pot',to:p.to,amt:p.amt})),..._nonPot];
+  const _savingsXfers=(ev.potToSavings||[]).map(p=>({method:'pot-savings',to:'קופת חיסכון',amt:p.amt,date:p.date}));
+  const _mergedDone=[...Object.values(_potByTo).map(p=>({method:'pot',to:p.to,amt:p.amt})),..._nonPot,..._savingsXfers];
   const doneRows=_mergedDone.length?`<div style="border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">העברות שבוצעו:</div><div style="padding:0 16px 4px">`+_mergedDone.map(s=>{
-    const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':'✓';
-    const badge=s.method==='fund'?`<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>`:s.method==='pot'?`<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>`:`<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>`;
-    const fromLabel=s.method==='pot'?'קופת האירוע':s.from;
-    return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span style="flex:1"><b style="color:var(--text)">${esc(fromLabel)}</b> העביר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
+    const icon=s.method==='fund'?'🏦':s.method==='pot'?'💰':s.method==='pot-savings'?'💎':'✓';
+    const badge=s.method==='fund'?`<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>`:s.method==='pot'?`<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>`:s.method==='pot-savings'?`<span style="font-size:10px;background:var(--green-bg);color:var(--green-mid);padding:1px 6px;border-radius:10px">חיסכון</span>`:`<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>`;
+    const fromLabel=(s.method==='pot'||s.method==='pot-savings')?'קופת האירוע':s.from;
+    return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span style="flex:1"><b style="color:var(--text)">${esc(fromLabel)}</b> הועבר ל<b style="color:var(--text)">${esc(s.to)}</b> ₪${s.amt.toLocaleString()}</span>${badge}</div>`;
   }).join('')+'</div></div>':'';
   const expRows=potExpItems.length?`<div style="border-bottom:1px solid var(--border)">
     <div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">הוצאות מהקופה:</div>
@@ -3650,6 +3673,7 @@ function renderPotModal(ev){
     </div>
     ${expRows}
     ${potTransferBtn}
+    ${effBal>0?`<div class="edit-only" style="padding:10px 16px;border-bottom:1px solid var(--border)"><button onclick="releasePotToSavings(${ev.id},${effBal})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💎 העבר יתרה לקופת חיסכון (₪${effBal.toLocaleString()})</button></div>`:''}
     ${!creditorFids.length&&potPayments.length&&potExcess<=0.5?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
     ${doneRows}
     <div style="padding:4px 16px 10px">
