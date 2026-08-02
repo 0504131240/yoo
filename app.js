@@ -552,7 +552,23 @@ async function load(){
       if(!fund.famBalances)fund.famBalances={};
     }catch(e2){}
     showSyncStatus('⚠ מקומי בלבד',3000);
-  }finally{render();setTimeout(handleHash,100);}
+  }finally{
+    // one-time migration: restore potPayments reduced by old releasePotToSavings logic
+    let _migFixed=false;
+    events.forEach(ev=>{
+      if(ev._pot2savFixed)return;
+      const pot2sav=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
+      if(pot2sav<=0){ev._pot2savFixed=true;return;}
+      const cur=(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
+      if(cur<=0){ev._pot2savFixed=true;return;}
+      const orig=cur+pot2sav;
+      ev.potPayments=ev.potPayments.map(p=>({...p,amt:Math.round(p.amt*orig/cur)}));
+      ev._pot2savFixed=true;
+      _migFixed=true;
+    });
+    if(_migFixed)save();
+    render();setTimeout(handleHash,100);
+  }
 }
 
 function showSyncStatus(msg,hideAfter){
