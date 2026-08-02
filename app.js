@@ -391,7 +391,7 @@ function sendSettledEmail(ev,famId){
   // HTML
   const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(_savPF>0) cardRows.push(['💎 מתוכם לקופת חיסכון',`₪${_savPF.toLocaleString()}`]);
-  if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
+  if(spent>0) cardRows.push(['ההוצאות שלך',`₪${spent.toLocaleString()}`]);
   if(fundBal>0) cardRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(cardRows);
   bodyHtml+=_splitMethodBlock(ev,famId);
