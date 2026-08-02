@@ -1756,12 +1756,6 @@ function releasePotToOne(evId,creditorFid,toFund){
 function releasePotToSavings(evId,amt){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   amt=Math.round(amt);if(amt<=0)return;
-  const potTotal=evPotTotal(ev);
-  const toReduce=Math.min(amt,potTotal);
-  if(toReduce>0.5){
-    const ratio=toReduce/potTotal;
-    ev.potPayments=(ev.potPayments||[]).map(p=>({...p,amt:Math.round(p.amt*(1-ratio))})).filter(p=>p.amt>0.5);
-  }
   if(!ev.potToSavings)ev.potToSavings=[];
   ev.potToSavings.push({amt,date:new Date().toLocaleDateString('he-IL')});
   save();render();
@@ -3702,7 +3696,7 @@ function renderPotModal(ev){
     </div>
     ${expRows}
     ${potTransferBtn}
-    ${(()=>{const _sTotal=(ev.savingsTotal||(ev.savingsAmt||0)*ev.participants.length);const _sPaid=(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0);const _sOwed=Math.round(_sTotal+evSavingsSurplus(ev)-_sPaid);const _sAmt=Math.min(effBal,Math.max(0,_sOwed));return _sAmt>0?`<div class="edit-only" style="padding:10px 16px;border-bottom:1px solid var(--border)"><button onclick="releasePotToSavings(${ev.id},${_sAmt})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💎 העבר לקופת חיסכון (₪${_sAmt.toLocaleString()})</button></div>`:'';})()}
+    ${(()=>{const _sTotal=(ev.savingsTotal||(ev.savingsAmt||0)*ev.participants.length);const _sPaid=(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0);const _sPot2Sav=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);const _sOwed=Math.round(_sTotal+evSavingsSurplus(ev)-_sPaid-_sPot2Sav);const _sAmt=Math.min(effBal,Math.max(0,_sOwed));return _sAmt>0?`<div class="edit-only" style="padding:10px 16px;border-bottom:1px solid var(--border)"><button onclick="releasePotToSavings(${ev.id},${_sAmt})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💎 העבר לקופת חיסכון (₪${_sAmt.toLocaleString()})</button></div>`:'';})()}
     ${!creditorFids.length&&potPayments.length&&potExcess<=0.5?`<div style="padding:10px 16px"><button class="edit-only" onclick="releasePotM(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ סמן כהועבר</button></div>`:''}
     ${doneRows}
     <div style="padding:4px 16px 10px">
