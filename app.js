@@ -47,6 +47,8 @@ const famFundBal=fid=>(fund.famBalances[String(fid)]||0);
 // קופות למטרה: {id, name, target, contributions:{famId:amount}, closed}
 let goalFunds=[];
 let nxtGoal=1;
+// קופת חיסכון כללית: {expenses:[{id,name,amt,date}], nxtExpId}
+let savingsPot={expenses:[],nxtExpId:1};
 const goalTotal=g=>Object.values(g.contributions||{}).reduce((s,v)=>s+v,0);
 const col=id=>COLORS[(id-1)%COLORS.length];
 const ini=n=>n.replace('משפחת','').trim().slice(0,2);
@@ -118,6 +120,10 @@ const evPotRefundByFam=ev=>{
   (ev.settled||[]).filter(s=>s.method==='pot-refund'&&s.fromFid!=null).forEach(s=>{r[s.fromFid]=(r[s.fromFid]||0)+s.amt;});
   return r;
 };
+// Savings pot helpers
+const savingsPotContrib=()=>events.reduce((s,ev)=>s+(ev.savingsAmt||0)*(ev.participants||[]).length,0);
+const savingsPotExpTotal=()=>(savingsPot.expenses||[]).reduce((s,e)=>s+e.amt,0);
+const savingsPotBal=()=>savingsPotContrib()-savingsPotExpTotal();
 function evEffectivePotPayments(ev){
   const payments=ev.potPayments||[];
   const expTotal=evPotExpTotal(ev);
@@ -431,6 +437,7 @@ function saveLocal(){
     localStorage.setItem('fund',JSON.stringify(fund));
     localStorage.setItem('nxtTx',String(nxtTx));
     localStorage.setItem('goalFunds',JSON.stringify(goalFunds));
+    localStorage.setItem('savingsPot',JSON.stringify(savingsPot));
     localStorage.setItem('adminPass',adminPass);
     localStorage.setItem('messages',JSON.stringify(messages));
     localStorage.setItem('calItems',JSON.stringify(calItems));
@@ -449,7 +456,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,adminPass,messages,calItems,birthdays});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays});
     localStorage.removeItem('pendingSave');
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
@@ -474,6 +481,8 @@ async function load(){
     fund=d.fund||{famBalances:{},transactions:[]};
     if(!fund.famBalances)fund.famBalances={};
     goalFunds=d.goalFunds||[];
+    savingsPot=d.savingsPot||{expenses:[],nxtExpId:1};
+    if(!savingsPot.nxtExpId)savingsPot.nxtExpId=(savingsPot.expenses||[]).length?Math.max(...savingsPot.expenses.map(e=>e.id))+1:1;
     adminPass=d.adminPass||'';
     messages=d.messages||[];
     calItems=d.calItems||[];
@@ -488,10 +497,11 @@ async function load(){
     // if there's a pending local save, override firebase data with local and push
     if(localStorage.getItem('pendingSave')==='1'){
       const localFa=localStorage.getItem('ff');const localEv=localStorage.getItem('fe');
-      const localFd=localStorage.getItem('fund');
+      const localFd=localStorage.getItem('fund');const localSp=localStorage.getItem('savingsPot');
       if(localFa)families=JSON.parse(localFa);
       if(localEv)events=JSON.parse(localEv);
       if(localFd){const p=JSON.parse(localFd);fund=p.famBalances?p:{famBalances:{},transactions:p.transactions||[]};}
+      if(localSp){savingsPot=JSON.parse(localSp);if(!savingsPot.nxtExpId)savingsPot.nxtExpId=1;}
       nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
       nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
       _saving=false;save();
@@ -506,6 +516,7 @@ async function load(){
       const fd=localStorage.getItem('fund');if(fd){const p=JSON.parse(fd);fund=p.famBalances?p:{famBalances:{},transactions:p.transactions||[]};}
       const tx=localStorage.getItem('nxtTx');if(tx)nxtTx=parseInt(tx);
       const gf=localStorage.getItem('goalFunds');if(gf)goalFunds=JSON.parse(gf);
+      const sp=localStorage.getItem('savingsPot');if(sp){savingsPot=JSON.parse(sp);if(!savingsPot.nxtExpId)savingsPot.nxtExpId=1;}
       const ap=localStorage.getItem('adminPass');if(ap)adminPass=ap;
       const msgs=localStorage.getItem('messages');if(msgs)messages=JSON.parse(msgs);
       const cals=localStorage.getItem('calItems');if(cals)calItems=JSON.parse(cals);
@@ -1414,6 +1425,7 @@ function evCard(ev){
         <div style="flex:1;min-width:0">
           <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
           ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+          ${ev.savingsAmt?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 חיסכון ₪${ev.savingsAmt.toLocaleString()}</div>`:''}
           ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
           ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
         </div>
@@ -1479,6 +1491,7 @@ function evCard(ev){
           <div style="flex:1;min-width:0">
             <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
             ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
+            ${ev.savingsAmt?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">💎 חיסכון ₪${ev.savingsAmt.toLocaleString()}</div>`:''}
             ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
             ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
           </div>
@@ -2258,6 +2271,8 @@ function editEv(evId){
     ev.participants.forEach(fid=>{ const inp=document.getElementById('fexp-'+fid); if(inp) inp.value=ev.expenses[fid]||''; });
     updateFormTotal();
   }
+  const savEl=document.getElementById('f-savings');
+  if(savEl)savEl.value=ev.savingsAmt||'';
   document.getElementById('newFormOverlay').style.display='flex';
   goTab('events',document.getElementById('nb-events'));
 }
@@ -2267,6 +2282,7 @@ function hideForm(){
   editingId=null;
   document.getElementById('formTitle').textContent='➕ אירוע חדש';
   document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
+  const savEl=document.getElementById('f-savings');if(savEl)savEl.value='';
 }
 function toggleChip(fid){
   const el=document.getElementById('chip-'+fid);
@@ -2335,6 +2351,7 @@ async function doCreate(){
   if(!ok)return;
   const totalCost=expMode==='total'?(await _toILS('f-total','fTotalCur')):null;
   const isCumulative=expMode==='cumulative';
+  const savingsAmt=Math.round(parseFloat(document.getElementById('f-savings')?.value)||0);
   const childOverrides={};const parentOverrides={};
   if(splitMethod!=='equal') participants.forEach(fid=>{
     childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0);
@@ -2346,10 +2363,12 @@ async function doCreate(){
       ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded;
       ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; ev.parentOverrides=parentOverrides;
       if(!ev.cumulative){ ev.expenses=expenses; ev.totalCost=totalCost; }
+      if(savingsAmt>0)ev.savingsAmt=savingsAmt;else delete ev.savingsAmt;
     }
   } else {
     const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides,parentOverrides};
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
+    if(savingsAmt>0)newEv.savingsAmt=savingsAmt;
     events.unshift(newEv);
     // notify participants only for non-cumulative events (personalized per family)
     (()=>{
@@ -2807,6 +2826,48 @@ function handleHash(){
   }
 }
 
+function renderSavingsPot(){
+  const el=document.getElementById('savingsPotSection');
+  if(!el)return;
+  const contrib=savingsPotContrib();
+  const expTotal=savingsPotExpTotal();
+  const bal=contrib-expTotal;
+  const contribEvs=events.filter(ev=>(ev.savingsAmt||0)>0);
+  if(!contrib&&!expTotal&&!contribEvs.length){el.innerHTML='';return;}
+  const expRows=(savingsPot.expenses||[]).map(e=>
+    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${esc(e.name)}</div>
+        ${e.date?`<div style="font-size:11px;color:var(--text2)">${esc(e.date)}</div>`:''}
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--red-mid)">-₪${e.amt.toLocaleString()}</div>
+      <button class="edit-only" onclick="delSavingsPotExp(${e.id})" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:2px 4px;line-height:1">🗑</button>
+    </div>`
+  ).join('');
+  const addForm=`<div class="edit-only" style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+    <input id="savExpName" type="text" placeholder="שם ההוצאה" style="flex:2;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text)">
+    <input id="savExpAmt" type="number" min="0" inputmode="numeric" placeholder="₪" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+    <button onclick="addSavingsPotExp()" style="padding:8px 12px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+</button>
+  </div>`;
+  const evList=contribEvs.length?`<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:6px">תרומות מאירועים</div>
+    ${contribEvs.map(ev=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <span style="color:var(--text)">${esc(ev.name)}</span>
+      <span style="font-weight:700;color:var(--green-mid)">+₪${((ev.savingsAmt||0)*(ev.participants||[]).length).toLocaleString()}</span>
+    </div>`).join('')}
+  </div>`:'';
+  el.innerHTML=`<div class="fund-section-title">💎 קופת חיסכון</div>
+    <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:8px">
+      <div style="text-align:center;margin-bottom:4px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:2px">יתרה</div>
+        <div style="font-size:32px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪${bal.toLocaleString()}</div>
+      </div>
+      ${contrib>0?`<div style="font-size:12px;color:var(--text2);text-align:center;margin-top:4px">נאסף: ₪${contrib.toLocaleString()} · הוצא: ₪${expTotal.toLocaleString()}</div>`:''}
+      ${expTotal>0?`<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:12px">${expRows}</div>`:''}
+      ${evList}
+      ${addForm}
+    </div>`;
+}
 function renderFund(){
   const mainTotal=fundTotal();
   const goalTotal2=goalFunds.filter(g=>!g.archived&&!g.closed).reduce((s,g)=>s+goalTotal(g),0);
@@ -2868,6 +2929,8 @@ function renderFund(){
     }
   }
 
+  renderSavingsPot();
+
   // היסטוריית תנועות
   const txEl=document.getElementById('fundTxList');
   const arrow=document.getElementById('fundTxArrow');
@@ -2886,6 +2949,20 @@ function renderFund(){
       <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
     </div>`;
   }).join('')}</div>`;
+}
+function addSavingsPotExp(){
+  const name=document.getElementById('savExpName')?.value.trim();
+  const amt=Math.round(parseFloat(document.getElementById('savExpAmt')?.value)||0);
+  if(!name||!amt)return;
+  if(!savingsPot.expenses)savingsPot.expenses=[];
+  if(!savingsPot.nxtExpId)savingsPot.nxtExpId=1;
+  const d=new Date();
+  savingsPot.expenses.push({id:savingsPot.nxtExpId++,name,amt,date:d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric'})});
+  save();renderFund();
+}
+function delSavingsPotExp(id){
+  savingsPot.expenses=(savingsPot.expenses||[]).filter(e=>e.id!==id);
+  save();renderFund();
 }
 function toggleFundTx(){
   fundTxOpen=!fundTxOpen;
