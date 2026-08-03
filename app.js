@@ -163,6 +163,14 @@ function evAdjBalance(ev){
   });
   (ev.potPayments||[]).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
   (ev.savingsPaid||[]).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
+  // Credit each family for their share of pot→savings transfer (reduces their savings obligation)
+  const _pot2savAdj=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
+  if(_pot2savAdj>0&&(ev.savingsTotal||ev.savingsAmt)&&(ev.participants||[]).length>0){
+    const _n=ev.participants.length;
+    const _savPF=ev.savingsTotal?Math.round(ev.savingsTotal/_n):(ev.savingsAmt||0);
+    const _creditPF=Math.min(_savPF,Math.round(_pot2savAdj/_n));
+    if(_creditPF>0) ev.participants.forEach(fid=>{adjBal[fid]=(adjBal[fid]||0)+_creditPF;});
+  }
   return adjBal;
 }
 const shareLabel=ev=>{
