@@ -145,7 +145,9 @@ const savingsPotExpTotal=()=>(savingsPot.expenses||[]).reduce((s,e)=>s+e.amt,0);
 const savingsPotBal=()=>savingsPotContrib()-savingsPotExpTotal();
 function evEffectivePotPayments(ev){
   const payments=ev.potPayments||[];
-  const expTotal=evPotExpTotal(ev);
+  // Money already spent from the pot, whether on a real expense or released to savings,
+  // is no longer available to hand back to depositors — dilute both the same way.
+  const expTotal=evPotExpTotal(ev)+(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
   if(!expTotal)return payments;
   const total=payments.reduce((s,p)=>s+p.amt,0);
   if(!total)return payments;
@@ -163,14 +165,11 @@ function evAdjBalance(ev){
   });
   (ev.potPayments||[]).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
   (ev.savingsPaid||[]).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
-  // Credit each family for their share of pot→savings transfer (reduces their savings obligation)
-  const _pot2savAdj=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
-  if(_pot2savAdj>0&&(ev.savingsTotal||ev.savingsAmt)&&(ev.participants||[]).length>0){
-    const _n=ev.participants.length;
-    const _savPF=ev.savingsTotal?Math.round(ev.savingsTotal/_n):(ev.savingsAmt||0);
-    const _creditPF=Math.min(_savPF,Math.round(_pot2savAdj/_n));
-    if(_creditPF>0) ev.participants.forEach(fid=>{adjBal[fid]=(adjBal[fid]||0)+_creditPF;});
-  }
+  // Note: potToSavings deliberately does NOT credit any family here. It's handled the
+  // same way as a pot expense — evEffectivePotPayments() dilutes what depositors can
+  // still draw from the pot, and whatever they're still owed for their deposit flows
+  // through the normal creditor/debtor settlement in calcTransfers, exactly like any
+  // other pot-funded cost.
   return adjBal;
 }
 const shareLabel=ev=>{
