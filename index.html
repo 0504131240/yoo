@@ -76,6 +76,22 @@
 
 </div>
 
+<!-- Payment claim confirm modal (opened from an email link) -->
+<div id="claimConfirmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2600;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeClaimConfirmModal()">
+  <div style="background:var(--surface);border-radius:var(--r);width:100%;max-width:340px;box-sizing:border-box" id="claimConfirmContent"></div>
+</div>
+
+<!-- Pending payment claims modal -->
+<div id="claimsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeClaimsModal()">
+  <div style="background:var(--surface);border-radius:var(--r);width:100%;max-width:400px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:700">💸 אישורי תשלום ממתינים</div>
+      <button onclick="closeClaimsModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
+    </div>
+    <div id="claimsModalContent"></div>
+  </div>
+</div>
+
 <!-- Calendar event modal -->
 <div id="calModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCalModal()">
   <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
@@ -171,6 +187,8 @@
 </div>
 
 <div class="main">
+
+  <div id="claimsBanner" class="edit-only"></div>
 
   <!-- HOME -->
   <div class="view active" id="view-home">

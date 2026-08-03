@@ -17,7 +17,8 @@ let cumPotEvId=null,cumPotFamId=null;
 let messages=[];
 let calItems=[];
 let birthdays=[];
-let nxtMsg=1,nxtCal=1,nxtBday=1;
+let paymentClaims=[];
+let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
 let calHebRefDate=new Date();
@@ -279,26 +280,34 @@ async function savePaymentSettings(){
   const st=document.getElementById('payStatus');
   if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
 }
-function _paymentBlock(owe,evName){
+function _paymentBlock(owe,evName,evId,famId){
   const p=getPaymentSettings();
   const hasBank=p.bank&&p.account;
   const hasBit=p.bit;
-  if(!hasBank&&!hasBit)return'';
-  let html=`<div style="margin-top:14px;padding:12px 14px;background:#F0FDF4;border-radius:8px;border:1px solid #BBF7D0">`;
-  html+=`<div style="font-weight:700;font-size:13px;color:#15803D;margin-bottom:8px">💸 לתשלום:</div>`;
-  if(hasBank){
-    html+=`<div style="font-size:12px;color:#166534;line-height:1.8">`;
-    html+=`🏦 <b>${_esc(p.bank)}</b>`;
-    if(p.branch) html+=` · סניף <b>${_esc(p.branch)}</b>`;
-    html+=`<br>מספר חשבון: <b style="letter-spacing:1px;direction:ltr;display:inline-block">${_esc(p.account)}</b>`;
+  let html='';
+  if(hasBank||hasBit){
+    html+=`<div style="margin-top:14px;padding:12px 14px;background:#F0FDF4;border-radius:8px;border:1px solid #BBF7D0">`;
+    html+=`<div style="font-weight:700;font-size:13px;color:#15803D;margin-bottom:8px">💸 לתשלום:</div>`;
+    if(hasBank){
+      html+=`<div style="font-size:12px;color:#166534;line-height:1.8">`;
+      html+=`🏦 <b>${_esc(p.bank)}</b>`;
+      if(p.branch) html+=` · סניף <b>${_esc(p.branch)}</b>`;
+      html+=`<br>מספר חשבון: <b style="letter-spacing:1px;direction:ltr;display:inline-block">${_esc(p.account)}</b>`;
+      html+=`</div>`;
+    }
+    if(hasBit){
+      html+=`<div style="margin-top:${hasBank?10:0}px">`;
+      html+=`<a href="${_esc(p.bit)}" style="display:inline-block;background:#1A3C40;color:#3BFFF0;text-decoration:none;padding:10px 22px;border-radius:20px;font-size:14px;font-weight:700">💙 שלם בביט · ₪${owe.toLocaleString()}</a>`;
+      html+=`</div>`;
+    }
     html+=`</div>`;
   }
-  if(hasBit){
-    html+=`<div style="margin-top:${hasBank?10:0}px">`;
-    html+=`<a href="${_esc(p.bit)}" style="display:inline-block;background:#1A3C40;color:#3BFFF0;text-decoration:none;padding:10px 22px;border-radius:20px;font-size:14px;font-weight:700">💙 שלם בביט · ₪${owe.toLocaleString()}</a>`;
+  if(evId!=null&&famId!=null){
+    const confirmUrl=`${_ejsUrl()}#confirm-${evId}-${famId}-${Math.round(owe)}`;
+    html+=`<div style="margin-top:10px;text-align:center">`;
+    html+=`<a href="${_esc(confirmUrl)}" style="display:inline-block;background:#fff;color:#15803D;text-decoration:none;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:700;border:1.5px solid #86EFAC">✓ כבר שילמתי, סמן בשבילי</a>`;
     html+=`</div>`;
   }
-  html+=`</div>`;
   return html;
 }
 function testEjsEmail(){
@@ -464,6 +473,7 @@ function saveLocal(){
     localStorage.setItem('messages',JSON.stringify(messages));
     localStorage.setItem('calItems',JSON.stringify(calItems));
     localStorage.setItem('birthdays',JSON.stringify(birthdays));
+    localStorage.setItem('paymentClaims',JSON.stringify(paymentClaims));
   }catch(e){}
 }
 
@@ -478,7 +488,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims});
     localStorage.removeItem('pendingSave');
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
@@ -509,9 +519,11 @@ async function load(){
     messages=d.messages||[];
     calItems=d.calItems||[];
     birthdays=d.birthdays||[];
+    paymentClaims=d.paymentClaims||[];
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
+    nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
@@ -543,9 +555,11 @@ async function load(){
       const msgs=localStorage.getItem('messages');if(msgs)messages=JSON.parse(msgs);
       const cals=localStorage.getItem('calItems');if(cals)calItems=JSON.parse(cals);
       const bds=localStorage.getItem('birthdays');if(bds)birthdays=JSON.parse(bds);
+      const pcs=localStorage.getItem('paymentClaims');if(pcs)paymentClaims=JSON.parse(pcs);
       nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
       nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
       nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
+      nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;
       nxtId=events.reduce((a,e)=>Math.max(a,e.id),0)+1;
       nxtFam=families.reduce((a,f)=>Math.max(a,f.id),0)+1;
       nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
@@ -575,7 +589,7 @@ function showSyncStatus(msg,hideAfter){
 
 function render(){
   applyEditMode();
-  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome];
+  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome,renderClaimsBanner];
   fns.forEach(fn=>{try{fn();}catch(e){console.error(fn.name,e);}});
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
@@ -2601,7 +2615,7 @@ function sendEmailToFam(evId,fid){
     const _potIsFromFund1=_fromFundToPot1>0.5&&Math.abs(_fromFundToPot1-potDep)<1;
     const msgPot=potDep>0.5?(_potIsFromFund1?`\nהעברת מהקופה הראשית ₪${potDep.toLocaleString()} לקופת האירוע`:`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`):'';
     const _savPerFam1=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
-    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot}${_savPerFam1>0?`\n💎 לקופת חיסכון: ₪${_savPerFam1.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
+    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot}${_savPerFam1>0?`\n💎 לקופת חיסכון: ₪${_savPerFam1.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}\n\nכבר שילמת? סמן כאן: ${_ejsUrl()}#confirm-${ev.id}-${fid}-${owe}`;
     const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
     if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
     if(_savPerFam1>0) cardRows.push(['💎 לקופת חיסכון',`₪${_savPerFam1.toLocaleString()}`]);
@@ -2630,7 +2644,7 @@ function sendEmailToFam(evId,fid){
       if(_rRows) bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#E0F2FE"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">סכום</th><th style="padding:6px;text-align:right;color:#D97706;font-weight:700;border-bottom:2px solid #7DD3FC">החלק שלך</th></tr>${_rRows}</table>`;
     }
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
-    bodyHtml+=_paymentBlock(owe,ev.name);
+    bodyHtml+=_paymentBlock(owe,ev.name,ev.id,fid);
     // Other debts
     const _otherDebts=events.filter(e=>e.id!==ev.id&&e.open&&(e.participants||[]).includes(fid)).map(e=>{const _d=Math.round(-(evAdjBalance(e)[fid]||0));return _d>0.5?{name:e.name,owe:_d}:null;}).filter(Boolean);
     if(_otherDebts.length){bodyHtml+=`<div style="margin-top:14px;padding:10px 14px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA">${_otherDebts.map(d=>`<div style="font-size:12px;color:#991B1B;margin-bottom:2px">⚠️ תזכורת: קיים גם חוב של ₪${d.owe.toLocaleString()} עבור "${_esc(d.name)}"</div>`).join('')}</div>`;}
@@ -2764,7 +2778,93 @@ function handleHash(){
     goTab('archive',null);
     expanded.add(id);renderArchive();
     setTimeout(()=>{const el=document.getElementById('ecard-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},150);
+  } else if(h.startsWith('confirm-')){
+    const parts=h.slice(8).split('-').map(Number);
+    const [evId,famId,amt]=parts;
+    history.replaceState(null,'',window.location.pathname);
+    if(parts.length===3&&!parts.some(isNaN)) openClaimConfirmModal(evId,famId,amt);
   }
+}
+function openClaimConfirmModal(evId,famId,amt){
+  const ev=events.find(e=>e.id===evId);const f=getFam(famId);
+  const modal=document.getElementById('claimConfirmModal');const el=document.getElementById('claimConfirmContent');
+  if(!modal||!el)return;
+  if(!ev||!f){
+    el.innerHTML=`<div style="padding:24px 20px;text-align:center;color:var(--text2)">הקישור לא תקין או שהאירוע כבר לא קיים.</div>`;
+    modal.style.display='flex';return;
+  }
+  el.innerHTML=`
+    <div style="padding:24px 20px;text-align:center">
+      <div style="font-size:32px;margin-bottom:8px">💸</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">לאשר תשלום?</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px">
+        ${esc(f.name.replace('משפחת','').trim())} מאשר/ת ששילם/ה <b>₪${amt.toLocaleString()}</b><br>עבור "${esc(ev.name)}"
+      </div>
+      <button onclick="submitPaymentClaim(${evId},${famId},${amt})" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--green-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">✓ כן, שילמתי</button>
+      <button onclick="closeClaimConfirmModal()" style="width:100%;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>`;
+  modal.style.display='flex';
+}
+function closeClaimConfirmModal(){
+  const modal=document.getElementById('claimConfirmModal');if(modal)modal.style.display='none';
+}
+function submitPaymentClaim(evId,famId,amt){
+  paymentClaims.push({id:nxtClaim++,evId,famId,amt,date:new Date().toLocaleDateString('he-IL'),ts:Date.now()});
+  save();
+  const el=document.getElementById('claimConfirmContent');
+  if(el) el.innerHTML=`
+    <div style="padding:24px 20px;text-align:center">
+      <div style="font-size:32px;margin-bottom:8px">✅</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">תודה!</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px">האישור נשלח, מי שמנהל את הקופה יבדוק ויעדכן.</div>
+      <button onclick="closeClaimConfirmModal()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+    </div>`;
+  renderClaimsBanner();
+}
+function renderClaimsBanner(){
+  const el=document.getElementById('claimsBanner');if(!el)return;
+  if(!paymentClaims.length){el.innerHTML='';return;}
+  el.innerHTML=`
+    <div onclick="openClaimsModal()" style="cursor:pointer;margin:0 16px 12px;padding:12px 14px;border-radius:var(--r2);background:var(--green-bg);border:1px solid var(--green-mid);display:flex;align-items:center;gap:10px">
+      <div style="font-size:20px">💸</div>
+      <div style="flex:1;font-size:13px;font-weight:700;color:var(--green-mid)">${paymentClaims.length} אישור${paymentClaims.length>1?'י':''} תשלום ממתין${paymentClaims.length>1?'ים':''} לבדיקה</div>
+      <div style="font-size:16px;color:var(--green-mid)">›</div>
+    </div>`;
+}
+function openClaimsModal(){
+  const modal=document.getElementById('claimsModal');const el=document.getElementById('claimsModalContent');
+  if(!modal||!el)return;
+  if(!paymentClaims.length){closeClaimsModal();return;}
+  const rows=[...paymentClaims].sort((a,b)=>b.ts-a.ts).map(c=>{
+    const ev=events.find(e=>e.id===c.evId);const f=getFam(c.famId);
+    const evName=ev?esc(ev.name):'אירוע שנמחק';
+    const famName=f?esc(f.name.replace('משפחת','').trim()):'משפחה שנמחקה';
+    return`<div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <div style="font-size:13px;font-weight:700">${famName}</div>
+        <div style="font-size:14px;font-weight:700;color:var(--green-mid)">₪${c.amt.toLocaleString()}</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">${evName} · ${esc(c.date||'')}</div>
+      <div style="display:flex;gap:6px">
+        ${ev?`<button onclick="goToClaimEvent(${c.id},${c.evId})" style="flex:1;padding:7px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↗ פתח אירוע</button>`:''}
+        <button onclick="dismissClaim(${c.id})" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">✓ טופל</button>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=rows;
+  modal.style.display='flex';
+}
+function closeClaimsModal(){
+  const modal=document.getElementById('claimsModal');if(modal)modal.style.display='none';
+}
+function dismissClaim(claimId){
+  paymentClaims=paymentClaims.filter(c=>c.id!==claimId);
+  save();renderClaimsBanner();openClaimsModal();
+}
+function goToClaimEvent(claimId,evId){
+  dismissClaim(claimId);
+  closeClaimsModal();
+  window.location.hash='event-'+evId;
 }
 
 function renderSavingsPot(){

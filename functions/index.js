@@ -29,6 +29,10 @@ exports.sendPushOnUpdate = onDocumentUpdated(
   if(countExps(after.events) > countExps(before.events))
     notifications.push({title:'💰 הוצאה חדשה', body:'נוספה הוצאה חדשה לאירוע'});
 
+  // אישורי תשלום חדשים
+  const newClaims = (after.paymentClaims||[]).filter(c => !(before.paymentClaims||[]).find(b=>b.id===c.id));
+  newClaims.forEach(c => notifications.push({title:'💸 אישור תשלום חדש', body:`₪${c.amt} · לבדיקה באפליקציה`}));
+
   if(!notifications.length) return null;
 
   const db = getFirestore();
