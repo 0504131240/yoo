@@ -1305,7 +1305,8 @@ function calcTransfers(ev){
   // Add savings pot as virtual creditor (collects savings + ceiling-rounding surplus from debtors)
   const _savingsTotal=ev.savingsTotal||(ev.savingsAmt||0)*ev.participants.length;
   const _savingsPaidTotal=(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0);
-  const _savingsOwed=Math.round(_savingsTotal+evSavingsSurplus(ev)-_savingsPaidTotal);
+  const _pot2savTotal=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
+  const _savingsOwed=Math.round(_savingsTotal+evSavingsSurplus(ev)-_savingsPaidTotal-_pot2savTotal);
   if(_savingsOwed>0.5) pos.push({name:'קופת חיסכון',fid:'__savings__',amt:_savingsOwed,isSavings:true});
   const transfers=[];
   // Sort largest first so big debtors match big creditors → fewer splits per person
