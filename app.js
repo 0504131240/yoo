@@ -561,36 +561,6 @@ async function load(){
     }catch(e2){}
     showSyncStatus('⚠ מקומי בלבד',3000);
   }finally{
-    // one-time migration: restore potPayments reduced by old releasePotToSavings logic
-    let _migFixed=false;
-    events.forEach(ev=>{
-      if(ev._pot2savFixed)return;
-      const pot2sav=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
-      if(pot2sav<=0){ev._pot2savFixed=true;return;}
-      const cur=(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
-      if(cur<=0){ev._pot2savFixed=true;return;}
-      const orig=cur+pot2sav;
-      ev.potPayments=ev.potPayments.map(p=>({...p,amt:Math.round(p.amt*orig/cur)}));
-      ev._pot2savFixed=true;
-      _migFixed=true;
-    });
-    // targeted fix: מנגל בין הזמנים — restore original pot deposits and savings transfer
-    (()=>{
-      const ev=events.find(e=>e.name==='מנגל בין הזמנים');if(!ev)return;
-      const _famAmt=[['הרשברג',13],['שוירץ',100],['ינקלביץ',40]];
-      const _hasPot=(ev.potPayments||[]).find(p=>p.amt===100);
-      const _hasSav=(ev.potToSavings||[]).some(p=>p.amt===34);
-      if(_hasPot&&_hasSav)return;
-      if(!_hasPot){
-        const newPot=[];
-        _famAmt.forEach(([nm,amt])=>{const f=families.find(f=>f.name.includes(nm));if(f)newPot.push({famId:f.id,amt});});
-        if(newPot.length)ev.potPayments=newPot;
-      }
-      if(!_hasSav){if(!ev.potToSavings)ev.potToSavings=[];ev.potToSavings.push({amt:34,date:'02/08/2026'});}
-      ev._pot2savFixed=true;
-      _migFixed=true;
-    })();
-    if(_migFixed)save();
     render();setTimeout(handleHash,100);
   }
 }
