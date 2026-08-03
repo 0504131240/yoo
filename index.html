@@ -76,24 +76,6 @@
 
 </div>
 
-<!-- Message modal -->
-<div id="msgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeMsgModal()">
-  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
-    <div style="font-size:15px;font-weight:700;margin-bottom:16px">💌 הוסף הודעה</div>
-    <div class="field" style="margin-bottom:10px">
-      <input id="msgAuthor" placeholder="שמך (אופציונלי)" maxlength="40" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
-    </div>
-    <div class="field" style="margin-bottom:14px">
-      <textarea id="msgText" placeholder="כתוב הודעה או ברכה..." maxlength="500" oninput="document.getElementById('msgCharCount').textContent=this.value.length+'/500'" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box;min-height:90px;resize:none"></textarea>
-      <div style="font-size:11px;color:var(--text3);text-align:left;margin-top:3px" id="msgCharCount"></div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button onclick="sendMessage()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">שלח</button>
-      <button onclick="closeMsgModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
-    </div>
-  </div>
-</div>
-
 <!-- Calendar event modal -->
 <div id="calModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCalModal()">
   <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">

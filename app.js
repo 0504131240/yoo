@@ -7,7 +7,7 @@ const COLORS=[
 let families=[];
 let events=[];
 let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
-let collapsedEvents=new Set(),collapsedGoals=new Set(),expandedArchGoals=new Set();
+let collapsedEvents=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
 let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null,addExpItemFromPot=false;
@@ -31,10 +31,6 @@ function toggleEvCollapse(evId){
   if(collapsedEvents.has(evId)){collapsedEvents.delete(evId);history.replaceState(null,'','#event-'+evId);}
   else{collapsedEvents.add(evId);history.replaceState(null,'','#events');}
   renderOpenList();
-}
-function toggleGoalCollapse(goalId){
-  if(collapsedGoals.has(goalId))collapsedGoals.delete(goalId);else collapsedGoals.add(goalId);
-  renderGoalFunds();
 }
 // fund: יתרה פנימית לכל משפחה + היסטוריית תנועות
 // famBalances: {famId: number} — כמה כל משפחה הפקידה פחות מה שיצא
@@ -259,7 +255,6 @@ async function loadPaymentSettings(){
       if(d.bit)     localStorage.setItem('payBitLink',d.bit);
     }
   }catch(e){}
-  localStorage.removeItem('payBitPhone'); // remove old key
   const ids=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
   const keys=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
   ids.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.value=localStorage.getItem(keys[i])||'';});
@@ -337,9 +332,6 @@ function _emailWrap(bodyHtml,headerTitle,headerIcon,urlOverride,headerSubtitle){
 }
 function _eCard(rows){
   return`<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;margin-bottom:14px">`+rows.map(([l,v,hi],i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0${i<rows.length-1?';border-bottom:1px solid #DBEAFE':''}"><span style="color:#666;font-size:13px">${_esc(l)}</span><span style="font-weight:700;font-size:13px${hi?';color:#1E88D8':''}">${v}</span></div>`).join('')+`</div>`;
-}
-function _eTable(headers,rows){
-  return`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE">${headers.map(h=>`<th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">${_esc(h)}</th>`).join('')}</tr>${rows.map(r=>`<tr style="border-bottom:1px solid #f0f0f6">${r.map((c,i)=>`<td style="padding:7px 10px${i>0?';font-weight:600':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`;
 }
 function _eBadge(text,color){return`<div style="display:inline-block;background:${color}1a;border:1px solid ${color}55;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:700;color:${color}">${_esc(text)}</div>`;}
 function _splitMethodBlock(ev,fid){
@@ -639,11 +631,6 @@ function renderFamilyHome(){
   renderChatInput();
 }
 
-function fmtTs(ts){
-  const d=new Date(ts);
-  return d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
-}
-
 function openChatSheet(){
   const s=document.getElementById('chatSheet');
   if(!s)return;
@@ -656,26 +643,6 @@ function closeChatSheet(){
   if(s)s.classList.remove('open');
 }
 
-function openMsgModal(){
-  document.getElementById('msgModal').style.display='flex';
-  setTimeout(()=>{const i=document.getElementById('msgAuthor');if(i)i.focus();},50);
-}
-function closeMsgModal(){
-  document.getElementById('msgModal').style.display='none';
-  document.getElementById('msgAuthor').value='';
-  document.getElementById('msgText').value='';
-  document.getElementById('msgCharCount').textContent='';
-}
-function sendMessage(){
-  const aEl=document.getElementById('msgAuthor');
-  const tEl=document.getElementById('msgText');
-  const author=aEl.value.trim();
-  const text=tEl.value.trim();
-  if(!text)return;
-  messages.push({id:nxtMsg++,author,text,ts:Date.now()});
-  save();renderMessages();
-  closeMsgModal();
-}
 function openCalModal(){
   const dEl=document.getElementById('calAddDate');
   if(calSelDay)dEl.value=calSelDay;
@@ -1240,7 +1207,6 @@ function goToEvent(evId){
   },50);
 }
 function goToGoalFund(goalId){
-  collapsedGoals.delete(goalId);
   goTab('fund',document.getElementById('nb-fund'));
   setTimeout(()=>{
     const el=document.getElementById('gfund-'+goalId);
@@ -1297,9 +1263,6 @@ function calcTransfers(ev){
     if(nCopy[ni].amt<=0.5)ni++;
   }
   return transfers;
-}
-function canPayFromFund(fromFid, amt){
-  return (fund.famBalances[String(fromFid)]||0) >= amt;
 }
 function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
@@ -1852,32 +1815,6 @@ function renderArchive(){
         </div></div>`:''}
     </div>`;
   }).join('');
-}
-function renderDebts(){
-  const debts={};
-  families.forEach(f=>{debts[f.id]={total:0,evs:[]};});
-  events.filter(e=>e.open).forEach(ev=>{
-    const bal=evAdjBalance(ev);
-    ev.participants.forEach(fid=>{ if(bal[fid]<-0.5){debts[fid].total+=Math.abs(bal[fid]);debts[fid].evs.push(esc(ev.name));} });
-  });
-  const has=families.filter(f=>debts[f.id]?.total>0);
-  const none=families.filter(f=>debts[f.id]?.total===0);
-  if(!has.length){
-    document.getElementById('debtList').innerHTML=`<div class="no-debt">✅<br><br>אין חובות פתוחים!<br><span style="font-size:12px">כולם מסודרים</span></div>`;return;
-  }
-  let html=`<div class="dcard">`;
-  html+=has.map(f=>{const cl=col(f.id);const d=debts[f.id];
-    return`<div class="drow">
-      <div style="display:flex;align-items:center;gap:10px">
-        ${famAva(f)}
-        <div><div class="dname">${esc(f.name)}</div><div class="devents">${d.evs.join(' · ')}</div></div>
-      </div>
-      <div><div class="damt">₪${d.total.toLocaleString()}</div><div class="dcnt">${d.evs.length} אירוע${d.evs.length>1?'ות':''}</div></div>
-    </div>`;
-  }).join('');
-  if(none.length)html+=`<div class="clean-row">✓ ללא חוב: ${none.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`;
-  html+=`</div>`;
-  document.getElementById('debtList').innerHTML=html;
 }
 function renderFamilies(){
   document.getElementById('famList').innerHTML=families.map(f=>{
@@ -2636,51 +2573,6 @@ function _sendCloseEvEmailOne(ev,fid){
   const html=_emailWrap(bodyHtml,ev.name,'🏁',_ejsUrl()+'#archive-'+ev.id,f.name);
   sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏁 האירוע הסתיים · ינקלביץ',msg,html);
 }
-function closeEv(evId){
-  const ev=events.find(e=>e.id===evId);if(!ev)return;
-  if(ev.cumulative){
-    ev.closed=true;
-    const adjBal=evAdjBalance(ev);
-    ev.participants.forEach(fid=>{
-      if(Math.abs(adjBal[fid]||0)<=0.5) _sendCloseEvEmailOne(ev,fid);
-    });
-    save();render();
-  } else {
-    // regular event: send closing summary only to families that didn't get a settled email yet (i.e. creditors)
-    const cost=evCost(ev);
-    const shares=evShares(ev);
-    const adjBal=evAdjBalance(ev);
-    ev.participants.forEach(fid=>{
-      const f=getFam(fid);if(!f||(!f.email&&!f.email2))return;
-      if(localStorage.getItem('settled-'+ev.id+'-'+fid)) return; // debtor already got settled email
-      const name=f.name.replace('משפחת','').trim();
-      const share=Math.round(shares[fid]||0);
-      const spent=Math.round(ev.expenses[fid]||0);
-      const bal=Math.round(adjBal[fid]||0);
-      // what this family received from others
-      const received=(ev.settled||[]).filter(s=>{const tf=families.find(x=>x.name.replace('משפחת','').trim()===s.to.replace('משפחת','').trim());return tf&&tf.id===fid;});
-      let msg=`האירוע "${ev.name}" נסגר.\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}`;
-      if(spent>0) msg+=`\nשילמת: ₪${spent.toLocaleString()}`;
-      if(received.length){
-        const recLines=received.map(s=>`• קיבלת ₪${s.amt.toLocaleString()} מ${s.from}`).join('\n');
-        msg+=`\n\n${recLines}`;
-      }
-      msg+=`\n\n${Math.abs(bal)<=0.5?'✅ החשבון שלך מסודר.':bal>0.5?`💰 מגיע לך עוד ₪${bal.toLocaleString()}.`:`⚠️ יתרת חוב: ₪${Math.abs(bal).toLocaleString()}.`}`;
-      const cCardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
-      if(spent>0) cCardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
-      let cBodyHtml=_eCard(cCardRows);
-      if(received.length){
-        cBodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">מה קיבלת:</p><ul style="margin:0 0 16px;padding-right:20px;color:#444">${received.map(s=>`<li style="margin-bottom:4px">₪${s.amt.toLocaleString()} מ${_esc(s.from)}</li>`).join('')}</ul>`;
-      }
-      const statusBadge=Math.abs(bal)<=0.5?_eBadge('✅ החשבון שלך מסודר','#16a34a'):bal>0.5?_eBadge(`💰 מגיע לך עוד ₪${bal.toLocaleString()}`,'#2563eb'):_eBadge(`⚠️ יתרת חוב ₪${Math.abs(bal).toLocaleString()}`,'#ef4444');
-      cBodyHtml+=`<div style="text-align:center;margin-top:4px">${statusBadge}</div>`;
-      const cHtml=_emailWrap(cBodyHtml,ev.name,'🗂',_ejsUrl()+'#archive-'+ev.id,f.name);
-      sendEmailNotif([{email:f.email,email2:f.email2,name}],'🗂 האירוע נסגר · ינקלביץ',msg,cHtml);
-    });
-    ev.open=false;ev.closedOn='היום';save();render();
-    goTab('archive',null);
-  }
-}
 function archiveEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   ev.open=false;ev.closedOn='היום';save();render();
@@ -2789,41 +2681,6 @@ function closeEmailModal(){
 function sendEmailFromModal(evId,fid,btnEl){
   sendEmailToFam(evId,fid);
   if(btnEl){btnEl.textContent='✓';btnEl.disabled=true;btnEl.style.background='var(--surface2)';btnEl.style.color='var(--text3)';btnEl.style.border='1px solid var(--border)';}
-}
-function sendDebtReminderEmails(evId){
-  const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const cost=evCost(ev);
-  const shares=evShares(ev);
-  const adjBal=evAdjBalance(ev);
-  const debtors=ev.participants.filter(fid=>(adjBal[fid]||0)<-0.5);
-  const withEmail=debtors.filter(fid=>{const f=getFam(fid);return f&&(f.email||f.email2);});
-  if(!withEmail.length){alert('אין חייבים עם כתובת מייל');return;}
-  withEmail.forEach(fid=>{
-    const f=getFam(fid);if(!f)return;
-    const name=f.name.replace('משפחת','').trim();
-    const share=Math.round(shares[fid]||0);
-    const spent=Math.round(ev.expenses[fid]||0);
-    const owe=Math.round(Math.abs(adjBal[fid]||0));
-    const potDep2=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
-    const _fromFundToPot2=potDep2>0.5?Math.round((fund.transactions||[]).filter(t=>Number(t.famId)===Number(fid)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.desc||'').includes(ev.name)).reduce((s,t)=>s+t.amount,0)):0;
-    const _potIsFromFund2=_fromFundToPot2>0.5&&Math.abs(_fromFundToPot2-potDep2)<1;
-    const msgPot2=potDep2>0.5?(_potIsFromFund2?`\nהעברת מהקופה הראשית ₪${potDep2.toLocaleString()} לקופת האירוע`:`\nהפקדת לקופת האירוע: ₪${potDep2.toLocaleString()}`):'';
-    const _savPerFam2=ev.savingsTotal?Math.round(ev.savingsTotal/(ev.participants.length||1)):(ev.savingsAmt||0);
-    const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot2}${_savPerFam2>0?`\n💎 לקופת חיסכון: ₪${_savPerFam2.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}`;
-    const _cRows2=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
-    if(spent>0) _cRows2.push(['שילמת',`₪${spent.toLocaleString()}`]);
-    if(_savPerFam2>0) _cRows2.push(['💎 לקופת חיסכון',`₪${_savPerFam2.toLocaleString()}`]);
-    if(potDep2>0.5) _cRows2.push([_potIsFromFund2?'העברת מהקופה הראשית':'הפקדת לקופת האירוע',`₪${potDep2.toLocaleString()}`]);
-    let bodyHtml=_eCard(_cRows2);
-    bodyHtml+=_splitMethodBlock(ev,fid);
-    bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
-    bodyHtml+=_paymentBlock(owe,ev.name);
-    const _otherDebts2=events.filter(e=>e.id!==ev.id&&e.open&&(e.participants||[]).includes(fid)).map(e=>{const _d=Math.round(-(evAdjBalance(e)[fid]||0));return _d>0.5?{name:e.name,owe:_d}:null;}).filter(Boolean);
-    if(_otherDebts2.length){bodyHtml+=`<div style="margin-top:14px;padding:10px 14px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA">${_otherDebts2.map(d=>`<div style="font-size:12px;color:#991B1B;margin-bottom:2px">⚠️ תזכורת: קיים גם חוב של ₪${d.owe.toLocaleString()} עבור "${_esc(d.name)}"</div>`).join('')}</div>`;}
-    const html=_emailWrap(bodyHtml,ev.name,'⚠️',_ejsUrl()+'#'+(ev.open?'event-':'archive-')+ev.id,f.name);
-    sendEmailNotif([{email:f.email,email2:f.email2,name}],`⚠️ תזכורת: חוב ב"${ev.name}" · ינקלביץ`,msg,html);
-  });
-  alert(`נשלח מייל ל-${withEmail.length} משפחות`);
 }
 function reopenEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
@@ -3145,7 +3002,7 @@ function delGoalFund(goalId){
 }
 function archiveGoalFund(goalId){
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
-  g.archived=true;collapsedGoals.delete(goalId);
+  g.archived=true;
   save();render();
   goTab('archive',null);
 }
@@ -3628,7 +3485,6 @@ function renderPotTransferModal(ev){
       <button onclick="releasePotToOneM(${ev.id},${fid},true)" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
     </div>`;
   }).join('');
-  const manualSection='';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div>
@@ -3639,7 +3495,6 @@ function renderPotTransferModal(ev){
     </div>
     <div style="padding:8px 16px 0"><div style="font-size:11px;font-weight:700;color:var(--text2)">זכאים לקבל</div></div>
     ${creditorRows}
-    ${manualSection}
     <div style="padding:8px 16px 12px">
       <button onclick="closePotTransferModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
@@ -3714,45 +3569,6 @@ function renderPotModal(ev){
       <button onclick="closePotModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
 }
-function _potFillAmt(selId,amtId){
-  const sel=document.getElementById(selId);const amtEl=document.getElementById(amtId);
-  if(!sel||!amtEl)return;
-  const o=sel.selectedOptions[0];
-  if(o)amtEl.value=o.dataset.max||'';
-}
-function potManualTransfer(evId,toFund){
-  const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const sel=document.getElementById('potToFid-'+evId);
-  const amtEl=document.getElementById('potTrAmt-'+evId);
-  const toFid=parseInt(sel?.value);
-  const amt=Math.round(parseFloat(amtEl?.value)||0);
-  if(!toFid||isNaN(toFid)){showToast('בחר זכאי');return;}
-  if(amt<1){showToast('הזן סכום');return;}
-  const toFam=getFam(toFid);if(!toFam)return;
-  const toName=toFam.name.replace('משפחת','').trim();
-  const potTot=evPotBal(ev);if(potTot<0.5){showToast('אין כסף בקופה');return;}
-  const give=Math.min(amt,Math.round(potTot));
-  if(!ev.settled)ev.settled=[];
-  let rem=give;const newPots=[];
-  for(const p of(ev.potPayments||[])){
-    if(rem<=0.5){newPots.push(p);continue;}
-    const take=Math.min(p.amt,rem);
-    if(take>0.5){const fromFam=getFam(p.famId);ev.settled.push({from:fromFam?fromFam.name.replace('משפחת','').trim():'',fromFid:p.famId,to:toName,toFid,amt:Math.round(take),method:'pot'});}
-    rem-=take;
-    const left=p.amt-take;if(left>0.5)newPots.push({...p,amt:left});
-  }
-  ev.potPayments=newPots;
-  if(toFund){
-    const key=String(toFid);
-    fund.famBalances[key]=(fund.famBalances[key]||0)+give;
-    fund.transactions.push({id:nxtTx++,type:'deposit',famId:toFid,amount:give,desc:'מקופת אירוע · '+ev.name+' → '+toName,date:new Date().toLocaleDateString('he-IL')});
-  }
-  save();render();
-  if(ev.closed){const adjA=evAdjBalance(ev);ev.participants.forEach(fid=>{if(Math.abs(adjA[fid]||0)<=0.5)_sendCloseEvEmailOne(ev,fid);});}
-  const newEv=events.find(e=>e.id===evId);
-  if(newEv&&evPotTotal(newEv)>0)renderPotModal(newEv);else closePotModal();
-  _refreshPotTransferModal(evId);
-}
 function releasePotToOneM(evId,creditorFid,toFund){
   releasePotToOne(evId,creditorFid,toFund);
   const ev=events.find(e=>e.id===evId);
@@ -3763,44 +3579,6 @@ function releasePotM(evId){
   releasePot(evId);
   closePotModal();
   closePotTransferModal();
-}
-function releasePotExcessToOne(evId,famId,toFund){
-  const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const excessByFam=calcPotExcessByFamily(ev);
-  const exc=excessByFam[famId];if(!exc||exc<0.5)return;
-  if(toFund){
-    const fam=getFam(famId);if(!fam)return;
-    const key=String(famId);
-    fund.famBalances[key]=(fund.famBalances[key]||0)+exc;
-    fund.transactions.push({id:nxtTx++,type:'deposit',famId,amount:exc,
-      desc:'החזר עודף מקופת האירוע · '+ev.name,
-      date:new Date().toLocaleDateString('he-IL')});
-  }
-  // Record excess refund in settled so evPotOrigByFam can reconstruct original deposit
-  if(!ev.settled)ev.settled=[];
-  const famRef=getFam(famId);
-  const fromName=famRef?famRef.name.replace('משפחת','').trim():'';
-  ev.settled.push({from:fromName,fromFid:famId,to:toFund?'קופה':'החזר עודף',amt:Math.round(exc),method:'pot-refund'});
-  // Trim this family's potPayments to only the amount that was actually distributed to creditors
-  const distributed={};
-  calcPotTransfers(ev).forEach(t=>{distributed[t.fromFid]=(distributed[t.fromFid]||0)+t.amt;});
-  const effAmt=Math.round(distributed[famId]||0);
-  ev.potPayments=(ev.potPayments||[]).filter(p=>p.famId!==famId);
-  if(effAmt>0.5) ev.potPayments.push({famId,amt:effAmt});
-  save();render();
-}
-function releasePotExcessToOneM(evId,famId,toFund){
-  releasePotExcessToOne(evId,famId,toFund);
-  const ev=events.find(e=>e.id===evId);
-  if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
-  _refreshPotTransferModal(evId);
-}
-function releasePotCombinedM(evId,creditorFid,toFund){
-  releasePotToOne(evId,creditorFid,toFund);
-  releasePotExcessToOne(evId,creditorFid,toFund);
-  const ev=events.find(e=>e.id===evId);
-  if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
-  _refreshPotTransferModal(evId);
 }
 function deletePotDeposit(evId,famId,localIdx){
   const ev=events.find(e=>e.id===evId);if(!ev||!ev.potPayments)return;
