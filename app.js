@@ -2836,7 +2836,8 @@ function showEmailGateWelcome(fam,slot){
   if(!el)return;
   if(modal)modal.style.display='flex';
   const firstName=slot===2?fam.emailName2:fam.emailName;
-  const name=firstName||fam.name.replace('משפחת','').trim();
+  const surname=fam.name.replace('משפחת','').trim();
+  const name=firstName?`${firstName} ${surname}`:surname;
   const fundBal=Math.round(famFundBal(fam.id));
   const debts=events.filter(ev=>ev.open&&(ev.participants||[]).includes(fam.id))
     .map(ev=>({name:ev.name,owe:Math.round(-(evAdjBalance(ev)[fam.id]||0))}))
