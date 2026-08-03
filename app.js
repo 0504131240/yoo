@@ -2809,7 +2809,7 @@ function openEmailGateModal(){
       <div style="font-size:34px;margin-bottom:8px">👋</div>
       <div style="font-size:15px;font-weight:700;margin-bottom:6px">ברוכים הבאים</div>
       <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:18px">האפליקציה מיועדת למשפחות המשתתפות בלבד — הזינו את כתובת המייל שלכם כדי להיכנס</div>
-      <input id="emailGateInput" type="email" placeholder="you@example.com" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box;margin-bottom:6px" onkeydown="if(event.key==='Enter')submitEmailGate()">
+      <input id="emailGateInput" type="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box;margin-bottom:6px" onkeydown="if(event.key==='Enter')submitEmailGate()">
       <div id="emailGateError" style="font-size:12px;color:var(--red-mid);min-height:16px;margin-bottom:8px"></div>
       <button onclick="submitEmailGate()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">המשך</button>
     </div>`;
