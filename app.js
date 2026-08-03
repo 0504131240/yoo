@@ -1193,7 +1193,7 @@ function renderHome(){
     ${open.length?open.map(ev=>{
       const cl=col(ev.id);
       const cost=evCost(ev);
-      const pending=calcTransfers(ev);
+      const pending=calcTransfers(ev).filter(t=>!t.coveredByPot);
       const adjBals=evAdjBalance(ev);
       const settledFams=ev.participants.filter(fid=>Math.abs(adjBals[fid]||0)<=0.5).length;
       const total=ev.participants.length;
@@ -1293,7 +1293,10 @@ function calcTransfers(ev){
   const _savingsTotal=ev.savingsTotal||(ev.savingsAmt||0)*ev.participants.length;
   const _savingsPaidTotal=(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0);
   const _pot2savTotal=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
-  const _savingsOwed=Math.round(_savingsTotal+evSavingsSurplus(ev)-_savingsPaidTotal-_pot2savTotal);
+  // Don't subtract pot2sav here — savings still owed by families even if pot already covered it
+  const _savingsOwed=Math.round(_savingsTotal+evSavingsSurplus(ev)-_savingsPaidTotal);
+  // If pot already transferred enough to savings, mark resulting transfers as auto-settled
+  const _savCoveredByPot=_savingsOwed>0.5&&_pot2savTotal>=_savingsOwed;
   if(_savingsOwed>0.5) pos.push({name:'קופת חיסכון',fid:'__savings__',amt:_savingsOwed,isSavings:true});
   const transfers=[];
   // Sort largest first so big debtors match big creditors → fewer splits per person
@@ -1307,6 +1310,7 @@ function calcTransfers(ev){
     if(pCopy[pi].amt<=0.5)pi++;
     if(nCopy[ni].amt<=0.5)ni++;
   }
+  if(_savCoveredByPot) transfers.forEach(t=>{if(t.toFid==='__savings__')t.coveredByPot=true;});
   return transfers;
 }
 function canPayFromFund(fromFid, amt){
@@ -1429,7 +1433,8 @@ function evCard(ev){
   const cost=evCost(ev);
   const excl=families.filter(f=>ev.excluded.includes(f.id));
   const adjBal=evAdjBalance(ev);
-  const transfers=calcTransfers(ev);
+  const _allTransfers=calcTransfers(ev);
+  const transfers=_allTransfers.filter(t=>!t.coveredByPot);
   const potPayments=ev.potPayments||[];
   const potOrigByFam=evPotOrigByFam(ev);
   const potTransByFam=evPotTransByFam(ev);
@@ -3547,7 +3552,9 @@ function closeSettleModal(){
 }
 function renderSettleModal(ev){
   const el=document.getElementById('settleModalContent');if(!el)return;
-  const transfers=calcTransfers(ev);
+  const _allTransfers=calcTransfers(ev);
+  const transfers=_allTransfers.filter(t=>!t.coveredByPot);
+  const _potCoveredTransfers=_allTransfers.filter(t=>t.coveredByPot);
   const settledList=ev.settled||[];
   const settleLines=transfers.map(t=>{
     if(t.toFid==='__savings__'){
@@ -3573,10 +3580,13 @@ function renderSettleModal(ev){
   const _nonPotRows=_nonPot.map(s=>{const icon=s.method==='fund'?'🏦':'✓';const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';return _rowHtml(icon,badge,s.from,s.to,s.amt);});
   const _savBadge='<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">חיסכון</span>';
   const _savPaidRows=(ev.savingsPaid||[]).map(p=>{const f=getFam(p.famId);if(!f)return'';return _rowHtml('💎',_savBadge,f.name.replace('משפחת','').trim(),'קופת חיסכון',p.amt);}).join('');
-  const doneRows=(settledList.length||(ev.savingsPaid||[]).length)?
+  const _potCovBadge='<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">הוסדר ע"י הקופה</span>';
+  const _potCovRows=_potCoveredTransfers.map(t=>_rowHtml('💰',_potCovBadge,t.from,'קופת חיסכון',t.amt));
+  const _hasDone=settledList.length||(ev.savingsPaid||[]).length||_potCoveredTransfers.length;
+  const doneRows=_hasDone?
     `<div style="padding:12px 16px 4px;border-top:2px solid var(--border);margin-top:${transfers.length?'8':'0'}px">
       <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">✅ בוצעו</div>
-      ${[..._nonPotRows,..._potRows].join('')}${_savPaidRows}
+      ${[..._nonPotRows,..._potRows,..._potCovRows].join('')}${_savPaidRows}
     </div>`:'';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
