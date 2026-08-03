@@ -163,14 +163,6 @@ function evAdjBalance(ev){
   });
   (ev.potPayments||[]).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
   (ev.savingsPaid||[]).forEach(p=>{ adjBal[p.famId]=(adjBal[p.famId]||0)+p.amt; });
-  // Credit each family for their share of pot→savings transfer (reduces their savings obligation)
-  const _pot2savAdj=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
-  if(_pot2savAdj>0&&(ev.savingsTotal||ev.savingsAmt)&&(ev.participants||[]).length>0){
-    const _n=ev.participants.length;
-    const _savPF=ev.savingsTotal?Math.round(ev.savingsTotal/_n):(ev.savingsAmt||0);
-    const _creditPF=Math.min(_savPF,Math.round(_pot2savAdj/_n));
-    if(_creditPF>0) ev.participants.forEach(fid=>{adjBal[fid]=(adjBal[fid]||0)+_creditPF;});
-  }
   return adjBal;
 }
 const shareLabel=ev=>{
@@ -562,19 +554,7 @@ async function load(){
     }catch(e2){}
     showSyncStatus('⚠ מקומי בלבד',3000);
   }finally{
-    // one-time migration: restore potPayments reduced by old releasePotToSavings logic
     let _migFixed=false;
-    events.forEach(ev=>{
-      if(ev._pot2savFixed)return;
-      const pot2sav=(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0);
-      if(pot2sav<=0){ev._pot2savFixed=true;return;}
-      const cur=(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
-      if(cur<=0){ev._pot2savFixed=true;return;}
-      const orig=cur+pot2sav;
-      ev.potPayments=ev.potPayments.map(p=>({...p,amt:Math.round(p.amt*orig/cur)}));
-      ev._pot2savFixed=true;
-      _migFixed=true;
-    });
     // targeted fix: מנגל בין הזמנים — restore original pot deposits and savings transfer
     (()=>{
       const ev=events.find(e=>e.name==='מנגל בין הזמנים');if(!ev)return;
