@@ -572,12 +572,13 @@ async function load(){
     showSyncStatus('⚠ מקומי בלבד',3000);
   }finally{
     render();setTimeout(handleHash,100);
-    const savedFamId=localStorage.getItem('deviceFamId2');
+    const savedFamId=localStorage.getItem('deviceFamId3');
     if(!savedFamId){
       openEmailGateModal();
-    } else if(savedFamId!=='skip'){
+    } else {
       const savedFam=getFam(parseInt(savedFamId));
-      if(savedFam) showEmailGateWelcome(savedFam,parseInt(localStorage.getItem('deviceEmailSlot2')||'1'));
+      if(savedFam) showEmailGateWelcome(savedFam,parseInt(localStorage.getItem('deviceEmailSlot3')||'1'));
+      else openEmailGateModal();
     }
   }
 }
@@ -2799,25 +2800,21 @@ function handleHash(){
 function openEmailGateModal(){
   const modal=document.getElementById('emailGateModal');const el=document.getElementById('emailGateContent');
   if(!modal||!el)return;
+  modal.onclick=null;
   el.innerHTML=`
     <div style="padding:26px 22px;text-align:center">
       <div style="font-size:34px;margin-bottom:8px">👋</div>
       <div style="font-size:15px;font-weight:700;margin-bottom:6px">ברוכים הבאים</div>
-      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:18px">מכשיר חדש — הזינו את כתובת המייל שלכם כדי שנזהה אתכם</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:18px">האפליקציה מיועדת למשפחות המשתתפות בלבד — הזינו את כתובת המייל שלכם כדי להיכנס</div>
       <input id="emailGateInput" type="email" placeholder="you@example.com" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box;margin-bottom:6px" onkeydown="if(event.key==='Enter')submitEmailGate()">
       <div id="emailGateError" style="font-size:12px;color:var(--red-mid);min-height:16px;margin-bottom:8px"></div>
-      <button onclick="submitEmailGate()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">המשך</button>
-      <button onclick="skipEmailGate()" style="width:100%;padding:8px;border:none;background:none;color:var(--text3);font-size:12px;font-family:var(--font);cursor:pointer;text-decoration:underline">דלג</button>
+      <button onclick="submitEmailGate()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">המשך</button>
     </div>`;
   modal.style.display='flex';
   setTimeout(()=>{const i=document.getElementById('emailGateInput');if(i)i.focus();},50);
 }
 function closeEmailGateModal(){
   const modal=document.getElementById('emailGateModal');if(modal)modal.style.display='none';
-}
-function skipEmailGate(){
-  localStorage.setItem('deviceFamId2','skip');
-  closeEmailGateModal();
 }
 function submitEmailGate(){
   const email=_cleanEmail(document.getElementById('emailGateInput')?.value||'');
@@ -2826,13 +2823,13 @@ function submitEmailGate(){
   const fam=families.find(f=>_cleanEmail(f.email)===email||_cleanEmail(f.email2)===email);
   if(!fam){ if(errEl)errEl.textContent='לא נמצאה משפחה עם המייל הזה'; return; }
   const slot=_cleanEmail(fam.email)===email?1:2;
-  localStorage.setItem('deviceFamId2',String(fam.id));
-  localStorage.setItem('deviceEmailSlot2',String(slot));
+  localStorage.setItem('deviceFamId3',String(fam.id));
+  localStorage.setItem('deviceEmailSlot3',String(slot));
   showEmailGateWelcome(fam,slot);
 }
 function resetDeviceIdentity(){
-  localStorage.removeItem('deviceFamId2');
-  localStorage.removeItem('deviceEmailSlot2');
+  localStorage.removeItem('deviceFamId3');
+  localStorage.removeItem('deviceEmailSlot3');
   openEmailGateModal();
 }
 function logVisit(famId,slot,name){
@@ -2874,7 +2871,7 @@ function renderVisitLog(){
 function showEmailGateWelcome(fam,slot){
   const el=document.getElementById('emailGateContent');const modal=document.getElementById('emailGateModal');
   if(!el)return;
-  if(modal)modal.style.display='flex';
+  if(modal){ modal.style.display='flex'; modal.onclick=e=>{if(e.target===modal)closeEmailGateModal();}; }
   const firstName=slot===2?fam.emailName2:fam.emailName;
   const surname=fam.name.replace('משפחת','').trim();
   const name=firstName?`${firstName} ${surname}`:surname;
