@@ -568,7 +568,13 @@ async function load(){
     showSyncStatus('⚠ מקומי בלבד',3000);
   }finally{
     render();setTimeout(handleHash,100);
-    if(!localStorage.getItem('deviceFamId')) openEmailGateModal();
+    const savedFamId=localStorage.getItem('deviceFamId');
+    if(!savedFamId){
+      openEmailGateModal();
+    } else if(savedFamId!=='skip'){
+      const savedFam=getFam(parseInt(savedFamId));
+      if(savedFam) showEmailGateWelcome(savedFam,parseInt(localStorage.getItem('deviceEmailSlot')||'1'));
+    }
   }
 }
 
@@ -2815,12 +2821,41 @@ function submitEmailGate(){
   if(!_validEmail(email)){ if(errEl)errEl.textContent='כתובת מייל לא תקינה'; return; }
   const fam=families.find(f=>_cleanEmail(f.email)===email||_cleanEmail(f.email2)===email);
   if(!fam){ if(errEl)errEl.textContent='לא נמצאה משפחה עם המייל הזה'; return; }
+  const slot=_cleanEmail(fam.email)===email?1:2;
   localStorage.setItem('deviceFamId',String(fam.id));
-  showEmailGateWelcome(fam);
+  localStorage.setItem('deviceEmailSlot',String(slot));
+  const firstName=slot===2?fam.firstName2:fam.firstName;
+  if(!firstName) askFirstName(fam,slot); else showEmailGateWelcome(fam,slot);
 }
-function showEmailGateWelcome(fam){
+function askFirstName(fam,slot){
   const el=document.getElementById('emailGateContent');if(!el)return;
-  const name=fam.name.replace('משפחת','').trim();
+  el.innerHTML=`
+    <div style="padding:26px 22px;text-align:center">
+      <div style="font-size:34px;margin-bottom:8px">😊</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">מה השם הפרטי שלך?</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:18px">כדי שנוכל לפנות אליך בשם</div>
+      <input id="firstNameInput" type="text" placeholder="שם פרטי" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;text-align:center;box-sizing:border-box;margin-bottom:14px" onkeydown="if(event.key==='Enter')submitFirstName(${fam.id},${slot})">
+      <button onclick="submitFirstName(${fam.id},${slot})" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">המשך</button>
+    </div>`;
+  setTimeout(()=>{const i=document.getElementById('firstNameInput');if(i)i.focus();},50);
+}
+function submitFirstName(famId,slot){
+  const fam=getFam(famId);if(!fam)return;
+  const name=(document.getElementById('firstNameInput')?.value||'').trim();
+  if(name){ if(slot===2)fam.firstName2=name; else fam.firstName=name; save(); }
+  showEmailGateWelcome(fam,slot);
+}
+function resetDeviceIdentity(){
+  localStorage.removeItem('deviceFamId');
+  localStorage.removeItem('deviceEmailSlot');
+  openEmailGateModal();
+}
+function showEmailGateWelcome(fam,slot){
+  const el=document.getElementById('emailGateContent');const modal=document.getElementById('emailGateModal');
+  if(!el)return;
+  if(modal)modal.style.display='flex';
+  const firstName=slot===2?fam.firstName2:fam.firstName;
+  const name=firstName||fam.name.replace('משפחת','').trim();
   const fundBal=Math.round(famFundBal(fam.id));
   const debts=events.filter(ev=>ev.open&&(ev.participants||[]).includes(fam.id))
     .map(ev=>({name:ev.name,owe:Math.round(-(evAdjBalance(ev)[fam.id]||0))}))
@@ -2842,7 +2877,8 @@ function showEmailGateWelcome(fam){
         ${debts.map(d=>`<div style="font-size:12px;color:var(--text2);padding:2px 0">${esc(d.name)} · ₪${d.owe.toLocaleString()}</div>`).join('')}
       </div>`:`
       <div style="background:var(--green-bg);border-radius:var(--r2);padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--green-mid)">✅ אין חובות פתוחים</div>`}
-      <button onclick="closeEmailGateModal()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">המשך לאפליקציה</button>
+      <button onclick="closeEmailGateModal()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">המשך לאפליקציה</button>
+      <button onclick="resetDeviceIdentity()" style="width:100%;padding:6px;border:none;background:none;color:var(--text3);font-size:11px;font-family:var(--font);cursor:pointer;text-decoration:underline">לא אני? החלף מייל</button>
     </div>`;
 }
 function openClaimConfirmModal(evId,famId,amt){
