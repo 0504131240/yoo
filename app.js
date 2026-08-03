@@ -568,6 +568,7 @@ async function load(){
     showSyncStatus('⚠ מקומי בלבד',3000);
   }finally{
     render();setTimeout(handleHash,100);
+    if(!localStorage.getItem('deviceFamId')) openEmailGateModal();
   }
 }
 
@@ -2784,6 +2785,65 @@ function handleHash(){
     history.replaceState(null,'',window.location.pathname);
     if(parts.length===3&&!parts.some(isNaN)) openClaimConfirmModal(evId,famId,amt);
   }
+}
+function openEmailGateModal(){
+  const modal=document.getElementById('emailGateModal');const el=document.getElementById('emailGateContent');
+  if(!modal||!el)return;
+  el.innerHTML=`
+    <div style="padding:26px 22px;text-align:center">
+      <div style="font-size:34px;margin-bottom:8px">👋</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">ברוכים הבאים</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:18px">מכשיר חדש — הזינו את כתובת המייל שלכם כדי שנזהה אתכם</div>
+      <input id="emailGateInput" type="email" placeholder="you@example.com" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box;margin-bottom:6px" onkeydown="if(event.key==='Enter')submitEmailGate()">
+      <div id="emailGateError" style="font-size:12px;color:var(--red-mid);min-height:16px;margin-bottom:8px"></div>
+      <button onclick="submitEmailGate()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">המשך</button>
+      <button onclick="skipEmailGate()" style="width:100%;padding:8px;border:none;background:none;color:var(--text3);font-size:12px;font-family:var(--font);cursor:pointer;text-decoration:underline">דלג</button>
+    </div>`;
+  modal.style.display='flex';
+  setTimeout(()=>{const i=document.getElementById('emailGateInput');if(i)i.focus();},50);
+}
+function closeEmailGateModal(){
+  const modal=document.getElementById('emailGateModal');if(modal)modal.style.display='none';
+}
+function skipEmailGate(){
+  localStorage.setItem('deviceFamId','skip');
+  closeEmailGateModal();
+}
+function submitEmailGate(){
+  const email=_cleanEmail(document.getElementById('emailGateInput')?.value||'');
+  const errEl=document.getElementById('emailGateError');
+  if(!_validEmail(email)){ if(errEl)errEl.textContent='כתובת מייל לא תקינה'; return; }
+  const fam=families.find(f=>_cleanEmail(f.email)===email||_cleanEmail(f.email2)===email);
+  if(!fam){ if(errEl)errEl.textContent='לא נמצאה משפחה עם המייל הזה'; return; }
+  localStorage.setItem('deviceFamId',String(fam.id));
+  showEmailGateWelcome(fam);
+}
+function showEmailGateWelcome(fam){
+  const el=document.getElementById('emailGateContent');if(!el)return;
+  const name=fam.name.replace('משפחת','').trim();
+  const fundBal=Math.round(famFundBal(fam.id));
+  const debts=events.filter(ev=>ev.open&&(ev.participants||[]).includes(fam.id))
+    .map(ev=>({name:ev.name,owe:Math.round(-(evAdjBalance(ev)[fam.id]||0))}))
+    .filter(d=>d.owe>0.5);
+  const totalDebt=debts.reduce((s,d)=>s+d.owe,0);
+  el.innerHTML=`
+    <div style="padding:26px 22px;text-align:center">
+      <div style="font-size:34px;margin-bottom:8px">👋</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:16px">ברוכים הבאים, ${esc(name)}!</div>
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:12px 14px;margin-bottom:12px;text-align:right">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--text2)">יתרתך בקופה הראשית</span>
+          <span style="font-size:14px;font-weight:700;color:${fundBal>=0?'var(--green-mid)':'var(--red-mid)'}">₪${fundBal.toLocaleString()}</span>
+        </div>
+      </div>
+      ${totalDebt>0.5?`
+      <div style="background:var(--red-bg);border-radius:var(--r2);padding:12px 14px;margin-bottom:16px;text-align:right">
+        <div style="font-size:13px;font-weight:700;color:var(--red-mid);margin-bottom:6px">⚠️ הנך בחוב של ₪${totalDebt.toLocaleString()}</div>
+        ${debts.map(d=>`<div style="font-size:12px;color:var(--text2);padding:2px 0">${esc(d.name)} · ₪${d.owe.toLocaleString()}</div>`).join('')}
+      </div>`:`
+      <div style="background:var(--green-bg);border-radius:var(--r2);padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--green-mid)">✅ אין חובות פתוחים</div>`}
+      <button onclick="closeEmailGateModal()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">המשך לאפליקציה</button>
+    </div>`;
 }
 function openClaimConfirmModal(evId,famId,amt){
   const ev=events.find(e=>e.id===evId);const f=getFam(famId);
