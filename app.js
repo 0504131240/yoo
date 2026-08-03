@@ -116,7 +116,8 @@ const evSavingsSurplus=ev=>{
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
 const evPotTotal=ev=>(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
 const evPotExpTotal=ev=>(ev.potExpItems||[]).reduce((s,it)=>s+it.amt,0);
-const evNetPotBal=ev=>Math.max(0,evPotTotal(ev)-evPotExpTotal(ev));
+const evPotBal=ev=>Math.max(0,evPotTotal(ev)-(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0));
+const evNetPotBal=ev=>Math.max(0,evPotBal(ev)-evPotExpTotal(ev));
 // Original deposit per family = remaining potPayments + already-transferred + excess-refunded settled entries
 const evPotOrigByFam=ev=>{
   const r={};
@@ -1445,7 +1446,7 @@ function evCard(ev){
   const potOrigByFam=evPotOrigByFam(ev);
   const potTransByFam=evPotTransByFam(ev);
   const potRefundByFam=evPotRefundByFam(ev);
-  const potTotal=evPotTotal(ev);
+  const potTotal=evPotBal(ev);
   const potExpTotalCard=evPotExpTotal(ev);
   const hasPot=potTotal>0;
   const potByFam={};
@@ -3010,7 +3011,7 @@ function renderFund(){
   // Event pots section
   const evPotsEl=document.getElementById('eventPotsSection');
   if(evPotsEl){
-    const potsWithFunds=events.filter(e=>e.open&&evPotTotal(e)>0);
+    const potsWithFunds=events.filter(e=>e.open&&evPotBal(e)>0);
     if(!potsWithFunds.length){
       evPotsEl.innerHTML='';
     } else {
@@ -3623,7 +3624,7 @@ function closePotTransferModal(){
 }
 function _refreshPotTransferModal(evId){
   if(potTrModalEvId!==evId)return;
-  const te=events.find(e=>e.id===evId);if(!te||evPotTotal(te)<=0)return closePotTransferModal();
+  const te=events.find(e=>e.id===evId);if(!te||evPotBal(te)<=0)return closePotTransferModal();
   const adjBal=evAdjBalance(te);
   if(te.participants.some(fid=>(adjBal[fid]||0)>0.5))renderPotTransferModal(te);else closePotTransferModal();
 }
@@ -3669,7 +3670,7 @@ function renderPotTransferModal(ev){
 function renderPotModal(ev){
   const el=document.getElementById('potModalContent');if(!el)return;
   const potPayments=ev.potPayments||[];
-  const potTotal=evPotTotal(ev);
+  const potTotal=evPotBal(ev);
   const potExpItems=ev.potExpItems||[];
   const potExpTot=evPotExpTotal(ev);
   const effBal=Math.round(potTotal-potExpTot);
@@ -3752,7 +3753,7 @@ function potManualTransfer(evId,toFund){
   if(amt<1){showToast('הזן סכום');return;}
   const toFam=getFam(toFid);if(!toFam)return;
   const toName=toFam.name.replace('משפחת','').trim();
-  const potTot=evPotTotal(ev);if(potTot<0.5){showToast('אין כסף בקופה');return;}
+  const potTot=evPotBal(ev);if(potTot<0.5){showToast('אין כסף בקופה');return;}
   const give=Math.min(amt,Math.round(potTot));
   if(!ev.settled)ev.settled=[];
   let rem=give;const newPots=[];
