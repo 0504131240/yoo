@@ -51,6 +51,7 @@ const goalTotal=g=>Object.values(g.contributions||{}).reduce((s,v)=>s+v,0);
 const col=id=>COLORS[(id-1)%COLORS.length];
 const ini=n=>n.replace('משפחת','').trim().slice(0,2);
 const getFam=id=>families.find(f=>f.id===id);
+const _isAdminPage=()=>/(^|\/)admin\.html$/.test(location.pathname);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const evCost=ev=>(ev.totalCost!=null?ev.totalCost:ev.participants.reduce((s,fid)=>s+(ev.expenses[fid]||0),0))+evPotExpTotal(ev);
 const evShare=ev=>{ const n=ev.participants.length; return n?Math.round(evCost(ev)/n):0; };
@@ -572,13 +573,15 @@ async function load(){
     showSyncStatus('⚠ מקומי בלבד',3000);
   }finally{
     render();setTimeout(handleHash,100);
-    const savedFamId=localStorage.getItem('deviceFamId3');
-    if(!savedFamId){
-      openEmailGateModal();
-    } else {
-      const savedFam=getFam(parseInt(savedFamId));
-      if(savedFam) showEmailGateWelcome(savedFam,parseInt(localStorage.getItem('deviceEmailSlot3')||'1'));
-      else openEmailGateModal();
+    if(!_isAdminPage()){
+      const savedFamId=localStorage.getItem('deviceFamId3');
+      if(!savedFamId){
+        openEmailGateModal();
+      } else {
+        const savedFam=getFam(parseInt(savedFamId));
+        if(savedFam) showEmailGateWelcome(savedFam,parseInt(localStorage.getItem('deviceEmailSlot3')||'1'));
+        else openEmailGateModal();
+      }
     }
   }
 }
@@ -3982,13 +3985,14 @@ function setAdminPass(){
   if(!p1){if(err){err.textContent='נא להזין סיסמה';err.style.display='block';}return;}
   if(p1!==p2){if(err){err.textContent='הסיסמאות אינן תואמות';err.style.display='block';}return;}
   adminPass=p1;editMode=true;
-  // editMode is in-memory only — resets on each page load
+  if(_isAdminPage())localStorage.setItem('adminRemembered','1');
   applyEditMode();save();closeLockModal();
 }
 function submitUnlock(){
   const val=(document.getElementById('unlockInp')||{}).value||'';
   if(val===adminPass){
-    editMode=true;// editMode is in-memory only — resets on each page load
+    editMode=true;
+    if(_isAdminPage())localStorage.setItem('adminRemembered','1');
     applyEditMode();closeLockModal();
   } else {
     const err=document.getElementById('passErr');if(err)err.style.display='block';
@@ -4054,10 +4058,18 @@ async function doBiometricUnlock(){
   if(ok){editMode=true;applyEditMode();closeLockModal();}
   else if(btn){btn.disabled=false;btn.textContent='👆 כניסה עם טביעת אצבע';}
 }
-async function autoUnlockBiometric(){
-  if(!adminPass||editMode||!localStorage.getItem('biometricCredId'))return;
-  const ok=await tryBiometric();
-  if(ok){editMode=true;applyEditMode();}
+async function autoUnlockAdmin(){
+  if(!_isAdminPage()||editMode)return;
+  if(adminPass&&localStorage.getItem('adminRemembered')==='1'){
+    editMode=true;
+    applyEditMode();
+    return;
+  }
+  if(adminPass&&localStorage.getItem('biometricCredId')){
+    const ok=await tryBiometric();
+    if(ok){editMode=true;localStorage.setItem('adminRemembered','1');applyEditMode();return;}
+  }
+  openLockModal();
 }
 const _CURMAP={'₪':'ILS','$':'USD','€':'EUR','£':'GBP'};
 let _rateCache={};
@@ -4103,7 +4115,7 @@ async function _updateCustomTotal(){
 }
 
 applyEditMode();
-load().then(async()=>{await autoUnlockBiometric();if(window.location.hash)handleHash();startRealtimeSync();renderNotifBtn();if(_notifOk()){checkBirthdayNotifs();registerFCMToken();}});
+load().then(async()=>{await autoUnlockAdmin();if(window.location.hash)handleHash();startRealtimeSync();renderNotifBtn();if(_notifOk()){checkBirthdayNotifs();registerFCMToken();}});
 loadEjsSettings();
 loadPaymentSettings();
 window.addEventListener('hashchange',handleHash);
