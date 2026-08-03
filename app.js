@@ -18,6 +18,7 @@ let messages=[];
 let calItems=[];
 let birthdays=[];
 let paymentClaims=[];
+let visits=[];
 let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
@@ -474,6 +475,7 @@ function saveLocal(){
     localStorage.setItem('calItems',JSON.stringify(calItems));
     localStorage.setItem('birthdays',JSON.stringify(birthdays));
     localStorage.setItem('paymentClaims',JSON.stringify(paymentClaims));
+    localStorage.setItem('visits',JSON.stringify(visits));
   }catch(e){}
 }
 
@@ -488,7 +490,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,visits});
     localStorage.removeItem('pendingSave');
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
@@ -520,6 +522,7 @@ async function load(){
     calItems=d.calItems||[];
     birthdays=d.birthdays||[];
     paymentClaims=d.paymentClaims||[];
+    visits=d.visits||[];
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
@@ -556,6 +559,7 @@ async function load(){
       const cals=localStorage.getItem('calItems');if(cals)calItems=JSON.parse(cals);
       const bds=localStorage.getItem('birthdays');if(bds)birthdays=JSON.parse(bds);
       const pcs=localStorage.getItem('paymentClaims');if(pcs)paymentClaims=JSON.parse(pcs);
+      const vst=localStorage.getItem('visits');if(vst)visits=JSON.parse(vst);
       nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
       nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
       nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
@@ -568,12 +572,12 @@ async function load(){
     showSyncStatus('⚠ מקומי בלבד',3000);
   }finally{
     render();setTimeout(handleHash,100);
-    const savedFamId=localStorage.getItem('deviceFamId');
+    const savedFamId=localStorage.getItem('deviceFamId2');
     if(!savedFamId){
       openEmailGateModal();
     } else if(savedFamId!=='skip'){
       const savedFam=getFam(parseInt(savedFamId));
-      if(savedFam) showEmailGateWelcome(savedFam,parseInt(localStorage.getItem('deviceEmailSlot')||'1'));
+      if(savedFam) showEmailGateWelcome(savedFam,parseInt(localStorage.getItem('deviceEmailSlot2')||'1'));
     }
   }
 }
@@ -596,7 +600,7 @@ function showSyncStatus(msg,hideAfter){
 
 function render(){
   applyEditMode();
-  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome,renderClaimsBanner];
+  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome,renderClaimsBanner,renderVisitLog];
   fns.forEach(fn=>{try{fn();}catch(e){console.error(fn.name,e);}});
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
@@ -2812,7 +2816,7 @@ function closeEmailGateModal(){
   const modal=document.getElementById('emailGateModal');if(modal)modal.style.display='none';
 }
 function skipEmailGate(){
-  localStorage.setItem('deviceFamId','skip');
+  localStorage.setItem('deviceFamId2','skip');
   closeEmailGateModal();
 }
 function submitEmailGate(){
@@ -2822,14 +2826,50 @@ function submitEmailGate(){
   const fam=families.find(f=>_cleanEmail(f.email)===email||_cleanEmail(f.email2)===email);
   if(!fam){ if(errEl)errEl.textContent='לא נמצאה משפחה עם המייל הזה'; return; }
   const slot=_cleanEmail(fam.email)===email?1:2;
-  localStorage.setItem('deviceFamId',String(fam.id));
-  localStorage.setItem('deviceEmailSlot',String(slot));
+  localStorage.setItem('deviceFamId2',String(fam.id));
+  localStorage.setItem('deviceEmailSlot2',String(slot));
   showEmailGateWelcome(fam,slot);
 }
 function resetDeviceIdentity(){
-  localStorage.removeItem('deviceFamId');
-  localStorage.removeItem('deviceEmailSlot');
+  localStorage.removeItem('deviceFamId2');
+  localStorage.removeItem('deviceEmailSlot2');
   openEmailGateModal();
+}
+function logVisit(famId,slot,name){
+  const existing=visits.find(v=>v.famId===famId&&v.slot===slot);
+  if(existing){ existing.name=name; existing.lastSeen=Date.now(); existing.count=(existing.count||1)+1; }
+  else{ visits.push({famId,slot,name,lastSeen:Date.now(),count:1}); }
+  save();
+  renderVisitLog();
+}
+function _relTime(ts){
+  const diff=Date.now()-ts;
+  const mins=Math.round(diff/60000);
+  if(mins<1)return'ממש עכשיו';
+  if(mins<60)return`לפני ${mins} דק'`;
+  const hrs=Math.round(mins/60);
+  if(hrs<24)return`לפני ${hrs} שע'`;
+  const days=Math.round(hrs/24);
+  if(days<30)return`לפני ${days} ימים`;
+  return new Date(ts).toLocaleDateString('he-IL');
+}
+function renderVisitLog(){
+  const el=document.getElementById('visitLogSection');if(!el)return;
+  if(!visits.length){el.innerHTML='';return;}
+  const rows=[...visits].sort((a,b)=>b.lastSeen-a.lastSeen).map(v=>{
+    const f=getFam(v.famId);
+    const famName=f?f.name.replace('משפחת','').trim():'משפחה שנמחקה';
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:13px;font-weight:700">${esc(v.name||famName)}</div>
+        <div style="font-size:11px;color:var(--text2)">${esc(famName)} · ${v.count||1} כניסות</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2)">${_relTime(v.lastSeen)}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`
+    <div class="sec-ttl edit-only" style="margin-top:20px">👥 מי נכנס לאפליקציה</div>
+    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:10px 14px;margin-bottom:12px">${rows}</div>`;
 }
 function showEmailGateWelcome(fam,slot){
   const el=document.getElementById('emailGateContent');const modal=document.getElementById('emailGateModal');
@@ -2838,6 +2878,7 @@ function showEmailGateWelcome(fam,slot){
   const firstName=slot===2?fam.emailName2:fam.emailName;
   const surname=fam.name.replace('משפחת','').trim();
   const name=firstName?`${firstName} ${surname}`:surname;
+  logVisit(fam.id,slot,name);
   const fundBal=Math.round(famFundBal(fam.id));
   const debts=events.filter(ev=>ev.open&&(ev.participants||[]).includes(fam.id))
     .map(ev=>({name:ev.name,owe:Math.round(-(evAdjBalance(ev)[fam.id]||0))}))
