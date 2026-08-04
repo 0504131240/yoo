@@ -690,9 +690,18 @@ function deleteMsg(id){
   save();renderMessages();
 }
 
+function _myChatName(){
+  if(_isAdminPage())return(localStorage.getItem('chatName')||'').trim();
+  const famId=localStorage.getItem('deviceFamId3');if(!famId)return'';
+  const fam=getFam(parseInt(famId));if(!fam)return'';
+  const slot=parseInt(localStorage.getItem('deviceEmailSlot3')||'1');
+  const firstName=slot===2?fam.emailName2:fam.emailName;
+  const surname=fam.name.replace('משפחת','').trim();
+  return firstName?`${firstName} ${surname}`:surname;
+}
 function renderChatInput(){
   const area=document.getElementById('chatInputArea');if(!area)return;
-  const saved=(localStorage.getItem('chatName')||'').trim();
+  const saved=_myChatName();
   if(!saved){
     area.innerHTML=`
       <div style="font-size:12px;color:var(--text2);text-align:center;direction:rtl">מה שמך? (פעם אחת בלבד)</div>
@@ -704,7 +713,7 @@ function renderChatInput(){
     area.innerHTML=`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
         <span style="font-size:11px;color:var(--text3)">מחובר כ: <b style="color:var(--text2)">${esc(saved)}</b></span>
-        <button onclick="changeChatName()" style="background:none;border:none;font-size:11px;color:var(--text3);cursor:pointer;text-decoration:underline;font-family:var(--font)">שנה שם</button>
+        ${_isAdminPage()?`<button onclick="changeChatName()" style="background:none;border:none;font-size:11px;color:var(--text3);cursor:pointer;text-decoration:underline;font-family:var(--font)">שנה שם</button>`:''}
       </div>
       <div style="display:flex;gap:6px">
         <input id="chatText" placeholder="כתוב הודעה..." maxlength="300" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg()}" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
@@ -726,7 +735,7 @@ function changeChatName(){
 }
 
 function sendChatMsg(){
-  const author=(localStorage.getItem('chatName')||'').trim();
+  const author=_myChatName();
   const textEl=document.getElementById('chatText');
   const text=(textEl?.value||'').trim();
   if(!text||!author)return;
@@ -818,7 +827,7 @@ async function startRealtimeSync(){
         const lastMsgId=parseInt(localStorage.getItem('lastMsgId')||'0');
         const lastEvId=parseInt(localStorage.getItem('lastEvId')||'0');
         const lastExpCount=parseInt(localStorage.getItem('lastExpCount')||'0');
-        const myName=(localStorage.getItem('chatName')||'').trim();
+        const myName=_myChatName();
         snapMsgs.filter(m=>m.id>lastMsgId&&m.author!==myName)
           .forEach(m=>showNotif('💬 הודעה חדשה',(m.author?m.author+': ':'')+m.text));
         snapEvs.filter(e=>e.id>lastEvId)
@@ -850,7 +859,7 @@ function renderMessages(){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">עדיין אין הודעות — שלח את הראשון 💬</div>';
     return;
   }
-  const myName=(localStorage.getItem('chatName')||'').trim();
+  const myName=_myChatName();
   const timeFmt=new Intl.DateTimeFormat('he-IL',{hour:'2-digit',minute:'2-digit'});
   const dateFmt=new Intl.DateTimeFormat('he-IL',{day:'2-digit',month:'2-digit'});
   let lastDate='';
