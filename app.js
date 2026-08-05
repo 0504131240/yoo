@@ -3001,7 +3001,7 @@ function renderSavingsPot(){
   const contrib=savingsPotContrib();
   const expTotal=savingsPotExpTotal();
   const bal=contrib-expTotal;
-  const contribEvs=events.filter(ev=>(ev.savingsTotal||ev.savingsAmt)>0);
+  const contribEvs=events.map(ev=>({ev,amt:(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0)+(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0)})).filter(x=>x.amt>0.5);
   if(!contrib&&!expTotal&&!contribEvs.length){el.innerHTML='';return;}
   const expRows=(savingsPot.expenses||[]).map(e=>
     `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -3020,9 +3020,9 @@ function renderSavingsPot(){
   </div>`;
   const evList=contribEvs.length?`<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px">
     <div style="font-size:11px;color:var(--text2);margin-bottom:6px">תרומות מאירועים</div>
-    ${contribEvs.map(ev=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+    ${contribEvs.map(({ev,amt})=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
       <span style="color:var(--text)">${esc(ev.name)}</span>
-      <span style="font-weight:700;color:var(--green-mid)">+₪${(ev.savingsTotal||(ev.savingsAmt||0)*(ev.participants||[]).length).toLocaleString()}</span>
+      <span style="font-weight:700;color:var(--green-mid)">+₪${Math.round(amt).toLocaleString()}</span>
     </div>`).join('')}
   </div>`:'';
   el.innerHTML=`<div class="fund-section-title">💎 קופת חיסכון</div>
