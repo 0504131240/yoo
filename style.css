@@ -221,11 +221,11 @@ body:not(.at-home){padding-bottom:140px}
   .fh-pill-btns{flex:1;padding-top:8px}
   .fh-home-lower .fh-cal-card{flex:1;margin:0}
 }
-/* Chat bottom sheet */
-#chatSheet{position:fixed;inset:0;z-index:900;display:none;flex-direction:column}
-#chatSheet.open{display:flex}
-#chatSheetBg{position:absolute;inset:0;background:rgba(0,0,0,0.48)}
-#chatSheetInner{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:20px 20px 0 0;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+/* Chat / poll bottom sheets */
+#chatSheet,#pollSheet{position:fixed;inset:0;z-index:900;display:none;flex-direction:column}
+#chatSheet.open,#pollSheet.open{display:flex}
+#chatSheetBg,#pollSheetBg{position:absolute;inset:0;background:rgba(0,0,0,0.48)}
+#chatSheetInner,#pollSheetInner{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:20px 20px 0 0;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
 /* Desktop layout */
 @media(min-width:600px){
   html{background:#e8eaf6}
@@ -245,7 +245,7 @@ body:not(.at-home){padding-bottom:140px}
   .fh-hero-logo{margin:0;height:80px}
   .fh-hero-sub{text-align:right;font-size:13px}
   .fh-desktop-iframe{margin:16px 24px 0}
-  #chatSheetInner{max-width:600px;margin:0 auto;left:0;right:0}
+  #chatSheetInner,#pollSheetInner{max-width:600px;margin:0 auto;left:0;right:0}
 }
 /* Hero */
 .fh-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 20px;background:#fff;flex-shrink:0}

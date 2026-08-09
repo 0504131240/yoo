@@ -48,6 +48,9 @@
       <button class="fh-pill-btn" style="background:linear-gradient(135deg,#43E97B,#0ABDE3);box-shadow:0 4px 22px rgba(67,233,123,0.35)" onclick="switchShell('pay')">
         <span class="fh-pill-ico">💰</span>תשלומים
       </button>
+      <button class="fh-pill-btn" style="background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:0 4px 22px rgba(124,58,237,0.35)" onclick="openPollSheet()">
+        <span class="fh-pill-ico">🗳</span>סקרים
+      </button>
     </div>
     <!-- Family calendar card — below on mobile, right on desktop -->
     <div class="fh-card fh-cal-card" style="margin:0">
@@ -185,9 +188,31 @@
     <div class="topbar-sub" id="topSub">ניהול הוצאות וחובות</div>
   </div>
   <div style="display:flex;gap:8px;flex-shrink:0">
+    <button class="btn-add" id="nb-notifcenter" onclick="openNotifCenter()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);position:relative">🔔<span id="notifCenterBadge" style="display:none;position:absolute;top:-4px;left:-4px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:var(--red-mid,#d33);color:#fff;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1"></span></button>
     <button class="btn-add" id="nb-families" onclick="goTab('families',this)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">👥</button>
     <button class="btn-add" onclick="openLockModal()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:16px"><span id="lockIcon">🔒</span></button>
     <button class="btn-add edit-only" onclick="showForm()">+ אירוע חדש</button>
+  </div>
+</div>
+
+<div id="notifCenterModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeNotifCenter()">
+  <div style="background:var(--bg);border-radius:var(--r2);max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">🔔 מרכז התראות</span>
+      <button onclick="closeNotifCenter()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div id="notifCenterList" style="flex:1;overflow-y:auto;padding:6px 16px"></div>
+  </div>
+</div>
+
+<div id="annualReportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeAnnualReport()">
+  <div style="background:var(--bg);border-radius:var(--r2);max-width:440px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px">
+      <span style="font-size:15px;font-weight:800;color:var(--text);flex-shrink:0">📊 דוח שנתי</span>
+      <select id="reportYearSel" onchange="renderAnnualReport()" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:5px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text)"></select>
+      <button onclick="closeAnnualReport()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div id="annualReportBody" style="flex:1;overflow-y:auto;padding:14px 16px"></div>
   </div>
 </div>
 
@@ -336,7 +361,10 @@
 
   <!-- FAMILIES -->
   <div class="view" id="view-families">
-    <div class="sec-ttl">ניהול משפחות</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div class="sec-ttl" style="margin:0">ניהול משפחות</div>
+      <button onclick="openAnnualReport()" style="padding:7px 12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap;margin-bottom:10px">📊 דוח שנתי</button>
+    </div>
     <div class="fam-add edit-only">
       <input type="text" id="famInput" placeholder="שם משפחה חדשה...">
       <button class="action-btn blue" onclick="addFam()">הוסף</button>
@@ -557,6 +585,33 @@
   </div>
 </div>
 
+<!-- Poll bottom sheet -->
+<div id="pollSheet">
+  <div id="pollSheetBg" onclick="closePollSheet()"></div>
+  <div id="pollSheetInner">
+    <div style="padding:14px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <button onclick="closePollSheet()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      <span style="font-size:15px;font-weight:800;color:var(--text)">🗳 סקרים</span>
+      <button class="edit-only" onclick="openNewPollModal()" style="background:none;border:none;font-size:22px;cursor:pointer;padding:0 2px;color:#7C3AED;line-height:1">+</button>
+    </div>
+    <div id="pollList" style="flex:1;overflow-y:auto;padding:10px 14px 16px;min-height:0"></div>
+  </div>
+</div>
+
+<!-- New poll modal -->
+<div id="newPollModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2600;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeNewPollModal()">
+  <div style="background:var(--bg);border-radius:var(--r2);max-width:380px;width:100%;max-height:85vh;overflow-y:auto;padding:18px">
+    <div style="font-size:15px;font-weight:800;margin-bottom:12px">🗳 סקר חדש</div>
+    <input type="text" id="pollQ" placeholder="השאלה שלך" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:10px">
+    <div id="pollOptsWrap"></div>
+    <button onclick="addPollOptInput()" style="width:100%;padding:7px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;margin-bottom:12px">➕ הוסף אפשרות</button>
+    <div id="pollErr" style="display:none;color:var(--red-mid,#c33);font-size:12px;margin-bottom:8px">נא למלא שאלה ולפחות 2 אפשרויות</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeNewPollModal()" style="flex:1;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+      <button onclick="saveNewPoll()" style="flex:1;padding:10px;border-radius:var(--r2);border:none;background:#7C3AED;color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ צור סקר</button>
+    </div>
+  </div>
+</div>
 
 <script src="app.js"></script>
 

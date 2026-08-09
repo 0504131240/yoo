@@ -19,7 +19,9 @@ let calItems=[];
 let birthdays=[];
 let paymentClaims=[];
 let visits=[];
-let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1;
+let notifications=[];
+let polls=[];
+let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1,nxtNotif=1,nxtPoll=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
 let calHebRefDate=new Date();
@@ -478,6 +480,8 @@ function saveLocal(){
     localStorage.setItem('birthdays',JSON.stringify(birthdays));
     localStorage.setItem('paymentClaims',JSON.stringify(paymentClaims));
     localStorage.setItem('visits',JSON.stringify(visits));
+    localStorage.setItem('notifications',JSON.stringify(notifications));
+    localStorage.setItem('polls',JSON.stringify(polls));
   }catch(e){}
 }
 
@@ -492,7 +496,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,visits});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,visits,notifications,polls});
     localStorage.removeItem('pendingSave');
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
@@ -525,10 +529,14 @@ async function load(){
     birthdays=d.birthdays||[];
     paymentClaims=d.paymentClaims||[];
     visits=d.visits||[];
+    notifications=d.notifications||[];
+    polls=d.polls||[];
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
     nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;
+    nxtNotif=notifications.length?Math.max(...notifications.map(n=>n.id))+1:1;
+    nxtPoll=polls.length?Math.max(...polls.map(p=>p.id))+1:1;
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
@@ -562,10 +570,14 @@ async function load(){
       const bds=localStorage.getItem('birthdays');if(bds)birthdays=JSON.parse(bds);
       const pcs=localStorage.getItem('paymentClaims');if(pcs)paymentClaims=JSON.parse(pcs);
       const vst=localStorage.getItem('visits');if(vst)visits=JSON.parse(vst);
+      const nts=localStorage.getItem('notifications');if(nts)notifications=JSON.parse(nts);
+      const pls=localStorage.getItem('polls');if(pls)polls=JSON.parse(pls);
       nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
       nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
       nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
       nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;
+      nxtNotif=notifications.length?Math.max(...notifications.map(n=>n.id))+1:1;
+      nxtPoll=polls.length?Math.max(...polls.map(p=>p.id))+1:1;
       nxtId=events.reduce((a,e)=>Math.max(a,e.id),0)+1;
       nxtFam=families.reduce((a,f)=>Math.max(a,f.id),0)+1;
       nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
@@ -626,7 +638,7 @@ function showSyncStatus(msg,hideAfter){
 
 function render(){
   applyEditMode();
-  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome,renderClaimsBanner,renderVisitLog];
+  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome,renderClaimsBanner,renderVisitLog,renderNotifCenterBadge];
   fns.forEach(fn=>{try{fn();}catch(e){console.error(fn.name,e);}});
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
@@ -1121,6 +1133,7 @@ function saveBday(){
   const hebDay=parseInt(document.getElementById('bdayDay').value);
   if(!name)return;
   birthdays.push({id:nxtBday++,name,hebMonth,hebDay});
+  addNotif('🎂','נוסף יום הולדת: '+name);
   save();renderBdayList();renderCalendar();
   closeBdayModal();
 }
@@ -1144,6 +1157,105 @@ function renderBdayList(){
       </div>
       <button onclick="deleteBday(${b.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0;opacity:.5">✕</button>
     </div>`).join('');
+}
+
+function _myFamId(){
+  const id=localStorage.getItem('deviceFamId3');
+  return id?parseInt(id):null;
+}
+function openPollSheet(){
+  const s=document.getElementById('pollSheet');if(!s)return;
+  s.classList.add('open');
+  renderPollList();
+}
+function closePollSheet(){
+  const s=document.getElementById('pollSheet');if(s)s.classList.remove('open');
+}
+function openNewPollModal(){
+  document.getElementById('pollQ').value='';
+  const wrap=document.getElementById('pollOptsWrap');
+  wrap.innerHTML='';
+  addPollOptInput();addPollOptInput();
+  document.getElementById('pollErr').style.display='none';
+  document.getElementById('newPollModal').style.display='flex';
+}
+function closeNewPollModal(){
+  document.getElementById('newPollModal').style.display='none';
+}
+function addPollOptInput(){
+  const wrap=document.getElementById('pollOptsWrap');if(!wrap)return;
+  const i=wrap.children.length+1;
+  const row=document.createElement('div');
+  row.style.cssText='margin-bottom:8px';
+  row.innerHTML=`<input type="text" placeholder="אפשרות ${i}" class="pollOptInp" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">`;
+  wrap.appendChild(row);
+}
+function saveNewPoll(){
+  const q=document.getElementById('pollQ').value.trim();
+  const opts=[...document.querySelectorAll('.pollOptInp')].map(i=>i.value.trim()).filter(Boolean);
+  const err=document.getElementById('pollErr');
+  if(!q||opts.length<2){err.style.display='block';return;}
+  err.style.display='none';
+  polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false});
+  addNotif('🗳','נוצר סקר חדש: "'+q+'"');
+  save();closeNewPollModal();renderPollList();
+}
+function votePoll(pollId,optIdx){
+  const p=polls.find(x=>x.id===pollId);if(!p||p.closed)return;
+  const fid=_myFamId();if(fid==null){alert('לא זוהתה משפחה במכשיר זה');return;}
+  p.votes[String(fid)]=optIdx;
+  save();renderPollList();
+}
+function togglePollClosed(pollId){
+  const p=polls.find(x=>x.id===pollId);if(!p)return;
+  p.closed=!p.closed;
+  save();renderPollList();
+}
+function deletePoll(pollId){
+  if(!confirm('למחוק סקר זה?'))return;
+  polls=polls.filter(p=>p.id!==pollId);
+  save();renderPollList();
+}
+function renderPollList(){
+  const el=document.getElementById('pollList');if(!el)return;
+  if(!polls.length){
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">עדיין אין סקרים — צור את הראשון 🗳</div>';
+    return;
+  }
+  const myFid=_myFamId();
+  el.innerHTML=polls.map(p=>{
+    const totalVotes=Object.keys(p.votes).length;
+    const myVote=myFid!=null?p.votes[String(myFid)]:undefined;
+    const showResults=p.closed||myVote!=null;
+    const optsHtml=p.options.map((opt,i)=>{
+      const count=Object.values(p.votes).filter(v=>v===i).length;
+      const pct=totalVotes?Math.round(count/totalVotes*100):0;
+      if(showResults){
+        const mine=myVote===i;
+        return`<div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+            <span style="font-weight:${mine?'800':'600'};color:${mine?'#7C3AED':'var(--text)'}">${esc(opt)}${mine?' ✓':''}</span>
+            <span style="color:var(--text2)">${pct}% (${count})</span>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${mine?'#7C3AED':'#C4B5FD'}"></div></div>
+        </div>`;
+      }
+      return`<button onclick="votePoll(${p.id},${i})" style="display:block;width:100%;text-align:right;padding:8px 10px;margin-bottom:6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(opt)}</button>`;
+    }).join('');
+    return`<div style="background:var(--surface2);border-radius:var(--r2);padding:12px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:800;color:var(--text);flex:1">${esc(p.question)}${p.closed?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">סגור</span>':''}</div>
+      </div>
+      ${optsHtml}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+        <div style="font-size:11px;color:var(--text3)">${totalVotes} הצביעו</div>
+        <div class="edit-only" style="display:flex;gap:10px">
+          <button onclick="togglePollClosed(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">${p.closed?'↻ פתח מחדש':'✓ סגור סקר'}</button>
+          <button onclick="deletePoll(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">🗑 מחק</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderHome(){
@@ -1415,6 +1527,7 @@ function confirmPartPay(){
         date:new Date().toLocaleDateString('he-IL')});
     }
     if(fromDirect>0) ev.settled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromDirect,method:'direct'});
+    addNotif('✓',_ppFrom+' העביר ל'+_ppTo+' ₪'+paid.toLocaleString()+' עבור "'+ev.name+'"');
     save();render();
     if(ev.closed){
       const adjAfter=evAdjBalance(ev);
@@ -1651,6 +1764,8 @@ function payToPot(evId,famId,amt){
   const payment=amt!=null?Math.min(Math.round(amt),owed):owed;
   if(!ev.potPayments)ev.potPayments=[];
   ev.potPayments.push({famId,amt:payment});
+  const _pf=getFam(famId);
+  addNotif('💰',(_pf?_pf.name.replace('משפחת','').trim():'')+' הפקיד/ה ₪'+payment.toLocaleString()+' לקופת "'+ev.name+'"');
   save();render();
   if(ev.closed){const nb=evAdjBalance(ev)[famId]||0;if(nb>=-0.5)_sendCloseEvEmailOne(ev,famId);}
 }
@@ -1895,6 +2010,101 @@ function renderFamilies(){
       <button class="action-btn edit-only" onclick="event.stopPropagation();openFamEditSheet(${f.id})">✏️ ערוך</button>
     </div>`;
   }).join('');
+}
+function _extractYear(str){
+  if(!str)return null;
+  const m=String(str).match(/(19|20)\d{2}/);
+  return m?parseInt(m[0]):null;
+}
+function _heILDateYear(str){
+  if(!str)return null;
+  const parts=String(str).split('.');
+  if(parts.length===3){const y=parseInt(parts[2]);if(y>1900)return y;}
+  return _extractYear(str);
+}
+function _reportYears(){
+  const ys=new Set();
+  events.forEach(ev=>{const y=_extractYear(ev.date);if(y)ys.add(y);});
+  (fund.transactions||[]).forEach(t=>{const y=_heILDateYear(t.date);if(y)ys.add(y);});
+  (savingsPot.expenses||[]).forEach(e=>{const y=_heILDateYear(e.date);if(y)ys.add(y);});
+  const cur=new Date().getFullYear();
+  ys.add(cur);
+  return [...ys].sort((a,b)=>b-a);
+}
+function openAnnualReport(){
+  const modal=document.getElementById('annualReportModal');if(!modal)return;
+  const sel=document.getElementById('reportYearSel');
+  const years=_reportYears();
+  sel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  sel.value=String(years[0]);
+  modal.style.display='flex';
+  renderAnnualReport();
+}
+function closeAnnualReport(){
+  const modal=document.getElementById('annualReportModal');if(modal)modal.style.display='none';
+}
+function renderAnnualReport(){
+  const el=document.getElementById('annualReportBody');if(!el)return;
+  const year=parseInt(document.getElementById('reportYearSel').value);
+  const yearEvs=events.filter(ev=>_extractYear(ev.date)===year);
+  const undatedCount=events.length-events.filter(ev=>_extractYear(ev.date)!=null).length;
+  const totalCost=yearEvs.reduce((s,ev)=>s+evCost(ev),0);
+  const totalSavings=yearEvs.reduce((s,ev)=>s+(ev.savingsTotal||0),0);
+  const famTotals={};
+  families.forEach(f=>{famTotals[f.id]={paid:0,share:0};});
+  yearEvs.forEach(ev=>{
+    const shares=evShares(ev);
+    ev.participants.forEach(fid=>{
+      if(!famTotals[fid])famTotals[fid]={paid:0,share:0};
+      famTotals[fid].paid+=(ev.expenses[fid]||0);
+      famTotals[fid].share+=(shares[fid]||0);
+    });
+  });
+  const famRows=families.map(f=>{
+    const t=famTotals[f.id]||{paid:0,share:0};
+    if(!t.paid&&!t.share)return'';
+    const net=Math.round(t.paid-t.share);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      ${famAva(f,26)}
+      <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
+      <span style="font-size:12px;color:var(--text2)">שילם/ה ₪${Math.round(t.paid).toLocaleString()}</span>
+      <span style="font-size:12px;font-weight:700;color:${net>=0?'var(--green-mid)':'var(--red-mid)'}">${net>=0?'+':''}₪${net.toLocaleString()}</span>
+    </div>`;
+  }).join('');
+  const topEvs=[...yearEvs].sort((a,b)=>evCost(b)-evCost(a)).slice(0,3);
+  const topEvsHtml=topEvs.length?topEvs.map(ev=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0">
+    <span>${esc(ev.name)}</span><span style="font-weight:700">₪${evCost(ev).toLocaleString()}</span>
+  </div>`).join(''):'<div style="font-size:12px;color:var(--text3)">אין אירועים בשנה זו</div>';
+  const fundTx=(fund.transactions||[]).filter(t=>_heILDateYear(t.date)===year);
+  const fundDeposits=fundTx.filter(t=>t.type==='deposit').reduce((s,t)=>s+t.amount,0);
+  const fundPayouts=fundTx.filter(t=>t.type==='payout').reduce((s,t)=>s+t.amount,0);
+  const savExpYear=(savingsPot.expenses||[]).filter(e=>_heILDateYear(e.date)===year).reduce((s,e)=>s+e.amt,0);
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--text2)">אירועים</div>
+        <div style="font-size:22px;font-weight:800">${yearEvs.length}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--text2)">סה"כ הוצאות</div>
+        <div style="font-size:22px;font-weight:800">₪${totalCost.toLocaleString()}</div>
+      </div>
+      ${totalSavings?`<div style="background:var(--surface2);border-radius:var(--r2);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--text2)">💎 יעד חיסכון</div>
+        <div style="font-size:22px;font-weight:800;color:var(--green-mid)">₪${totalSavings.toLocaleString()}</div>
+      </div>`:''}
+      ${savExpYear?`<div style="background:var(--surface2);border-radius:var(--r2);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--text2)">💎 הוצא מהחיסכון</div>
+        <div style="font-size:22px;font-weight:800">₪${savExpYear.toLocaleString()}</div>
+      </div>`:''}
+    </div>
+    ${fundTx.length?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px">🏦 קופה ראשית: הופקדו ₪${fundDeposits.toLocaleString()} · שולמו ₪${fundPayouts.toLocaleString()}</div>`:''}
+    <div style="font-size:13px;font-weight:800;margin-bottom:6px">🏆 האירועים היקרים ביותר</div>
+    <div style="margin-bottom:14px">${topEvsHtml}</div>
+    <div style="font-size:13px;font-weight:800;margin-bottom:6px">👨‍👩‍👧‍👦 לפי משפחה</div>
+    <div>${famRows||'<div style="font-size:12px;color:var(--text3)">אין נתונים</div>'}</div>
+    ${undatedCount?`<div style="font-size:11px;color:var(--text3);margin-top:12px">* ${undatedCount} אירועים ללא תאריך שנה מזוהה אינם כלולים בדוח</div>`:''}
+  `;
 }
 function famAva(f, size=34, extra=''){
   const cl=col(f.id);
@@ -2430,6 +2640,7 @@ async function doCreate(){
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
     if(savingsTotal>0)newEv.savingsTotal=savingsTotal;
     events.unshift(newEv);
+    addNotif('📅','נוסף אירוע חדש: "'+newEv.name+'"');
     // notify participants only for non-cumulative events (personalized per family)
     (()=>{
       if(newEv.cumulative) return;
@@ -2906,6 +3117,39 @@ function renderVisitLog(){
   el.innerHTML=`
     <div class="sec-ttl edit-only" style="margin-top:20px">👥 מי נכנס לאפליקציה</div>
     <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:10px 14px;margin-bottom:12px">${rows}</div>`;
+}
+function addNotif(icon,text){
+  notifications.unshift({id:nxtNotif++,icon,text,ts:Date.now()});
+  if(notifications.length>200)notifications.length=200;
+  renderNotifCenterBadge();
+}
+function _notifLastSeen(){return parseInt(localStorage.getItem('notifLastSeen')||'0');}
+function renderNotifCenterBadge(){
+  const badge=document.getElementById('notifCenterBadge');if(!badge)return;
+  const seen=_notifLastSeen();
+  const unread=notifications.filter(n=>n.ts>seen).length;
+  if(unread>0){badge.style.display='flex';badge.textContent=unread>99?'99+':String(unread);}
+  else badge.style.display='none';
+}
+function openNotifCenter(){
+  const modal=document.getElementById('notifCenterModal');if(!modal)return;
+  const list=document.getElementById('notifCenterList');
+  if(list){
+    list.innerHTML=notifications.length?notifications.map(n=>`
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:18px;flex-shrink:0">${n.icon||'🔔'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;color:var(--text)">${esc(n.text)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${_relTime(n.ts)}</div>
+        </div>
+      </div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">אין עדיין התראות</div>';
+  }
+  modal.style.display='flex';
+  localStorage.setItem('notifLastSeen',String(Date.now()));
+  renderNotifCenterBadge();
+}
+function closeNotifCenter(){
+  const modal=document.getElementById('notifCenterModal');if(modal)modal.style.display='none';
 }
 function showEmailGateWelcome(fam,slot){
   const el=document.getElementById('emailGateContent');const modal=document.getElementById('emailGateModal');
@@ -3544,6 +3788,8 @@ async function doAddExpItem(){
       ev.expItemId=(ev.expItemId||0)+1;
       ev.expenseItems.push({id:ev.expItemId,famId:addExpItemFamId,name,amt:total,customSplit});
       ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+total;
+      const _pf=getFam(addExpItemFamId);
+      addNotif('💳',(_pf?_pf.name.replace('משפחת','').trim():'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+total.toLocaleString()+' ל"'+ev.name+'"');
     }
     closeAddExpItem();save();render();
     return;
@@ -3566,6 +3812,8 @@ async function doAddExpItem(){
     if(isPartial)item.sharedWith=sw;
     ev.expenseItems.push(item);
     ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;
+    const _pf=getFam(addExpItemFamId);
+    addNotif('💳',(_pf?_pf.name.replace('משפחת','').trim():'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+Math.round(amt).toLocaleString()+' ל"'+ev.name+'"');
   }
   closeAddExpItem();
   save();render();
