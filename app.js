@@ -2544,7 +2544,7 @@ function editEv(evId){
   document.getElementById('formTitle').textContent='✏️ עריכת אירוע';
   document.getElementById('formSaveBtn').textContent='✓ שמור שינויים';
   document.getElementById('f-name').value=ev.name;
-  document.getElementById('f-date').value=(ev.date==='לא צוין'?'':ev.date)||'';
+  document.getElementById('f-date').value=ev.dateISO||'';
   ['e-name','e-cost','e-fams'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('show'); });
   document.getElementById('famChips').innerHTML=families.map(f=>
     `<button class="chip ${ev.participants.includes(f.id)?'on':''}" id="chip-${f.id}" onclick="toggleChip(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
@@ -2634,7 +2634,15 @@ function updateExpenseInputs(){
 function updateFormTotal(){_updateCustomTotal();}
 async function doCreate(){
   const name=document.getElementById('f-name').value.trim();
-  const date=document.getElementById('f-date').value.trim()||'';
+  const _dateISORaw=document.getElementById('f-date').value||'';
+  let date='',dateISO=null;
+  if(_dateISORaw){
+    dateISO=_dateISORaw;
+    date=new Date(_dateISORaw+'T00:00:00').toLocaleDateString('he-IL',{day:'numeric',month:'long',year:'numeric'});
+  } else if(editingId!=null){
+    const _existingEv=events.find(e=>e.id===editingId);
+    if(_existingEv){ date=_existingEv.date==='לא צוין'?'':(_existingEv.date||''); dateISO=_existingEv.dateISO||null; }
+  }
   let ok=true;
   if(!name){document.getElementById('e-name').classList.add('show');ok=false;}
   else document.getElementById('e-name').classList.remove('show');
@@ -2690,7 +2698,7 @@ async function doCreate(){
   if(editingId!=null){
     const ev=events.find(e=>e.id===editingId);
     if(ev){
-      ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded;
+      ev.name=name; ev.date=date; if(dateISO)ev.dateISO=dateISO;else delete ev.dateISO; ev.participants=participants; ev.excluded=excluded;
       ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; ev.parentOverrides=parentOverrides;
       if(!ev.cumulative){
         ev.totalCost=totalCost;
@@ -2711,6 +2719,7 @@ async function doCreate(){
     }
   } else {
     const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides,parentOverrides};
+    if(dateISO)newEv.dateISO=dateISO;
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
     else if(expMode==='custom'&&formExpenseItems&&formExpenseItems.length){
       let seq=1;
