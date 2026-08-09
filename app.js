@@ -1472,40 +1472,6 @@ function evCard(ev){
       return [];
     });
   };
-  const mems=ev.participants.map(fid=>{
-    const f=getFam(fid);if(!f)return'';
-    const cl=col(fid);
-    const spent=ev.expenses[fid]||0;
-    const b=adjBal[fid];
-    const share=shares[fid]||0;
-    const tagClass=b>0.5?'exp-tag-neg':b<-0.5?'exp-tag-pos':'exp-tag-zero';
-    const tagText=b>0.5?'מקבל ₪'+Math.round(b).toLocaleString():b<-0.5?'מחזיר ₪'+Math.round(Math.abs(b)).toLocaleString():'מסודר ✓';
-    const isDebtor=b<-0.5;
-    const tagTag=isDebtor?'button':'span';
-    const tagClick=isDebtor?` onclick="openPotPayModal(${ev.id},${fid})"` : '';
-    const tagCls='exp-tag '+tagClass+(isDebtor?' exp-tag-clickable':'');
-    const famPotAmt=potOrigByFam[fid]||0;
-    const famPotTransAmt=potTransByFam[fid]||0;
-    const famPotRefundAmt=potRefundByFam[fid]||0;
-    return`<div class="exp-input-row">
-      <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
-        ${famAva(f)}
-        <div style="flex:1;min-width:0">
-          <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
-          ${cost>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
-          ${ev.savingsTotal?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">מתוכם ₪${evSavingsPerFam(ev).toLocaleString()} לקופת חיסכון 💎</div>`:''}
-          ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
-          ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
-        </div>
-      </div>
-      <div style="width:64px;flex-shrink:0;text-align:center">
-        ${spent>0?`<div style="font-size:13px;font-weight:700;color:var(--text)">₪${spent.toLocaleString()}</div><div style="font-size:10px;color:var(--text2)">הוצאות</div>`:''}
-      </div>
-      <div style="flex:1;display:flex;align-items:center;justify-content:flex-end">
-        <${tagTag} class="${tagCls}" id="tag-${ev.id}-${fid}"${tagClick}>${tagText}</${tagTag}>
-      </div>
-    </div>`;
-  }).join('');
   const cumRows=ev.participants.map(fid=>{
     const f=getFam(fid);if(!f)return'';
     const cl=col(fid);
@@ -1664,10 +1630,8 @@ function evCard(ev){
     </div>
     <button class="exp-btn" onclick="toggleEvCollapse(${ev.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
     ${collapsed?'':`
-    <div class="members-list" id="mlist-${ev.id}">${ev.cumulative?cumRows:mems}</div>
-    ${ev.cumulative?addExpBtn:`<div style="padding:0 14px 10px" class="edit-only">
-      <button onclick="openCumPot(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופת האירוע</button>
-    </div>`}
+    <div class="members-list" id="mlist-${ev.id}">${cumRows}</div>
+    ${addExpBtn}
     ${exclLine}
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
@@ -2458,7 +2422,7 @@ async function doCreate(){
     if(ev){
       ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded;
       ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; ev.parentOverrides=parentOverrides;
-      if(!ev.cumulative){ ev.expenses=expenses; ev.totalCost=totalCost; }
+      if(!ev.cumulative){ ev.totalCost=totalCost; if(!(ev.expenseItems&&ev.expenseItems.length))ev.expenses=expenses; }
       if(savingsTotal>0){ev.savingsTotal=savingsTotal;}else{delete ev.savingsTotal;}
     }
   } else {
