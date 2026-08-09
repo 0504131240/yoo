@@ -592,7 +592,15 @@ async function load(){
       delete ev.savingsAmt;
       _savAmtMigrated=true;
     });
-    if(_savAmtMigrated)save();
+    let _kidsMigrated=false;
+    families.forEach(f=>{
+      if(f.kids)return;
+      const n=f.children||0;
+      f.kids=[];
+      for(let i=0;i<n;i++)f.kids.push({id:i+1,name:'',gender:'',hebMonth:'',hebDay:null});
+      _kidsMigrated=true;
+    });
+    if(_savAmtMigrated||_kidsMigrated)save();
     render();setTimeout(handleHash,100);
     if(!_isAdminPage()){
       const savedFamId=localStorage.getItem('deviceFamId3');
@@ -830,8 +838,16 @@ function renderNotifBtn(){
       :requestNotifPerm;
 }
 
+function allBirthdays(){
+  const kidBdays=families.flatMap(f=>(f.kids||[]).filter(k=>k.hebDay&&k.hebMonth).map(k=>({
+    name:(k.name?k.name:'ילד/ה')+' ('+f.name.replace('משפחת','').trim()+')',
+    hebDay:k.hebDay,hebMonth:k.hebMonth
+  })));
+  return [...birthdays,...kidBdays];
+}
 function checkBirthdayNotifs(){
-  if(!_notifOk()||!birthdays.length)return;
+  const all=allBirthdays();
+  if(!_notifOk()||!all.length)return;
   const today=new Date(),todayStr=today.toDateString();
   if(localStorage.getItem('bdayNotifDate')===todayStr)return;
   localStorage.setItem('bdayNotifDate',todayStr);
@@ -840,7 +856,7 @@ function checkBirthdayNotifs(){
   for(let i=0;i<=7;i++){
     const d=new Date(today);d.setDate(d.getDate()+i);
     const hd=parseInt(dayFmt.format(d)),hm=monthFmt.format(d);
-    birthdays.filter(b=>b.hebDay===hd&&b.hebMonth===hm).forEach(b=>{
+    all.filter(b=>b.hebDay===hd&&b.hebMonth===hm).forEach(b=>{
       if(i===0)showNotif('🎂 יום הולדת היום!','יום הולדת שמח ל'+b.name+'!');
       else showNotif('🎂 יום הולדת בעוד '+i+' ימים','של '+b.name);
     });
@@ -982,6 +998,7 @@ function renderCalendar(){
   if(!gridEl)return;
   _applyCalToggleStyle();
   const todayStr=new Date().toISOString().slice(0,10);
+  const _allBdays=allBirthdays();
   let html='';
   let hebDays=null;
   if(calHebrew){
@@ -1000,7 +1017,7 @@ function renderCalendar(){
       const isToday=ds===todayStr;
       const isSel=calSelDay===ds&&!isToday;
       const evOnDay=calItems.filter(c=>c.date===ds);
-      const bdayOnDay=birthdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
+      const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
       const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;
       const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
@@ -1023,7 +1040,7 @@ function renderCalendar(){
       const isToday=ds===todayStr;
       const isSel=calSelDay===ds&&!isToday;
       const evOnDay=calItems.filter(c=>c.date===ds);
-      const bdayOnDay=birthdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
+      const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
       const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;
       const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
@@ -1384,10 +1401,6 @@ function goToGoalFund(goalId){
     const el=document.getElementById('gfund-'+goalId);
     if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
   },100);
-}
-function stepFamChildren(delta){
-  const inp=document.getElementById('famEditChildren');
-  inp.value=Math.max(0,(parseInt(inp.value)||0)+delta);
 }
 function stepChild(id,delta){
   const inp=document.getElementById(id);
@@ -2031,17 +2044,23 @@ function _reportYears(){
   ys.add(cur);
   return [...ys].sort((a,b)=>b-a);
 }
+let _reportView='family';
 function openAnnualReport(){
   const modal=document.getElementById('annualReportModal');if(!modal)return;
   const sel=document.getElementById('reportYearSel');
   const years=_reportYears();
   sel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
   sel.value=String(years[0]);
+  _reportView='family';
   modal.style.display='flex';
   renderAnnualReport();
 }
 function closeAnnualReport(){
   const modal=document.getElementById('annualReportModal');if(modal)modal.style.display='none';
+}
+function setReportView(v){
+  _reportView=v;
+  renderAnnualReport();
 }
 function renderAnnualReport(){
   const el=document.getElementById('annualReportBody');if(!el)return;
@@ -2071,14 +2090,23 @@ function renderAnnualReport(){
       <span style="font-size:12px;font-weight:700;color:${net>=0?'var(--green-mid)':'var(--red-mid)'}">${net>=0?'+':''}₪${net.toLocaleString()}</span>
     </div>`;
   }).join('');
-  const topEvs=[...yearEvs].sort((a,b)=>evCost(b)-evCost(a)).slice(0,3);
-  const topEvsHtml=topEvs.length?topEvs.map(ev=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0">
-    <span>${esc(ev.name)}</span><span style="font-weight:700">₪${evCost(ev).toLocaleString()}</span>
+  const allEvsSorted=[...yearEvs].sort((a,b)=>evCost(b)-evCost(a));
+  const evRows=allEvsSorted.length?allEvsSorted.map(ev=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+      <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(ev.name)}</span>
+      <span style="font-size:13px;font-weight:800;flex-shrink:0">₪${evCost(ev).toLocaleString()}</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:2px">${ev.date&&ev.date!=='לא צוין'?esc(ev.date)+' · ':''}${ev.participants.length} משפחות</div>
   </div>`).join(''):'<div style="font-size:12px;color:var(--text3)">אין אירועים בשנה זו</div>';
   const fundTx=(fund.transactions||[]).filter(t=>_heILDateYear(t.date)===year);
   const fundDeposits=fundTx.filter(t=>t.type==='deposit').reduce((s,t)=>s+t.amount,0);
   const fundPayouts=fundTx.filter(t=>t.type==='payout').reduce((s,t)=>s+t.amount,0);
   const savExpYear=(savingsPot.expenses||[]).filter(e=>_heILDateYear(e.date)===year).reduce((s,e)=>s+e.amt,0);
+  const _famActive=_reportView==='family';
+  const toggleHtml=`<div style="display:flex;gap:6px;margin-bottom:14px">
+    <button onclick="setReportView('family')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid ${_famActive?'var(--blue-mid)':'var(--border)'};background:${_famActive?'var(--blue-mid)':'transparent'};color:${_famActive?'#fff':'var(--text2)'};font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">👨‍👩‍👧‍👦 לפי משפחות</button>
+    <button onclick="setReportView('events')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid ${!_famActive?'var(--blue-mid)':'var(--border)'};background:${!_famActive?'var(--blue-mid)':'transparent'};color:${!_famActive?'#fff':'var(--text2)'};font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">📅 לפי אירועים</button>
+  </div>`;
   el.innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div style="background:var(--surface2);border-radius:var(--r2);padding:12px;text-align:center">
@@ -2099,10 +2127,14 @@ function renderAnnualReport(){
       </div>`:''}
     </div>
     ${fundTx.length?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px">🏦 קופה ראשית: הופקדו ₪${fundDeposits.toLocaleString()} · שולמו ₪${fundPayouts.toLocaleString()}</div>`:''}
-    <div style="font-size:13px;font-weight:800;margin-bottom:6px">🏆 האירועים היקרים ביותר</div>
-    <div style="margin-bottom:14px">${topEvsHtml}</div>
+    ${toggleHtml}
+    ${_famActive?`
     <div style="font-size:13px;font-weight:800;margin-bottom:6px">👨‍👩‍👧‍👦 לפי משפחה</div>
     <div>${famRows||'<div style="font-size:12px;color:var(--text3)">אין נתונים</div>'}</div>
+    `:`
+    <div style="font-size:13px;font-weight:800;margin-bottom:6px">📅 כל האירועים</div>
+    <div>${evRows}</div>
+    `}
     ${undatedCount?`<div style="font-size:11px;color:var(--text3);margin-top:12px">* ${undatedCount} אירועים ללא תאריך שנה מזוהה אינם כלולים בדוח</div>`:''}
   `;
 }
@@ -2248,7 +2280,7 @@ function openFamEditSheet(fid){
     else { preview.innerHTML=`<span style="background:${cl.bg};color:${cl.c};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">${ini(f.name)}</span>`; }
   }
   if(clearBtn) clearBtn.style.display=f.photo?'inline-block':'none';
-  document.getElementById('famEditChildren').value=f.children||0;
+  renderFamEditKids();
   document.getElementById('famEditEmailName').value=f.emailName||'';
   document.getElementById('famEditEmail').value=f.email||'';
   document.getElementById('famEditEmailName2').value=f.emailName2||'';
@@ -2334,6 +2366,98 @@ function closeFamEditSheet(){
   document.getElementById('famEditOverlay').style.display='none';
   _famEditId=null;
 }
+function renderFamEditKids(){
+  const el=document.getElementById('famEditKidsList');if(!el)return;
+  const f=families.find(x=>x.id===_famEditId);if(!f)return;
+  const kids=f.kids||[];
+  if(!kids.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">אין ילדים רשומים</div>';
+    return;
+  }
+  el.innerHTML=kids.map(k=>{
+    const genderIcon=k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👶';
+    const bdayTxt=k.hebDay&&k.hebMonth?HEB_DAY_NUM[k.hebDay]+' '+esc(k.hebMonth):'ללא תאריך לידה';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:16px">${genderIcon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(k.name||'ילד/ה ללא שם')}</div>
+        <div style="font-size:11px;color:var(--text3)">${bdayTxt}</div>
+      </div>
+      <button type="button" onclick="openEditKidModal(${k.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">✏️</button>
+      <button type="button" onclick="deleteKid(${k.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">✕</button>
+    </div>`;
+  }).join('');
+}
+let _kidEditId=null,_kidGender='';
+function _kidMonthDayOptions(){
+  const mSel=document.getElementById('kidBdayMonth');
+  const dSel=document.getElementById('kidBdayDay');
+  if(mSel&&!mSel.options.length){
+    mSel.appendChild(new Option('לא צוין',''));
+    HEB_MONTHS_LIST.forEach(m=>mSel.appendChild(new Option(m,m)));
+  }
+  if(dSel&&!dSel.options.length){
+    dSel.appendChild(new Option('לא צוין',''));
+    for(let i=1;i<=30;i++)dSel.appendChild(new Option(HEB_DAY_NUM[i]+' ('+i+')',i));
+  }
+}
+function setKidGender(g){
+  _kidGender=g;
+  const b1=document.getElementById('kidGenderBoy'),b2=document.getElementById('kidGenderGirl');
+  if(b1){b1.style.background=g==='boy'?'var(--blue-mid)':'transparent';b1.style.color=g==='boy'?'#fff':'var(--text2)';b1.style.borderColor=g==='boy'?'var(--blue-mid)':'var(--border)';}
+  if(b2){b2.style.background=g==='girl'?'var(--blue-mid)':'transparent';b2.style.color=g==='girl'?'#fff':'var(--text2)';b2.style.borderColor=g==='girl'?'var(--blue-mid)':'var(--border)';}
+}
+function openAddKidModal(){
+  if(_famEditId==null)return;
+  _kidEditId=null;
+  _kidMonthDayOptions();
+  document.getElementById('kidModalTitle').textContent='👶 הוסף ילד';
+  document.getElementById('kidName').value='';
+  document.getElementById('kidBdayMonth').value='';
+  document.getElementById('kidBdayDay').value='';
+  setKidGender('');
+  document.getElementById('kidModal').style.display='flex';
+  setTimeout(()=>{const i=document.getElementById('kidName');if(i)i.focus();},50);
+}
+function openEditKidModal(kidId){
+  const f=families.find(x=>x.id===_famEditId);if(!f)return;
+  const k=(f.kids||[]).find(x=>x.id===kidId);if(!k)return;
+  _kidEditId=kidId;
+  _kidMonthDayOptions();
+  document.getElementById('kidModalTitle').textContent='✏️ ערוך ילד';
+  document.getElementById('kidName').value=k.name||'';
+  document.getElementById('kidBdayMonth').value=k.hebMonth||'';
+  document.getElementById('kidBdayDay').value=k.hebDay||'';
+  setKidGender(k.gender||'');
+  document.getElementById('kidModal').style.display='flex';
+}
+function closeKidModal(){
+  document.getElementById('kidModal').style.display='none';
+  _kidEditId=null;
+}
+function saveKid(){
+  const f=families.find(x=>x.id===_famEditId);if(!f)return;
+  const name=document.getElementById('kidName').value.trim();
+  const hebMonth=document.getElementById('kidBdayMonth').value;
+  const hebDay=parseInt(document.getElementById('kidBdayDay').value)||null;
+  if(!f.kids)f.kids=[];
+  if(_kidEditId!=null){
+    const k=f.kids.find(x=>x.id===_kidEditId);
+    if(k){k.name=name;k.gender=_kidGender;k.hebMonth=hebMonth&&hebDay?hebMonth:'';k.hebDay=hebMonth&&hebDay?hebDay:null;}
+  }else{
+    const nid=f.kids.length?Math.max(...f.kids.map(k=>k.id))+1:1;
+    f.kids.push({id:nid,name,gender:_kidGender,hebMonth:hebMonth&&hebDay?hebMonth:'',hebDay:hebMonth&&hebDay?hebDay:null});
+  }
+  f.children=f.kids.length;
+  save();renderFamEditKids();render();closeKidModal();
+}
+function deleteKid(kidId){
+  const f=families.find(x=>x.id===_famEditId);if(!f)return;
+  if(!confirm('למחוק ילד זה?'))return;
+  f.kids=(f.kids||[]).filter(k=>k.id!==kidId);
+  f.children=f.kids.length;
+  save();renderFamEditKids();render();
+}
 function saveFamEdit(){
   if(_famEditId==null)return;
   const f=families.find(x=>x.id===_famEditId);if(!f)return;
@@ -2341,7 +2465,6 @@ function saveFamEdit(){
   if(!name){ alert('נא להזין שם'); return; }
   if(!name.startsWith('משפחת'))name='משפחת '+name;
   f.name=name;
-  f.children=Math.max(0,parseInt(document.getElementById('famEditChildren').value)||0);
   const prevEmail=f.email,prevEmail2=f.email2;
   f.email=_cleanEmail(document.getElementById('famEditEmail').value)||'';
   f.email2=_cleanEmail(document.getElementById('famEditEmail2').value)||'';
