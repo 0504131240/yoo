@@ -461,10 +461,12 @@
         <button type="button" id="kidGenderGirl" onclick="setKidGender('girl')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">👧 בת</button>
       </div>
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">תאריך לידה עברי (אופציונלי)</div>
-      <div style="display:flex;gap:8px;margin-bottom:18px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
         <select id="kidBdayMonth" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text)"></select>
         <select id="kidBdayDay" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text)"></select>
       </div>
+      <input type="number" id="kidBdayYear" placeholder="שנה עברית (לדוגמה: 5784)"
+        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:18px;box-sizing:border-box;direction:ltr;text-align:center">
       <div style="display:flex;gap:8px">
         <button onclick="saveKid()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור</button>
         <button onclick="closeKidModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>

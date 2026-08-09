@@ -61,7 +61,7 @@ const FAM_ADULTS=2;
 const SPLIT_LABELS={equal:'שווה לכל משפחה',percapita:'לפי נפשות',weighted:'ילד = 50% ממבוגר'};
 const famWeight=(f,method,childOverride,parentOverride)=>{
   if(!f) return 1;
-  const ch=childOverride!=null?childOverride:(f.children||0);
+  const ch=childOverride!=null?childOverride:(method==='percapita'?famPercapitaChildCount(f):(f.children||0));
   const adults=parentOverride!=null?parentOverride:FAM_ADULTS;
   if(method==='percapita') return adults+ch;
   if(method==='weighted') return adults+ch*0.5;
@@ -982,6 +982,34 @@ function toHebrewYear(hy){
   else if(t===1&&o===6)s+='טז';
   else{if(t)s+=TENS[t];if(o)s+=ONES[o];}
   return s.length===1?s+'׳':s.slice(0,-1)+'״'+s.slice(-1);
+}
+function hebrewToGregorian(hebYear,hebMonthName,hebDay){
+  if(!hebYear||!hebMonthName||!hebDay)return null;
+  const dayFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'});
+  const monthFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'});
+  const yearFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'});
+  const gregYearGuess=hebYear-3760;
+  const cur=new Date(gregYearGuess,0,1);
+  cur.setDate(cur.getDate()-150);
+  for(let i=0;i<400;i++){
+    if(parseInt(yearFmt.format(cur))===hebYear&&monthFmt.format(cur)===hebMonthName&&parseInt(dayFmt.format(cur))===hebDay)return new Date(cur);
+    cur.setDate(cur.getDate()+1);
+  }
+  return null;
+}
+function kidAge(k){
+  if(!k.hebYear||!k.hebMonth||!k.hebDay)return null;
+  const bd=hebrewToGregorian(k.hebYear,k.hebMonth,k.hebDay);
+  if(!bd)return null;
+  const today=new Date();
+  let age=today.getFullYear()-bd.getFullYear();
+  const m=today.getMonth()-bd.getMonth();
+  if(m<0||(m===0&&today.getDate()<bd.getDate()))age--;
+  return age;
+}
+function famPercapitaChildCount(f){
+  if(!f.kids||!f.kids.length)return f.children||0;
+  return f.kids.filter(k=>{const age=kidAge(k);return age==null||age>=3;}).length;
 }
 function _applyCalToggleStyle(){
   const hBtn=document.getElementById('calToggleHeb');
@@ -2393,7 +2421,8 @@ function renderFamEditKids(){
   }
   el.innerHTML=kids.map(k=>{
     const genderIcon=k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👶';
-    const bdayTxt=k.hebDay&&k.hebMonth?HEB_DAY_NUM[k.hebDay]+' '+esc(k.hebMonth):'ללא תאריך לידה';
+    const age=kidAge(k);
+    const bdayTxt=k.hebDay&&k.hebMonth?HEB_DAY_NUM[k.hebDay]+' '+esc(k.hebMonth)+(k.hebYear?' '+toHebrewYear(k.hebYear):'')+(age!=null?' · גיל '+age:''):'ללא תאריך לידה';
     return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:16px">${genderIcon}</span>
       <div style="flex:1;min-width:0">
@@ -2432,6 +2461,7 @@ function openAddKidModal(){
   document.getElementById('kidName').value='';
   document.getElementById('kidBdayMonth').value='';
   document.getElementById('kidBdayDay').value='';
+  document.getElementById('kidBdayYear').value='';
   setKidGender('');
   document.getElementById('kidModal').style.display='flex';
   setTimeout(()=>{const i=document.getElementById('kidName');if(i)i.focus();},50);
@@ -2445,6 +2475,7 @@ function openEditKidModal(kidId){
   document.getElementById('kidName').value=k.name||'';
   document.getElementById('kidBdayMonth').value=k.hebMonth||'';
   document.getElementById('kidBdayDay').value=k.hebDay||'';
+  document.getElementById('kidBdayYear').value=k.hebYear||'';
   setKidGender(k.gender||'');
   document.getElementById('kidModal').style.display='flex';
 }
@@ -2457,13 +2488,15 @@ function saveKid(){
   const name=document.getElementById('kidName').value.trim();
   const hebMonth=document.getElementById('kidBdayMonth').value;
   const hebDay=parseInt(document.getElementById('kidBdayDay').value)||null;
+  const hebYear=parseInt(document.getElementById('kidBdayYear').value)||null;
+  const hasDate=!!(hebMonth&&hebDay);
   if(!f.kids)f.kids=[];
   if(_kidEditId!=null){
     const k=f.kids.find(x=>x.id===_kidEditId);
-    if(k){k.name=name;k.gender=_kidGender;k.hebMonth=hebMonth&&hebDay?hebMonth:'';k.hebDay=hebMonth&&hebDay?hebDay:null;}
+    if(k){k.name=name;k.gender=_kidGender;k.hebMonth=hasDate?hebMonth:'';k.hebDay=hasDate?hebDay:null;k.hebYear=hasDate?hebYear:null;}
   }else{
     const nid=f.kids.length?Math.max(...f.kids.map(k=>k.id))+1:1;
-    f.kids.push({id:nid,name,gender:_kidGender,hebMonth:hebMonth&&hebDay?hebMonth:'',hebDay:hebMonth&&hebDay?hebDay:null});
+    f.kids.push({id:nid,name,gender:_kidGender,hebMonth:hasDate?hebMonth:'',hebDay:hasDate?hebDay:null,hebYear:hasDate?hebYear:null});
   }
   f.children=f.kids.length;
   save();renderFamEditKids();render();closeKidModal();
@@ -2544,7 +2577,7 @@ function updateChildOverrideInputs(){
   const inpStyle='border:none;border-right:1.5px solid var(--border);border-left:1.5px solid var(--border);border-radius:0;width:36px;height:30px;padding:0';
   const stepperWrap='display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden';
   document.getElementById('childOverrideInputs').innerHTML=selected.map(f=>{
-    const valCh=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:(f.children||0);
+    const valCh=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:(splitMethod==='percapita'?famPercapitaChildCount(f):(f.children||0));
     const valPa=ev&&ev.parentOverrides&&ev.parentOverrides[f.id]!=null?ev.parentOverrides[f.id]:FAM_ADULTS;
     return`<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r2)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -2583,7 +2616,7 @@ function updateChildPickSummary(){
   const el=document.getElementById('childPickSummary');if(!el)return;
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   if(!selected.length){el.textContent='הגדר הרכב לפי משפחה';return;}
-  const totalCh=selected.reduce((s,f)=>{ const v=formChildOverride(f.id); return s+(v!=null?v:(f.children||0)); },0);
+  const totalCh=selected.reduce((s,f)=>{ const v=formChildOverride(f.id); return s+(v!=null?v:(splitMethod==='percapita'?famPercapitaChildCount(f):(f.children||0))); },0);
   const totalPa=selected.reduce((s,f)=>{ const v=formParentOverride(f.id); return s+(v!=null?v:FAM_ADULTS); },0);
   el.textContent=`${totalPa} הורים · ${totalCh} ילדים`;
 }
@@ -2832,7 +2865,7 @@ async function doCreate(){
   const savingsTotal=Math.round(parseFloat(document.getElementById('f-savings')?.value)||0);
   const childOverrides={};const parentOverrides={};
   if(splitMethod!=='equal') participants.forEach(fid=>{
-    childOverrides[fid]=formChildOverride(fid)??(getFam(fid)?.children||0);
+    childOverrides[fid]=formChildOverride(fid)??(splitMethod==='percapita'?famPercapitaChildCount(getFam(fid)||{}):(getFam(fid)?.children||0));
     parentOverrides[fid]=formParentOverride(fid)??FAM_ADULTS;
   });
   if(editingId!=null){
