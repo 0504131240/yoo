@@ -27,7 +27,7 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
-const CACHE = 'family-pay-v6';
+const CACHE = 'family-pay-v7';
 const STATIC = ['./icon.svg','./icon.jpg','./manifest.json'];
 
 self.addEventListener('install', e => {
@@ -44,12 +44,14 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = e.request.url;
-  // Always network-first for HTML and Firebase
+  // Always network-first for HTML, Firebase, and the app's own code/styles —
+  // these change on every deploy and must never be served stale from cache.
   if (url.includes('firestore') || url.includes('firebase') ||
-      url.endsWith('/') || url.endsWith('.html')) {
+      url.endsWith('/') || url.endsWith('.html') ||
+      url.endsWith('.js') || url.endsWith('.css')) {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
     return;
   }
-  // Cache-first only for static assets (images, icons)
+  // Cache-first only for truly static assets (images, icons, manifest)
   e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request)));
 });
