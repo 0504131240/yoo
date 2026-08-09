@@ -208,7 +208,7 @@ function debtEmailContent(famName, debts, totalDebt) {
 }
 
 exports.weeklyDebtReminder = onSchedule(
-  {schedule: 'every friday 10:00', timeZone: 'Asia/Jerusalem', region: 'me-west1'},
+  {schedule: 'every sunday 09:00', timeZone: 'Asia/Jerusalem', region: 'me-west1'},
   async () => {
     const db = getFirestore();
     const [dataSnap, ejsSnap] = await Promise.all([
