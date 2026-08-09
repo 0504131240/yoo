@@ -2369,6 +2369,8 @@ function delFamFromEdit(){
 let expMode='total';
 let editingId=null;
 let splitMethod='equal';
+let _custItems={};
+let _custItemSeq=1;
 function setSplitMethod(method){
   splitMethod=method;
   ['splitEqual','splitPercapita','splitWeighted'].forEach(id=>document.getElementById(id).classList.remove('active'));
@@ -2454,9 +2456,33 @@ function closeExpensePicker(){
 }
 function updateExpensePickSummary(){
   const el=document.getElementById('expensePickSummary');if(!el)return;
+  const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   let total=0;
-  families.forEach(f=>{ const inp=document.getElementById('fexp-'+f.id); if(inp) total+=parseFloat(inp.value)||0; });
+  selected.forEach(f=>{ total+=_custFamTotal(f.id); });
   el.textContent=total>0?`הוזן ₪${total.toLocaleString()}`:'כמה כל משפחה שילמה';
+}
+function _custFamTotal(fid){
+  return (_custItems[fid]||[]).reduce((s,r)=>s+(parseFloat(r.amt)||0),0);
+}
+function _custItemAdd(fid){
+  if(!_custItems[fid])_custItems[fid]=[];
+  _custItems[fid].push({id:_custItemSeq++,name:'',amt:''});
+  updateExpenseInputs();
+}
+function _custItemRemove(fid,rowId){
+  if(!_custItems[fid])return;
+  _custItems[fid]=_custItems[fid].filter(r=>r.id!==rowId);
+  if(!_custItems[fid].length)_custItems[fid]=[{id:_custItemSeq++,name:'',amt:''}];
+  updateExpenseInputs();
+}
+function _custItemEdit(fid,rowId,field,val){
+  const row=(_custItems[fid]||[]).find(r=>r.id===rowId);if(!row)return;
+  row[field]=val;
+  if(field==='amt'){
+    const el=document.getElementById('fexpfamtot-'+fid);
+    if(el)el.textContent='₪'+Math.round(_custFamTotal(fid)).toLocaleString();
+    _updateCustomTotal();
+  }
 }
 function setExpMode(mode){
   expMode=mode;
@@ -2492,6 +2518,7 @@ function updateTotalPreview(){
 }
 function showForm(){
   editingId=null;
+  _custItems={};
   document.getElementById('formTitle').textContent='➕ אירוע חדש';
   document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
   document.getElementById('f-name').value='';
@@ -2513,6 +2540,7 @@ function showForm(){
 function editEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   editingId=evId;
+  _custItems={};
   document.getElementById('formTitle').textContent='✏️ עריכת אירוע';
   document.getElementById('formSaveBtn').textContent='✓ שמור שינויים';
   document.getElementById('f-name').value=ev.name;
@@ -2534,7 +2562,16 @@ function editEv(evId){
   } else {
     expMode='custom';
     setExpMode('custom');
-    ev.participants.forEach(fid=>{ const inp=document.getElementById('fexp-'+fid); if(inp) inp.value=ev.expenses[fid]||''; });
+    ev.participants.forEach(fid=>{
+      const plainItems=(ev.expenseItems||[]).filter(it=>it.famId===fid&&!it.customSplit&&(!it.sharedWith||it.sharedWith.length===ev.participants.length));
+      const anyItems=(ev.expenseItems||[]).some(it=>it.famId===fid);
+      if(plainItems.length){
+        _custItems[fid]=plainItems.map(it=>({id:_custItemSeq++,name:it.name||'',amt:it.amt||0}));
+      } else if(!anyItems&&ev.expenses[fid]){
+        _custItems[fid]=[{id:_custItemSeq++,name:'',amt:ev.expenses[fid]}];
+      }
+    });
+    updateExpenseInputs();
     updateFormTotal();
   }
   const savEl=document.getElementById('f-savings');
@@ -2549,6 +2586,7 @@ function hideForm(){
   document.getElementById('newFormOverlay').style.display='none';
   closeFamPicker();closeChildOverridePicker();closeExpensePicker();
   editingId=null;
+  _custItems={};
   document.getElementById('formTitle').textContent='➕ אירוע חדש';
   document.getElementById('formSaveBtn').textContent='✓ צור אירוע';
   const savEl=document.getElementById('f-savings');if(savEl)savEl.value='';
@@ -2573,12 +2611,22 @@ function updateExpenseInputs(){
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   if(!selected.length){ document.getElementById('expensesSection').style.display='none'; return; }
   document.getElementById('expensesSection').style.display='block';
+  selected.forEach(f=>{ if(!_custItems[f.id]||!_custItems[f.id].length)_custItems[f.id]=[{id:_custItemSeq++,name:'',amt:''}]; });
   document.getElementById('expenseInputs').innerHTML=selected.map(f=>{
-    const cl=col(f.id);
-    return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      ${famAva(f, 30, 'flex-shrink:0')}
-      <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
-      <input class="exp-inp" type="number" min="0" inputmode="numeric" placeholder="0" id="fexp-${f.id}" oninput="_updateCustomTotal()">
+    const rows=_custItems[f.id]||[];
+    const tot=_custFamTotal(f.id);
+    return`<div style="margin-bottom:12px;padding:10px;background:var(--surface2);border-radius:var(--r2)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        ${famAva(f, 28, 'flex-shrink:0')}
+        <span style="flex:1;font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--green-mid)" id="fexpfamtot-${f.id}">₪${Math.round(tot).toLocaleString()}</span>
+      </div>
+      ${rows.map(r=>`<div style="display:flex;gap:6px;margin-bottom:6px">
+        <input type="text" placeholder="תיאור (אופציונלי)" value="${esc(r.name)}" oninput="_custItemEdit(${f.id},${r.id},'name',this.value)" style="flex:2;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:7px 8px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+        <input type="number" min="0" inputmode="numeric" placeholder="0" value="${esc(String(r.amt))}" oninput="_custItemEdit(${f.id},${r.id},'amt',this.value)" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:7px 8px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+        <button type="button" onclick="_custItemRemove(${f.id},${r.id})" style="flex-shrink:0;width:26px;border-radius:6px;border:none;background:none;color:var(--text3);font-size:14px;cursor:pointer">✕</button>
+      </div>`).join('')}
+      <button type="button" onclick="_custItemAdd(${f.id})" style="width:100%;padding:6px;border-radius:6px;border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">+ הוסף פריט</button>
     </div>`;
   }).join('');
   updateFormTotal();
@@ -2599,6 +2647,7 @@ async function doCreate(){
   else document.getElementById('e-fams').classList.remove('show');
   const expenses={};
   let anyExpense=false;
+  let formExpenseItems=null;
   if(expMode==='total'){
     const total=parseFloat(document.getElementById('f-total')?.value)||0;
     if(!total){document.getElementById('e-cost').classList.add('show');ok=false;}
@@ -2614,7 +2663,18 @@ async function doCreate(){
   } else {
     const _cSym=document.getElementById('customCur')?.value||'₪';
     const _cRate=_cSym==='₪'?1:((await _getRate(_cSym))||1);
-    for(const fid of participants){const inp=document.getElementById('fexp-'+fid);const v=Math.round((parseFloat(inp&&inp.value)||0)*_cRate);expenses[fid]=v;if(v>0)anyExpense=true;}
+    formExpenseItems=[];
+    for(const fid of participants){
+      const rows=(_custItems[fid]||[]).filter(r=>Math.round((parseFloat(r.amt)||0)*_cRate)>0);
+      let famSum=0;
+      rows.forEach(r=>{
+        const amt=Math.round((parseFloat(r.amt)||0)*_cRate);
+        famSum+=amt;
+        formExpenseItems.push({famId:fid,name:(r.name||'').trim()||'הוצאה',amt});
+      });
+      expenses[fid]=famSum;
+      if(famSum>0)anyExpense=true;
+    }
     if(!anyExpense){document.getElementById('e-cost').classList.add('show');ok=false;}
     else document.getElementById('e-cost').classList.remove('show');
   }
@@ -2632,12 +2692,31 @@ async function doCreate(){
     if(ev){
       ev.name=name; ev.date=date; ev.participants=participants; ev.excluded=excluded;
       ev.splitMethod=splitMethod; ev.childOverrides=childOverrides; ev.parentOverrides=parentOverrides;
-      if(!ev.cumulative){ ev.totalCost=totalCost; if(!(ev.expenseItems&&ev.expenseItems.length))ev.expenses=expenses; }
+      if(!ev.cumulative){
+        ev.totalCost=totalCost;
+        if(expMode==='custom'){
+          const preserved=(ev.expenseItems||[]).filter(it=>it.customSplit||(it.sharedWith&&it.sharedWith.length<participants.length));
+          const finalExpenses={...expenses};
+          preserved.forEach(it=>{ finalExpenses[it.famId]=(finalExpenses[it.famId]||0)+it.amt; });
+          let seq=Math.max(0,...preserved.map(it=>it.id||0))+1;
+          const freshItems=(formExpenseItems||[]).map(it=>({...it,id:seq++}));
+          ev.expenses=finalExpenses;
+          ev.expenseItems=[...preserved,...freshItems];
+          ev.expItemId=Math.max(seq-1,ev.expItemId||0);
+        } else if(!(ev.expenseItems&&ev.expenseItems.length)){
+          ev.expenses=expenses;
+        }
+      }
       if(savingsTotal>0){ev.savingsTotal=savingsTotal;}else{delete ev.savingsTotal;}
     }
   } else {
     const newEv={id:nxtId++,name,date,open:true,closedOn:null,participants,excluded,expenses,totalCost:isCumulative?null:totalCost,splitMethod,childOverrides,parentOverrides};
     if(isCumulative){newEv.cumulative=true;newEv.expenseItems=[];newEv.expItemId=0;}
+    else if(expMode==='custom'&&formExpenseItems&&formExpenseItems.length){
+      let seq=1;
+      newEv.expenseItems=formExpenseItems.map(it=>({...it,id:seq++}));
+      newEv.expItemId=seq-1;
+    }
     if(savingsTotal>0)newEv.savingsTotal=savingsTotal;
     events.unshift(newEv);
     addNotif('📅','נוסף אירוע חדש: "'+newEv.name+'"');
@@ -4431,7 +4510,8 @@ async function _updateCustomTotal(){
   const sym=document.getElementById('customCur')?.value||'₪';
   const rate=sym==='₪'?1:((await _getRate(sym))||1);
   let total=0;
-  families.forEach(f=>{const inp=document.getElementById('fexp-'+f.id);if(inp)total+=Math.round((parseFloat(inp.value)||0)*rate);});
+  const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
+  selected.forEach(f=>{total+=Math.round(_custFamTotal(f.id)*rate);});
   const el=document.getElementById('formTotalCost');
   if(el)el.textContent='₪'+total.toLocaleString();
   updateExpensePickSummary();
