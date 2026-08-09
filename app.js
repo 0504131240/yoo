@@ -2943,10 +2943,10 @@ function showEmailGateWelcome(fam,slot){
   const name=firstName?`${firstName} ${surname}`:surname;
   logVisit(fam.id,slot,name);
   const fundBal=Math.round(famFundBal(fam.id));
-  const debts=events.filter(ev=>ev.open&&(ev.participants||[]).includes(fam.id))
-    .map(ev=>({name:ev.name,owe:Math.round(-(evAdjBalance(ev)[fam.id]||0))}))
-    .filter(d=>d.owe>0.5);
-  const totalDebt=debts.reduce((s,d)=>s+d.owe,0);
+  const evBals=events.filter(ev=>ev.open&&(ev.participants||[]).includes(fam.id))
+    .map(ev=>({name:ev.name,bal:Math.round(evAdjBalance(ev)[fam.id]||0)}))
+    .filter(d=>Math.abs(d.bal)>0.5);
+  const totalEvBal=evBals.reduce((s,d)=>s+d.bal,0);
   el.innerHTML=`
     <div style="padding:26px 22px;text-align:center">
       <div style="font-size:34px;margin-bottom:8px">👋</div>
@@ -2957,12 +2957,20 @@ function showEmailGateWelcome(fam,slot){
           <span style="font-size:14px;font-weight:700;color:${fundBal>=0?'var(--green-mid)':'var(--red-mid)'}">₪${fundBal.toLocaleString()}</span>
         </div>
       </div>
-      ${totalDebt>0.5?`
-      <div style="background:var(--red-bg);border-radius:var(--r2);padding:12px 14px;margin-bottom:16px;text-align:right">
-        <div style="font-size:13px;font-weight:700;color:var(--red-mid);margin-bottom:6px">⚠️ הנך בחוב של ₪${totalDebt.toLocaleString()}</div>
-        ${debts.map(d=>`<div style="font-size:12px;color:var(--text2);padding:2px 0">${esc(d.name)} · ₪${d.owe.toLocaleString()}</div>`).join('')}
+      ${evBals.length?`
+      <div style="background:${totalEvBal<-0.5?'var(--red-bg)':'var(--surface2)'};border-radius:var(--r2);padding:12px 14px;margin-bottom:16px;text-align:right">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:13px;color:var(--text2)">יתרתך באירועים</span>
+          <span style="font-size:14px;font-weight:700;color:${totalEvBal>=0?'var(--green-mid)':'var(--red-mid)'}">${totalEvBal>=0?'+':'-'}₪${Math.abs(totalEvBal).toLocaleString()}</span>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:6px">
+          ${evBals.map(d=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0">
+            <span style="color:var(--text2)">${esc(d.name)}</span>
+            <span style="font-weight:700;color:${d.bal>=0?'var(--green-mid)':'var(--red-mid)'}">${d.bal>=0?'+':'-'}₪${Math.abs(d.bal).toLocaleString()}</span>
+          </div>`).join('')}
+        </div>
       </div>`:`
-      <div style="background:var(--green-bg);border-radius:var(--r2);padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--green-mid)">✅ אין חובות פתוחים</div>`}
+      <div style="background:var(--green-bg);border-radius:var(--r2);padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--green-mid)">✅ מסודר בכל האירועים</div>`}
       <button onclick="closeEmailGateModal()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">המשך לאפליקציה</button>
       <button onclick="resetDeviceIdentity()" style="width:100%;padding:6px;border:none;background:none;color:var(--text3);font-size:11px;font-family:var(--font);cursor:pointer;text-decoration:underline">לא אני? החלף מייל</button>
     </div>`;
