@@ -999,6 +999,7 @@ function renderCalendar(){
   _applyCalToggleStyle();
   const todayStr=new Date().toISOString().slice(0,10);
   const _allBdays=allBirthdays();
+  const bdayByDate={};
   let html='';
   let hebDays=null;
   if(calHebrew){
@@ -1018,6 +1019,7 @@ function renderCalendar(){
       const isSel=calSelDay===ds&&!isToday;
       const evOnDay=calItems.filter(c=>c.date===ds);
       const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
+      if(bdayOnDay.length)bdayByDate[ds]=bdayOnDay;
       const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;
       const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
@@ -1041,6 +1043,7 @@ function renderCalendar(){
       const isSel=calSelDay===ds&&!isToday;
       const evOnDay=calItems.filter(c=>c.date===ds);
       const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
+      if(bdayOnDay.length)bdayByDate[ds]=bdayOnDay;
       const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;
       const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':'')].filter(Boolean).join(' ');
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
@@ -1051,7 +1054,7 @@ function renderCalendar(){
     }
   }
   gridEl.innerHTML=html;
-  renderCalEvList(hebDays);
+  renderCalEvList(hebDays,bdayByDate);
 }
 
 function selectCalDay(ds){
@@ -1059,34 +1062,48 @@ function selectCalDay(ds){
   renderCalendar();
 }
 
-function renderCalEvList(hebDays){
+function renderCalEvList(hebDays,bdayByDate){
   const el=document.getElementById('calEvList');if(!el)return;
-  let list;
+  bdayByDate=bdayByDate||{};
+  let dateFilter;
   if(calSelDay){
-    list=calItems.filter(c=>c.date===calSelDay);
+    dateFilter=ds=>ds===calSelDay;
   } else if(hebDays){
     const ds=new Set(hebDays.map(d=>d.toISOString().slice(0,10)));
-    list=calItems.filter(c=>ds.has(c.date)).sort((a,b)=>a.date.localeCompare(b.date));
+    dateFilter=d=>ds.has(d);
   } else {
     const monthStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}`;
-    list=calItems.filter(c=>c.date.startsWith(monthStr)).sort((a,b)=>a.date.localeCompare(b.date));
+    dateFilter=d=>d.startsWith(monthStr);
   }
+  const evList=calItems.filter(c=>dateFilter(c.date)).map(c=>({type:'ev',date:c.date,item:c}));
+  const bdayList=Object.entries(bdayByDate).filter(([ds])=>dateFilter(ds))
+    .flatMap(([ds,bdays])=>bdays.map(b=>({type:'bday',date:ds,item:b})));
+  const list=[...evList,...bdayList].sort((a,b)=>a.date.localeCompare(b.date));
   if(!list.length){el.innerHTML='';return;}
-  el.innerHTML=list.map(c=>{
-    const d=new Date(c.date+'T00:00:00');
+  el.innerHTML=list.map(({type,date,item})=>{
+    const d=new Date(date+'T00:00:00');
     const hebF=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric',month:'long'});
     const latF=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'});
     const hebYNum=parseInt(latF.format(d));
     const lbl=calHebrew
       ?hebF.format(d)+' '+toHebrewYear(hebYNum)
       :d.toLocaleDateString('he-IL',{day:'numeric',month:'long'});
+    if(type==='bday'){
+      return`<div class="fh-cal-ev">
+        <div class="fh-cal-ev-dot" style="background:#c0392b"></div>
+        <div class="fh-cal-ev-info">
+          <div class="fh-cal-ev-name">🎂 ${esc(item.name)} — יום הולדת</div>
+          <div class="fh-cal-ev-date">${lbl}</div>
+        </div>
+      </div>`;
+    }
     return`<div class="fh-cal-ev">
-      <div class="fh-cal-ev-dot" style="background:${c.color||'var(--blue-mid)'}"></div>
+      <div class="fh-cal-ev-dot" style="background:${item.color||'var(--blue-mid)'}"></div>
       <div class="fh-cal-ev-info">
-        <div class="fh-cal-ev-name">${esc(c.title)}</div>
+        <div class="fh-cal-ev-name">${esc(item.title)}</div>
         <div class="fh-cal-ev-date">${lbl}</div>
       </div>
-      <button onclick="deleteCalItem(${c.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>
+      <button onclick="deleteCalItem(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>
     </div>`;
   }).join('');
 }
