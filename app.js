@@ -3709,11 +3709,20 @@ function renderPotTransferModal(ev){
   if(!creditorFids.length){closePotTransferModal();return;}
   const potByCreditor={};
   potTransfers.forEach(t=>{if(!potByCreditor[t.toFid])potByCreditor[t.toFid]={amt:0};potByCreditor[t.toFid].amt+=t.amt;});
-  const _sug=fid=>{const fromOthers=(potByCreditor[fid]||{amt:0}).amt;const ownExc=excessByFam[fid]||0;const c=Math.min(Math.round(adjBal[fid]||0),fromOthers+ownExc);return c>0.5?c:Math.round(adjBal[fid]||0);};
+  const _sug=fid=>{const fromOthers=(potByCreditor[fid]||{amt:0}).amt;const ownExc=excessByFam[fid]||0;return Math.min(Math.round(adjBal[fid]||0),Math.round(fromOthers+ownExc));};
   const creditorRows=creditorFids.map(fid=>{
     const pf=getFam(fid);if(!pf)return'';
     const name=pf.name.replace('משפחת','').trim();
     const sug=_sug(fid);
+    const owed=Math.round(adjBal[fid]||0);
+    if(sug<=0.5){
+      return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);opacity:0.55">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${esc(name)}</div>
+          <div style="font-size:11px;color:var(--text2)">מגיע לו ₪${owed.toLocaleString()} · אין כרגע יתרה זמינה בקופה בשבילו</div>
+        </div>
+      </div>`;
+    }
     return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700">${esc(name)}</div>
@@ -3750,12 +3759,6 @@ function renderPotModal(ev){
   const potByCreditor={};
   potTransfers.forEach(t=>{if(!potByCreditor[t.toFid])potByCreditor[t.toFid]={name:t.to,fid:t.toFid,amt:0};potByCreditor[t.toFid].amt+=t.amt;});
   const excessByFam=calcPotExcessByFamily(ev);
-  const _potSuggest=fid=>{
-    const fromOthers=(potByCreditor[fid]||{amt:0}).amt;
-    const ownExcess=excessByFam[fid]||0;
-    const calc=Math.min(Math.round(adjBal[fid]||0),fromOthers+ownExcess);
-    return calc>0.5?calc:Math.round(adjBal[fid]||0);
-  };
   const potTransferBtn=creditorFids.length?`<div class="edit-only" style="padding:10px 16px;border-bottom:1px solid var(--border)">
     <button onclick="openPotTransferModal(${ev.id})" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">↗ העברה לזכאים${creditorFids.length>1?' ('+creditorFids.length+')':''}</button>
   </div>`:'';
