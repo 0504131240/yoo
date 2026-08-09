@@ -586,6 +586,19 @@ async function load(){
   }
 }
 
+function showToast(msg,hideAfter){
+  let el=document.getElementById('toastMsg');
+  if(!el){
+    el=document.createElement('div');
+    el.id='toastMsg';
+    el.style.cssText='position:fixed;bottom:calc(90px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#1A1A18;color:#fff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:20px;z-index:3000;transition:opacity 0.3s;white-space:nowrap;pointer-events:none;max-width:88vw;overflow:hidden;text-overflow:ellipsis';
+    document.body.appendChild(el);
+  }
+  el.textContent=msg;
+  el.style.opacity='1';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>{el.style.opacity='0';},hideAfter||2500);
+}
 function showSyncStatus(msg,hideAfter){
   let el=document.getElementById('syncStatus');
   if(!el){
@@ -1766,6 +1779,47 @@ function releasePotToOne(evId,creditorFid,toFund){
   const potMap={};
   ev.potPayments.forEach(p=>{potMap[p.famId]=(potMap[p.famId]||0)+p.amt;});
   transfers.forEach(t=>{potMap[t.fromFid]=(potMap[t.fromFid]||0)-t.amt;});
+  ev.potPayments=Object.entries(potMap).filter(([,a])=>a>0.5).map(([fid,amt])=>({famId:+fid,amt:Math.round(amt)}));
+  save();render();
+  if(ev.closed){const adjA=evAdjBalance(ev);ev.participants.forEach(fid=>{if(Math.abs(adjA[fid]||0)<=0.5)_sendCloseEvEmailOne(ev,fid);});}
+}
+// Manual override: let the treasurer pick who gets pot money the automatic
+// allocation didn't route to them (e.g. two creditors tied for more than the pot holds)
+function releasePotManual(evId,creditorFid,amt,toFund){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  amt=Math.round(amt);if(amt<=0)return;
+  const adjBal=evAdjBalance(ev);
+  const pots=evEffectivePotPayments(ev);
+  const totalAvail=pots.reduce((s,p)=>s+p.amt,0);
+  amt=Math.min(amt,totalAvail,Math.round(adjBal[creditorFid]||0));
+  if(amt<=0)return;
+  const cred=getFam(creditorFid);if(!cred)return;
+  const credName=cred.name.replace('משפחת','').trim();
+  const potByFam={};
+  pots.forEach(p=>{if(p.famId!==creditorFid)potByFam[p.famId]=(potByFam[p.famId]||0)+p.amt;});
+  if(!ev.settled)ev.settled=[];
+  const potMap={};
+  ev.potPayments.forEach(p=>{potMap[p.famId]=(potMap[p.famId]||0)+p.amt;});
+  let rem=amt;
+  Object.entries(potByFam).forEach(([fidStr,avail])=>{
+    if(rem<=0.5)return;
+    const fid=parseInt(fidStr);
+    const take=Math.min(avail,rem);
+    if(take<=0.5)return;
+    const fromFam=getFam(fid);if(!fromFam)return;
+    ev.settled.push({from:fromFam.name.replace('משפחת','').trim(),fromFid:fid,to:credName,toFid:creditorFid,amt:Math.round(take),method:'pot'});
+    potMap[fid]=(potMap[fid]||0)-take;
+    rem-=take;
+  });
+  const given=amt-rem;
+  if(given<=0.5)return;
+  if(toFund){
+    const key=String(creditorFid);
+    fund.famBalances[key]=(fund.famBalances[key]||0)+given;
+    fund.transactions.push({id:nxtTx++,type:'deposit',famId:creditorFid,amount:given,
+      desc:'מקופת אירוע · '+ev.name+' → '+credName,
+      date:new Date().toLocaleDateString('he-IL')});
+  }
   ev.potPayments=Object.entries(potMap).filter(([,a])=>a>0.5).map(([fid,amt])=>({famId:+fid,amt:Math.round(amt)}));
   save();render();
   if(ev.closed){const adjA=evAdjBalance(ev);ev.participants.forEach(fid=>{if(Math.abs(adjA[fid]||0)<=0.5)_sendCloseEvEmailOne(ev,fid);});}
@@ -3710,16 +3764,34 @@ function renderPotTransferModal(ev){
   const potByCreditor={};
   potTransfers.forEach(t=>{if(!potByCreditor[t.toFid])potByCreditor[t.toFid]={amt:0};potByCreditor[t.toFid].amt+=t.amt;});
   const _sug=fid=>{const fromOthers=(potByCreditor[fid]||{amt:0}).amt;const ownExc=excessByFam[fid]||0;return Math.min(Math.round(adjBal[fid]||0),Math.round(fromOthers+ownExc));};
+  const potAvail=Math.round(evNetPotBal(ev));
   const creditorRows=creditorFids.map(fid=>{
     const pf=getFam(fid);if(!pf)return'';
     const name=pf.name.replace('משפחת','').trim();
     const sug=_sug(fid);
     const owed=Math.round(adjBal[fid]||0);
     if(sug<=0.5){
-      return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);opacity:0.55">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700">${esc(name)}</div>
-          <div style="font-size:11px;color:var(--text2)">מגיע לו ₪${owed.toLocaleString()} · אין כרגע יתרה זמינה בקופה בשבילו</div>
+      if(potAvail<=0.5){
+        return`<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);opacity:0.55">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700">${esc(name)}</div>
+            <div style="font-size:11px;color:var(--text2)">מגיע לו ₪${owed.toLocaleString()} · אין כרגע יתרה בקופה</div>
+          </div>
+        </div>`;
+      }
+      const manualMax=Math.min(owed,potAvail);
+      const inpId='pot-manual-'+ev.id+'-'+fid;
+      return`<div style="padding:10px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700">${esc(name)}</div>
+            <div style="font-size:11px;color:var(--text2)">מגיע לו ₪${owed.toLocaleString()} · הקופה כרגע הוקצתה למישהו אחר, אפשר להעביר לו ידנית</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <input id="${inpId}" type="number" min="1" max="${manualMax}" value="${manualMax}" inputmode="numeric" style="width:80px;flex-shrink:0;border:1.5px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center">
+          <button onclick="releasePotManualM(${ev.id},${fid},'${inpId}',false)" style="flex:1;padding:7px 10px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר ידנית</button>
+          <button onclick="releasePotManualM(${ev.id},${fid},'${inpId}',true)" style="flex:1;padding:7px 10px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
         </div>
       </div>`;
     }
@@ -3812,6 +3884,14 @@ function renderPotModal(ev){
 }
 function releasePotToOneM(evId,creditorFid,toFund){
   releasePotToOne(evId,creditorFid,toFund);
+  const ev=events.find(e=>e.id===evId);
+  if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
+  _refreshPotTransferModal(evId);
+}
+function releasePotManualM(evId,creditorFid,inpId,toFund){
+  const amt=parseFloat(document.getElementById(inpId)?.value||'0');
+  if(!amt||amt<=0){showToast('הזן סכום');return;}
+  releasePotManual(evId,creditorFid,amt,toFund);
   const ev=events.find(e=>e.id===evId);
   if(ev&&evPotTotal(ev)>0)renderPotModal(ev);else closePotModal();
   _refreshPotTransferModal(evId);
