@@ -2086,7 +2086,7 @@ function renderAnnualReport(){
     return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
       ${famAva(f,26)}
       <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
-      <span style="font-size:12px;color:var(--text2)">שילם/ה ₪${Math.round(t.paid).toLocaleString()}</span>
+      <span style="font-size:12px;color:var(--text2)">עלות: ₪${Math.round(t.share).toLocaleString()}</span>
       <span style="font-size:12px;font-weight:700;color:${net>=0?'var(--green-mid)':'var(--red-mid)'}">${net>=0?'+':''}₪${net.toLocaleString()}</span>
     </div>`;
   }).join('');
