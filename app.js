@@ -4855,6 +4855,15 @@ window.addEventListener('hashchange',handleHash);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+  // If an update activates while this page is already open (e.g. it loaded under
+  // an older worker), reload once to actually get the new page instead of leaving
+  // the user stuck on stale content until their next visit.
+  let _swRefreshed=false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(_swRefreshed)return;
+    _swRefreshed=true;
+    window.location.reload();
+  });
 }
 history.scrollRestoration = 'manual';
 window.addEventListener('load', () => {
