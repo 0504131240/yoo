@@ -3760,7 +3760,7 @@ function renderFund(){
     const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
     return`<div class="fund-tx-row">
       <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
-      <span class="fund-tx-desc">${esc(tx.desc)}</span>
+      <span class="fund-tx-desc"><span>${esc(tx.desc)}</span>${tx.date?`<span class="fund-tx-date">${esc(tx.date)}</span>`:''}</span>
       <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
     </div>`;
   }).join('')}</div>`;
@@ -3794,7 +3794,7 @@ function toggleFundTx(){
         const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
         return`<div class="fund-tx-row">
           <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
-          <span class="fund-tx-desc">${esc(tx.desc)}</span>
+          <span class="fund-tx-desc"><span>${esc(tx.desc)}</span>${tx.date?`<span class="fund-tx-date">${esc(tx.date)}</span>`:''}</span>
           <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
         </div>`;
       }).join('')}</div>`;
