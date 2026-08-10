@@ -72,7 +72,6 @@
       <div class="fh-cal-evlist" id="calEvList"></div>
       <div style="padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap">
         <button onclick="openCalModal()" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
-        <button onclick="openBdayModal()" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #e040fb;background:transparent;color:#e040fb;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
         <button onclick="openNewPollModal()" class="edit-only" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #7C3AED;background:transparent;color:#7C3AED;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🗳 צור סקר</button>
       </div>
     </div>
@@ -116,31 +115,6 @@
     <div style="display:flex;gap:8px">
       <button onclick="addCalItem()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">הוסף</button>
       <button onclick="closeCalModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
-    </div>
-  </div>
-</div>
-
-<!-- Birthday modal -->
-<div id="bdayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeBdayModal()">
-  <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
-    <div style="font-size:15px;font-weight:700;margin-bottom:16px">🎂 הוסף יום הולדת עברי</div>
-    <div class="field" style="margin-bottom:10px">
-      <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">שם</label>
-      <input id="bdayName" placeholder="שם בן/בת המשפחה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
-    </div>
-    <div style="display:flex;gap:10px;margin-bottom:14px">
-      <div class="field" style="flex:1">
-        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">חודש</label>
-        <select id="bdayMonth" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box"></select>
-      </div>
-      <div class="field" style="flex:1">
-        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px">יום</label>
-        <select id="bdayDay" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 8px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box"></select>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button onclick="saveBday()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">הוסף</button>
-      <button onclick="closeBdayModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
   </div>
 </div>

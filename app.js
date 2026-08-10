@@ -600,7 +600,9 @@ async function load(){
       for(let i=0;i<n;i++)f.kids.push({id:i+1,name:'',gender:'',hebMonth:'',hebDay:null});
       _kidsMigrated=true;
     });
-    if(_savAmtMigrated||_kidsMigrated)save();
+    const _bdaysCleared=birthdays.length>0;
+    if(_bdaysCleared)birthdays=[];
+    if(_savAmtMigrated||_kidsMigrated||_bdaysCleared)save();
     render();setTimeout(handleHash,100);
     if(!_isAdminPage()){
       const savedFamId=localStorage.getItem('deviceFamId3');
@@ -687,7 +689,6 @@ const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','י
 const HEB_DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
 const LAT_DAYS_SHORT=["א'","ב'","ג'","ד'","ה'","ו'","ש'"];
 const HEB_DAY_NUM=['','א','ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב','יג','יד','טו','טז','יז','יח','יט','כ','כא','כב','כג','כד','כה','כו','כז','כח','כט','ל'];
-const HEB_MONTHS_LIST=['תשרי','חשוון','כסלו','טבת','שבט','אדר','אדר ב\'','ניסן','אייר','סיון','תמוז','אב','אלול'];
 
 function renderFamilyHome(){
   const sub=document.getElementById('fhSub');
@@ -850,7 +851,7 @@ function allBirthdays(){
     if(f.parent2Bday&&f.parent2Bday.hebDay&&f.parent2Bday.hebMonth)arr.push({name:(f.emailName2||'הורה')+' ('+fam+')',hebDay:f.parent2Bday.hebDay,hebMonth:f.parent2Bday.hebMonth});
     return arr;
   });
-  return [...birthdays,...kidBdays,...parentBdays];
+  return [...kidBdays,...parentBdays];
 }
 function checkBirthdayNotifs(){
   const all=allBirthdays();
@@ -1179,54 +1180,6 @@ function saveCostEdit(evId,val){
   const newCost=parseFloat(val)||0;
   ev.totalCost=newCost;
   save();render();
-}
-
-function openBdayModal(){
-  const mSel=document.getElementById('bdayMonth');
-  const dSel=document.getElementById('bdayDay');
-  if(mSel&&!mSel.options.length){
-    HEB_MONTHS_LIST.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;mSel.appendChild(o);});
-  }
-  if(dSel&&!dSel.options.length){
-    for(let i=1;i<=30;i++){const o=document.createElement('option');o.value=i;o.textContent=HEB_DAY_NUM[i]+' ('+i+')';dSel.appendChild(o);}
-  }
-  document.getElementById('bdayName').value='';
-  document.getElementById('bdayModal').style.display='flex';
-  setTimeout(()=>{const i=document.getElementById('bdayName');if(i)i.focus();},50);
-}
-function closeBdayModal(){
-  document.getElementById('bdayModal').style.display='none';
-}
-function saveBday(){
-  const name=document.getElementById('bdayName').value.trim();
-  const hebMonth=document.getElementById('bdayMonth').value;
-  const hebDay=parseInt(document.getElementById('bdayDay').value);
-  if(!name)return;
-  birthdays.push({id:nxtBday++,name,hebMonth,hebDay});
-  addNotif('🎂','נוסף יום הולדת: '+name);
-  save();renderBdayList();renderCalendar();
-  closeBdayModal();
-}
-function deleteBday(id){
-  if(!confirm('למחוק יום הולדת זה?'))return;
-  birthdays=birthdays.filter(b=>b.id!==id);
-  save();renderBdayList();renderCalendar();
-}
-function renderBdayList(){
-  const el=document.getElementById('bdayList');if(!el)return;
-  if(!birthdays.length){
-    el.innerHTML='<div style="padding:12px 16px;text-align:center;color:var(--text3);font-size:13px">עדיין אין ימי הולדת — הוסף את הראשון 🎂</div>';
-    return;
-  }
-  el.innerHTML=birthdays.map(b=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border)">
-      <span style="font-size:18px">🎂</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(b.name)}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:1px">${HEB_DAY_NUM[b.hebDay]} ${esc(b.hebMonth)}</div>
-      </div>
-      <button onclick="deleteBday(${b.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0;opacity:.5">✕</button>
-    </div>`).join('');
 }
 
 function _myFamId(){
