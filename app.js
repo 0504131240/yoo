@@ -1110,11 +1110,12 @@ function renderCalEvList(hebDays,bdayByDate){
   if(!list.length){el.innerHTML='';return;}
   el.innerHTML=list.map(({type,date,item})=>{
     const d=new Date(date+'T00:00:00');
-    const hebF=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric',month:'long'});
+    const latDayFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'});
+    const monthFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'});
     const latF=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'});
     const hebYNum=parseInt(latF.format(d));
     const lbl=calHebrew
-      ?hebF.format(d)+' '+toHebrewYear(hebYNum)
+      ?HEB_DAY_NUM[parseInt(latDayFmt.format(d))]+' ב'+monthFmt.format(d)+' '+toHebrewYear(hebYNum)
       :d.toLocaleDateString('he-IL',{day:'numeric',month:'long'});
     if(type==='bday'){
       return`<div class="fh-cal-ev">
