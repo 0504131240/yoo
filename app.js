@@ -10,7 +10,7 @@ let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
-let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null,addExpItemFromPot=false;
+let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null,addExpItemFromPot=false,addExpItemPayMode='single';
 const expandedExpItems=new Set();
 const expandedFamShares=new Set();
 let cumPotEvId=null,cumPotFamId=null;
@@ -116,6 +116,17 @@ const evSavingsSurplus=ev=>{
   return Math.max(0,Math.round(_sum-_spf*(ev.participants||[]).length-evCost(ev)));
 };
 const evBalance=ev=>{ const shares=evShares(ev); const res={}; ev.participants.forEach(fid=>{ res[fid]=(ev.expenses[fid]||0)-(shares[fid]||0); }); return res; };
+// Who fronted the money for an expense item, as {famId: amount} — normalizes the legacy
+// single-payer (it.famId) shape and the newer multi-payer (it.payers) shape into one form.
+const itemPayers=it=>it.payers||(it.famId!=null?{[it.famId]:it.amt}:{});
+const itemPayerAmt=(it,fid)=>{const p=itemPayers(it);let s=0;Object.entries(p).forEach(([k,v])=>{if(Number(k)===Number(fid))s+=v;});return s;};
+const itemPayerNames=it=>Object.keys(itemPayers(it)).map(fid=>{const f=getFam(parseInt(fid));return f?f.name.replace('משפחת','').trim():'';}).filter(Boolean);
+function _creditItemPayers(ev,item){
+  Object.entries(itemPayers(item)).forEach(([fid,amt])=>{const nfid=parseInt(fid);ev.expenses[nfid]=(ev.expenses[nfid]||0)+amt;});
+}
+function _uncreditItemPayers(ev,item){
+  Object.entries(itemPayers(item)).forEach(([fid,amt])=>{const nfid=parseInt(fid);ev.expenses[nfid]=Math.max(0,(ev.expenses[nfid]||0)-amt);});
+}
 const evPotTotal=ev=>(ev.potPayments||[]).reduce((s,p)=>s+p.amt,0);
 const evPotExpTotal=ev=>(ev.potExpItems||[]).reduce((s,it)=>s+it.amt,0);
 const evPotBal=ev=>Math.max(0,evPotTotal(ev)-(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0));
@@ -373,7 +384,7 @@ function sendSettledEmail(ev,famId){
   const cost=evCost(ev);
   const shares=evShares(ev);
   const share=Math.round(shares[famId]||0);
-  const spent=Math.round(ev.expenses?(ev.expenses[famId]||0):(ev.expenseItems||[]).filter(it=>Number(it.famId)===Number(famId)).reduce((s,it)=>s+it.amt,0));
+  const spent=Math.round(ev.expenses?(ev.expenses[famId]||0):(ev.expenseItems||[]).reduce((s,it)=>s+itemPayerAmt(it,famId),0));
   const lines=[];
   const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
   const _potTotal=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(famId)).reduce((s,p)=>s+p.amt,0));
@@ -1642,7 +1653,7 @@ function evCard(ev){
   const cumRows=ev.participants.map(fid=>{
     const f=getFam(fid);if(!f)return'';
     const cl=col(fid);
-    const items=(ev.expenseItems||[]).filter(it=>it.famId===fid);
+    const items=(ev.expenseItems||[]).filter(it=>itemPayerAmt(it,fid)>0);
     const spent=ev.expenses[fid]||0;
     const b=adjBal[fid];
     const share=shares[fid]||0;
@@ -1667,17 +1678,21 @@ function evCard(ev){
         const swNames=it.sharedWith?it.sharedWith.map(sid=>{const sf=getFam(sid);return sf?sf.name.replace('משפחת','').trim():'';}).filter(Boolean).join(', '):'';
         const itemKey=ev.id+'-item-'+it.id;
         const isItemExpanded=expandedExpItems.has(itemKey);
-        const itSubLabel=it.customSplit?
+        const payerNames=itemPayerNames(it);
+        const isMultiPayer=payerNames.length>1;
+        const itSubLabel=(it.customSplit?
           `<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">⚖️ ידנית</span>`:
-          (swNames?`<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">👥 ${esc(swNames)}</span>`:'');
+          (swNames?`<span style="display:block;font-size:10px;color:var(--blue);margin-top:1px">👥 ${esc(swNames)}</span>`:''))+
+          (isMultiPayer?`<span style="display:block;font-size:10px;color:var(--amber);margin-top:1px">🧾 שולם ע"י ${esc(payerNames.join(' + '))}</span>`:'');
         const breakdownHtml=it.customSplit&&isItemExpanded?
           `<div style="margin-top:4px;padding:4px 8px;background:var(--surface2);border-radius:6px">${
             Object.entries(it.customSplit).map(([sfid,a])=>{const sf=getFam(parseInt(sfid));if(!sf)return'';return`<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><span style="flex:1;font-size:11px;color:var(--text2)">${esc(sf.name.replace('משפחת','').trim())}</span><span style="font-size:11px;font-weight:700">₪${a.toLocaleString()}</span></div>`;}).join('')
           }</div>`:'';
+        const myPaidAmt=itemPayerAmt(it,fid);
         return`<div style="padding:3px 0;font-size:11px">
           <div style="display:flex;align-items:center;gap:6px">
             <div style="flex:1;min-width:0"><span style="color:var(--text2)">${esc(it.name)}</span>${itSubLabel}</div>
-            <span style="font-weight:600;color:var(--text);flex-shrink:0">₪${it.amt.toLocaleString()}${it.origAmt&&it.origCur?'<span style="font-size:10px;color:var(--text2);font-weight:400"> ('+it.origAmt+it.origCur+')</span>':''}</span>
+            <span style="font-weight:600;color:var(--text);flex-shrink:0">₪${myPaidAmt.toLocaleString()}${!isMultiPayer&&it.origAmt&&it.origCur?'<span style="font-size:10px;color:var(--text2);font-weight:400"> ('+it.origAmt+it.origCur+')</span>':''}</span>
             ${it.customSplit?`<button onclick="toggleExpItem(${ev.id},${it.id})" style="flex-shrink:0;padding:1px 5px;border-radius:4px;border:1px solid var(--border);background:none;font-size:10px;color:var(--text2);font-family:var(--font);cursor:pointer">${isItemExpanded?'▲':'▼'}</button>`:''}
             <button onclick="editExpItem(${ev.id},${it.id})" class="edit-only" style="flex-shrink:0;width:18px;height:18px;border-radius:50%;border:none;background:var(--blue-bg);color:var(--blue);font-size:10px;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✏</button>
             <button onclick="deleteExpItem(${ev.id},${it.id})" class="edit-only" style="flex-shrink:0;width:18px;height:18px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:0;line-height:18px;text-align:center">✕</button>
@@ -3073,8 +3088,8 @@ function _sendCloseEvEmailOne(ev,fid){
   const shares=evShares(ev);
   const share=Math.round(shares[fid]||0);
   const name=f.name.replace('משפחת','').trim();
-  const myItems=(ev.expenseItems||[]).filter(it=>Number(it.famId)===Number(fid));
-  const mySpent=Math.round(myItems.reduce((s,it)=>s+it.amt,0));
+  const myItems=(ev.expenseItems||[]).filter(it=>itemPayerAmt(it,fid)>0);
+  const mySpent=Math.round(myItems.reduce((s,it)=>s+itemPayerAmt(it,fid),0));
   const settleLines=[];
   if(mySpent>0) settleLines.push(`הוצאות שלך באירוע: ₪${mySpent.toLocaleString()}`);
   const _myPotPend=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
@@ -3125,7 +3140,7 @@ function _sendCloseEvEmailOne(ev,fid){
   let msg=`האירוע "${ev.name}" הסתיים!\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${_savingsPerFam>0?`\n💎 לקופת חיסכון: ₪${_savingsPerFam.toLocaleString()}`:''}
 `;
   if(mySpent>0){
-    const itemLines=myItems.map(it=>`  - ${it.name}: ₪${it.amt.toLocaleString()}`).join('\n');
+    const itemLines=myItems.map(it=>`  - ${it.name}: ₪${itemPayerAmt(it,fid).toLocaleString()}`).join('\n');
     msg+=`\n💳 ההוצאות שלך (${name}):\n${itemLines}\n  סה"כ: ₪${mySpent.toLocaleString()}`;
   }
   if(settleLines.length) msg+=`\n\nאיך סודר:\n${settleLines.map(l=>'• '+l).join('\n')}`;
@@ -3154,7 +3169,7 @@ function _sendCloseEvEmailOne(ev,fid){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 פירוט כל ההוצאות:</p>`;
     const itemsByFam={};
     ev.participants.forEach(fid2=>{itemsByFam[fid2]=[];});
-    allItems.forEach(it=>{if(itemsByFam[it.famId])itemsByFam[it.famId].push(it);});
+    allItems.forEach(it=>{Object.keys(itemPayers(it)).forEach(fidStr=>{const nfid=parseInt(fidStr);if(itemsByFam[nfid])itemsByFam[nfid].push(it);});});
     const _em=ev.splitMethod||'equal';
     let _eTotalW=0;const _eW={};
     ev.participants.forEach(p=>{_eW[p]=famWeight(getFam(p),_em,ev.childOverrides?.[p]);_eTotalW+=_eW[p];});
@@ -3176,15 +3191,16 @@ function _sendCloseEvEmailOne(ev,fid){
       const pname=pf?pf.name.replace('משפחת','').trim():'?';
       visibleIts.forEach(it=>{
         const myShare=_itemShare(it,fid);
+        const paidAmt=itemPayerAmt(it,fid2);
         itemRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}">
           <td style="padding:5px 6px">${_esc(it.name)}</td>
           <td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pname)}</td>
-          <td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${it.amt.toLocaleString()}</td>
+          <td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${paidAmt.toLocaleString()}</td>
           <td style="padding:5px 6px;font-weight:700;color:#D97706">${myShare?'₪'+myShare.toLocaleString():'—'}</td>
         </tr>`;
       });
       if(visibleIts.length>1){
-        const _totAmt=visibleIts.reduce((s,it)=>s+it.amt,0);
+        const _totAmt=visibleIts.reduce((s,it)=>s+itemPayerAmt(it,fid2),0);
         const _totShare=visibleIts.reduce((s,it)=>s+_itemShare(it,fid),0);
         itemRows+=`<tr style="border-bottom:2px solid #BFDBFE${isMine?';background:#FEF9C3':''}">
           <td colspan="2" style="padding:3px 6px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
@@ -3254,7 +3270,7 @@ function sendEmailToFam(evId,fid){
     if(_rAllItems.length||_rPotExpItems.length){
       bodyHtml+=`<p style="font-weight:700;margin:12px 0 8px;color:#333">💳 פירוט הוצאות:</p>`;
       const _rByFam={};ev.participants.forEach(f2=>{_rByFam[f2]=[];});
-      _rAllItems.forEach(it=>{if(_rByFam[it.famId])_rByFam[it.famId].push(it);});
+      _rAllItems.forEach(it=>{Object.keys(itemPayers(it)).forEach(fidStr=>{const nfid=parseInt(fidStr);if(_rByFam[nfid])_rByFam[nfid].push(it);});});
       const _rM=ev.splitMethod||'equal';let _rTW=0;const _rW={};
       ev.participants.forEach(p=>{_rW[p]=famWeight(getFam(p),_rM,ev.childOverrides?.[p]);_rTW+=_rW[p];});
       const _rShare=(it,rfid)=>{if(it.customSplit)return it.customSplit[String(rfid)]||0;const sw=it.sharedWith?it.sharedWith.filter(p=>ev.participants.includes(p)):ev.participants;if(!sw.includes(rfid))return 0;if(it.sharedWith)return Math.round(it.amt/sw.length);const swW=sw.reduce((s,p)=>s+(_rW[p]||0),0);return swW?Math.round(it.amt*(_rW[rfid]||0)/swW):0;};
@@ -3264,7 +3280,7 @@ function sendEmailToFam(evId,fid){
         const isMine=f2===fid;
         const vis=isMine?its:its.filter(it=>_rShare(it,fid)>0);if(!vis.length)return;
         const pf=getFam(f2);const pn=pf?pf.name.replace('משפחת','').trim():'?';
-        vis.forEach(it=>{const ms=_rShare(it,fid);_rRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pn)}</td><td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#D97706">${ms?'₪'+ms.toLocaleString():'—'}</td></tr>`;});
+        vis.forEach(it=>{const ms=_rShare(it,fid);const pa=itemPayerAmt(it,f2);_rRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pn)}</td><td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${pa.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#D97706">${ms?'₪'+ms.toLocaleString():'—'}</td></tr>`;});
       });
       _rPotExpItems.forEach(it=>{const ms=_rTW>0?Math.round(it.amt*(_rW[fid]||0)/_rTW):0;_rRows+=`<tr style="border-bottom:1px solid #EDE9FE;background:#F5F3FF"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#7C3AED">קופת האירוע</td><td style="padding:5px 6px;font-weight:600;color:#7C3AED">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#6D28D9">₪${ms.toLocaleString()}</td></tr>`;});
       if(_rRows) bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#E0F2FE"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">סכום</th><th style="padding:6px;text-align:right;color:#D97706;font-weight:700;border-bottom:2px solid #7DD3FC">החלק שלך</th></tr>${_rRows}</table>`;
@@ -4032,6 +4048,18 @@ function openAddExpItem(evId){
   addExpItemEvId=evId; addExpItemFamId=null;
   addExpItemSharedWith=new Set(ev.participants);
   addExpItemSplitMode='equal'; _editExpItemId=null; addExpItemFromPot=false;
+  const payMultiInps=document.getElementById('expItemPayMultiInputs');
+  if(payMultiInps){
+    payMultiInps.innerHTML=ev.participants.map(fid=>{
+      const f=getFam(fid);if(!f)return'';
+      return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        ${famAva(f,30,'flex-shrink:0')}
+        <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
+        <input type="number" min="0" inputmode="numeric" placeholder="0" id="payamt-${fid}" oninput="_updateExpItemPayTotal()" style="width:72px;border:1.5px solid var(--border);border-radius:var(--r2);padding:7px 8px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);text-align:center;direction:ltr;box-sizing:border-box">
+      </div>`;
+    }).join('');
+  }
+  setExpItemPayMode('single');
   const potWrap=document.getElementById('expFromPotToggleWrap');
   if(potWrap)potWrap.style.display=evPotTotal(ev)>0?'block':'none';
   const potBtn=document.getElementById('expFromPotToggle');
@@ -4102,7 +4130,7 @@ function toggleExpFromPot(){
 }
 function closeAddExpItem(){
   document.getElementById('addExpItemOverlay').style.display='none';
-  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal'; _editExpItemId=null; addExpItemFromPot=false;
+  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal'; addExpItemPayMode='single'; _editExpItemId=null; addExpItemFromPot=false;
 }
 function setExpItemSplitMode(mode){
   addExpItemSplitMode=mode;
@@ -4121,6 +4149,28 @@ function _updateExpItemCustomTotal(){
   const el=document.getElementById('expItemCustomTotal');
   if(el)el.textContent='₪'+Math.round(total).toLocaleString();
 }
+function setExpItemPayMode(mode){
+  addExpItemPayMode=mode;
+  const isMulti=mode==='multi';
+  const picker=document.getElementById('expItemFamPicker');if(picker)picker.style.display=isMulti?'none':'flex';
+  const multiWrap=document.getElementById('expItemPayMultiWrap');if(multiWrap)multiWrap.style.display=isMulti?'block':'none';
+  const b1=document.getElementById('expPaySingleBtn');
+  const b2=document.getElementById('expPayMultiBtn');
+  if(b1){b1.style.background=isMulti?'transparent':'var(--blue-mid)';b1.style.color=isMulti?'var(--text2)':'#fff';b1.style.borderColor=isMulti?'var(--border)':'var(--blue-mid)';}
+  if(b2){b2.style.background=isMulti?'var(--blue-mid)':'transparent';b2.style.color=isMulti?'#fff':'var(--text2)';b2.style.borderColor=isMulti?'var(--blue-mid)':'var(--border)';}
+  const amtField=document.getElementById('expItemAmtField');if(amtField)amtField.style.display=isMulti?'none':'block';
+  const amtNote=document.getElementById('expItemAmtFromPayNote');if(amtNote)amtNote.style.display=isMulti?'block':'none';
+  if(isMulti)_updateExpItemPayTotal();
+}
+function _updateExpItemPayTotal(){
+  const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
+  let total=0;
+  ev.participants.forEach(fid=>{const inp=document.getElementById('payamt-'+fid);if(inp)total+=parseFloat(inp.value)||0;});
+  const el=document.getElementById('expItemPayTotal');
+  if(el)el.textContent='₪'+Math.round(total).toLocaleString();
+  const note=document.getElementById('expItemAmtFromPayNote');
+  if(note)note.textContent='הסכום נקבע לפי סה"כ המשלמים: ₪'+Math.round(total).toLocaleString();
+}
 async function doAddExpItem(){
   const name=document.getElementById('expItemName').value.trim();
   const errEl=document.getElementById('expItemErr');
@@ -4136,8 +4186,19 @@ async function doAddExpItem(){
     closeAddExpItem();save();render();
     return;
   }
+  const isMultiPay=addExpItemPayMode==='multi';
+  let payers=null,payersTotal=0;
+  if(isMultiPay){
+    payers={};
+    ev.participants.forEach(fid=>{
+      const inp=document.getElementById('payamt-'+fid);
+      const v=Math.round(parseFloat(inp&&inp.value)||0);
+      if(v>0){payers[String(fid)]=v;payersTotal+=v;}
+    });
+  }
+  const payFamId=isMultiPay?null:addExpItemFamId;
   if(addExpItemSplitMode==='custom'){
-    if(!name||!addExpItemFamId){if(errEl)errEl.style.display='block';return;}
+    if(!name||(isMultiPay?!payersTotal:!payFamId)){if(errEl)errEl.style.display='block';return;}
     const customSplit={};let total=0;
     ev.participants.forEach(fid=>{
       const inp=document.getElementById('csplit-'+fid);
@@ -4148,38 +4209,59 @@ async function doAddExpItem(){
     if(errEl)errEl.style.display='none';
     if(_editExpItemId!=null){
       const old=(ev.expenseItems||[]).find(it=>it.id===_editExpItemId);
-      if(old){ev.expenses[old.famId]=Math.max(0,(ev.expenses[old.famId]||0)-old.amt);old.famId=addExpItemFamId;old.name=name;old.amt=total;old.customSplit=customSplit;delete old.sharedWith;delete old.origAmt;delete old.origCur;ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+total;}
+      if(old){
+        _uncreditItemPayers(ev,old);
+        old.name=name;old.amt=total;old.customSplit=customSplit;delete old.sharedWith;delete old.origAmt;delete old.origCur;
+        if(payers){old.payers=payers;delete old.famId;}else{old.famId=payFamId;delete old.payers;}
+        _creditItemPayers(ev,old);
+      }
     }else{
       if(!ev.expenseItems)ev.expenseItems=[];
       ev.expItemId=(ev.expItemId||0)+1;
-      ev.expenseItems.push({id:ev.expItemId,famId:addExpItemFamId,name,amt:total,customSplit});
-      ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+total;
-      const _pf=getFam(addExpItemFamId);
-      addNotif('💳',(_pf?_pf.name.replace('משפחת','').trim():'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+total.toLocaleString()+' ל"'+ev.name+'"');
+      const item={id:ev.expItemId,name,amt:total,customSplit};
+      if(payers)item.payers=payers;else item.famId=payFamId;
+      ev.expenseItems.push(item);
+      _creditItemPayers(ev,item);
+      const _payNames=itemPayerNames(item).join(' + ');
+      addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+total.toLocaleString()+' ל"'+ev.name+'"');
     }
     closeAddExpItem();save();render();
     return;
   }
-  const rawAmt=parseFloat(document.getElementById('expItemAmt').value)||0;
-  if(!name||!addExpItemFamId||rawAmt<=0){if(errEl)errEl.style.display='block';return;}
+  let amt,origCur='₪',rawAmt=0;
+  if(isMultiPay){
+    if(!name||!payersTotal){if(errEl)errEl.style.display='block';return;}
+    amt=payersTotal;
+  }else{
+    rawAmt=parseFloat(document.getElementById('expItemAmt').value)||0;
+    if(!name||!payFamId||rawAmt<=0){if(errEl)errEl.style.display='block';return;}
+    amt=await _toILS('expItemAmt','expItemCur');
+    origCur=document.getElementById('expItemCur')?.value||'₪';
+  }
   if(errEl)errEl.style.display='none';
-  const amt=await _toILS('expItemAmt','expItemCur');
-  const origCur=document.getElementById('expItemCur')?.value||'₪';
   const sw=[...(addExpItemSharedWith||new Set(ev.participants))].filter(fid=>ev.participants.includes(fid));
   const isPartial=sw.length>0&&sw.length<ev.participants.length;
   if(_editExpItemId!=null){
     const old=(ev.expenseItems||[]).find(it=>it.id===_editExpItemId);
-    if(old){ev.expenses[old.famId]=Math.max(0,(ev.expenses[old.famId]||0)-old.amt);old.famId=addExpItemFamId;old.name=name;old.amt=amt;delete old.customSplit;if(origCur!=='₪'){old.origAmt=rawAmt;old.origCur=origCur;}else{delete old.origAmt;delete old.origCur;}if(isPartial)old.sharedWith=sw;else delete old.sharedWith;ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;}
+    if(old){
+      _uncreditItemPayers(ev,old);
+      old.name=name;old.amt=amt;delete old.customSplit;
+      if(origCur!=='₪'){old.origAmt=rawAmt;old.origCur=origCur;}else{delete old.origAmt;delete old.origCur;}
+      if(isPartial)old.sharedWith=sw;else delete old.sharedWith;
+      if(payers){old.payers=payers;delete old.famId;}else{old.famId=payFamId;delete old.payers;}
+      _creditItemPayers(ev,old);
+    }
   }else{
     if(!ev.expenseItems)ev.expenseItems=[];
     ev.expItemId=(ev.expItemId||0)+1;
-    const item={id:ev.expItemId,famId:addExpItemFamId,name,amt};
+    const item={id:ev.expItemId,name,amt};
+    if(payers)item.payers=payers;else item.famId=payFamId;
     if(origCur!=='₪'){item.origAmt=rawAmt;item.origCur=origCur;}
     if(isPartial)item.sharedWith=sw;
     ev.expenseItems.push(item);
-    ev.expenses[addExpItemFamId]=(ev.expenses[addExpItemFamId]||0)+amt;
-    const _pf=getFam(addExpItemFamId);
-    addNotif('💳',(_pf?_pf.name.replace('משפחת','').trim():'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+Math.round(amt).toLocaleString()+' ל"'+ev.name+'"');
+    _creditItemPayers(ev,item);
+    const _payNames=itemPayerNames(item).join(' + ');
+    addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+Math.round(amt).toLocaleString()+' ל"'+ev.name+'"');
   }
   closeAddExpItem();
   save();render();
@@ -4187,7 +4269,7 @@ async function doAddExpItem(){
 function deleteExpItem(evId,itemId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   const item=(ev.expenseItems||[]).find(it=>it.id===itemId);if(!item)return;
-  ev.expenses[item.famId]=Math.max(0,(ev.expenses[item.famId]||0)-item.amt);
+  _uncreditItemPayers(ev,item);
   ev.expenseItems=ev.expenseItems.filter(it=>it.id!==itemId);
   save();render();
 }
@@ -4213,7 +4295,14 @@ function editExpItem(evId,itemId){
   const titleEl=document.getElementById('addExpItemTitle');
   if(titleEl)titleEl.textContent='✏️ ערוך הוצאה';
   document.getElementById('expItemName').value=item.name;
-  selectAddExpFam(item.famId);
+  if(item.payers){
+    setExpItemPayMode('multi');
+    Object.entries(item.payers).forEach(([fid,amt])=>{const inp=document.getElementById('payamt-'+fid);if(inp)inp.value=amt;});
+    _updateExpItemPayTotal();
+  }else{
+    setExpItemPayMode('single');
+    selectAddExpFam(item.famId);
+  }
   if(item.customSplit){
     setExpItemSplitMode('custom');
     ev.participants.forEach(fid=>{
