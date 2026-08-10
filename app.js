@@ -2422,16 +2422,19 @@ function renderFamEditKids(){
   }
   el.innerHTML=kids.map(k=>{
     const genderIcon=k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👶';
+    const genderBg=k.gender==='boy'?'var(--blue-bg)':k.gender==='girl'?'#FBEAF0':'var(--surface)';
     const age=kidAge(k);
-    const bdayTxt=k.hebDay&&k.hebMonth?HEB_DAY_NUM[k.hebDay]+' '+esc(k.hebMonth)+(k.hebYear?' '+toHebrewYear(k.hebYear):'')+(age!=null?' · גיל '+age:''):'ללא תאריך לידה';
-    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:16px">${genderIcon}</span>
+    const hasBday=k.hebDay&&k.hebMonth;
+    const bdayTxt=hasBday?HEB_DAY_NUM[k.hebDay]+' '+esc(k.hebMonth)+(k.hebYear?' '+toHebrewYear(k.hebYear):'')+(age!=null?' · גיל '+age:''):'הוסף תאריך לידה';
+    const isEmpty=!k.name&&!hasBday;
+    return`<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;margin-bottom:6px;background:var(--surface2);border-radius:var(--r2);${isEmpty?'opacity:.6':''}">
+      <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;background:${genderBg}">${genderIcon}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(k.name||'ילד/ה ללא שם')}</div>
-        <div style="font-size:11px;color:var(--text3)">${bdayTxt}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(k.name||'ילד/ה ללא שם')}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${bdayTxt}</div>
       </div>
-      <button type="button" onclick="openEditKidModal(${k.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">✏️</button>
-      <button type="button" onclick="deleteKid(${k.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">✕</button>
+      <button type="button" onclick="openEditKidModal(${k.id})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px;flex-shrink:0">✏️</button>
+      <button type="button" onclick="deleteKid(${k.id})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px;flex-shrink:0">✕</button>
     </div>`;
   }).join('');
 }
