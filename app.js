@@ -2459,22 +2459,54 @@ function clearKidDate(){
 }
 function openKidDatePicker(){
   _kidPickerRefDate=_kidPickedDate?(hebrewToGregorian(_kidPickedDate.hebYear,_kidPickedDate.hebMonth,_kidPickedDate.hebDay)||new Date()):new Date();
+  closeKidYearList();
   renderKidDatePicker();
   document.getElementById('kidDatePickerModal').style.display='flex';
 }
 function closeKidDatePicker(){
   document.getElementById('kidDatePickerModal').style.display='none';
+  closeKidYearList();
 }
 function kidPickerPrevMonth(){
+  closeKidYearList();
   const days=getHebMonthDays(_kidPickerRefDate);
   const prev=new Date(days[0]);prev.setDate(prev.getDate()-1);
   _kidPickerRefDate=prev;
   renderKidDatePicker();
 }
 function kidPickerNextMonth(){
+  closeKidYearList();
   const days=getHebMonthDays(_kidPickerRefDate);
   const next=new Date(days[days.length-1]);next.setDate(next.getDate()+1);
   _kidPickerRefDate=next;
+  renderKidDatePicker();
+}
+function toggleKidYearList(){
+  const el=document.getElementById('kidYearList');if(!el)return;
+  if(el.style.display==='block'){closeKidYearList();return;}
+  renderKidYearList();
+  el.style.display='block';
+}
+function closeKidYearList(){
+  const el=document.getElementById('kidYearList');if(el)el.style.display='none';
+}
+function renderKidYearList(){
+  const el=document.getElementById('kidYearList');if(!el)return;
+  const days=getHebMonthDays(_kidPickerRefDate);
+  const curYear=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(days[0]));
+  let html='';
+  for(let y=curYear+2;y>=curYear-100;y--){
+    const active=y===curYear;
+    html+=`<button type="button" onclick="jumpKidPickerYear(${y})" style="display:block;width:100%;padding:7px 10px;border:none;background:${active?'var(--blue-bg)':'transparent'};color:${active?'var(--blue-mid)':'var(--text)'};font-size:13px;font-weight:${active?'700':'500'};font-family:var(--font);cursor:pointer;text-align:center">${toHebrewYear(y)}</button>`;
+  }
+  el.innerHTML=html;
+}
+function jumpKidPickerYear(y){
+  const days=getHebMonthDays(_kidPickerRefDate);
+  const curMonthName=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(days[0]);
+  const target=hebrewToGregorian(y,curMonthName,1)||hebrewToGregorian(y,'תשרי',1);
+  if(target)_kidPickerRefDate=target;
+  closeKidYearList();
   renderKidDatePicker();
 }
 function renderKidDatePicker(){

@@ -492,10 +492,11 @@
   <!-- Hebrew date picker for kid birthday -->
   <div id="kidDatePickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1400;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeKidDatePicker()">
     <div style="background:var(--surface);border-radius:var(--r);padding:16px;width:100%;max-width:320px;box-sizing:border-box">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;position:relative">
         <button type="button" class="fh-cal-arrow" onclick="kidPickerPrevMonth()">›</button>
-        <span class="fh-cal-month" id="kidPickerTitle"></span>
+        <button type="button" id="kidPickerTitle" onclick="toggleKidYearList()" class="fh-cal-month" style="background:none;border:none;font-family:var(--font);cursor:pointer;padding:2px 8px;border-radius:6px"></button>
         <button type="button" class="fh-cal-arrow" onclick="kidPickerNextMonth()">‹</button>
+        <div id="kidYearList" style="display:none;position:absolute;top:30px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);box-shadow:0 6px 20px rgba(0,0,0,.18);max-height:200px;overflow-y:auto;z-index:10;width:110px"></div>
       </div>
       <div class="fh-cal-grid" id="kidPickerGrid"></div>
       <div style="display:flex;gap:8px;margin-top:12px">
