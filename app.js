@@ -1204,6 +1204,12 @@ function _myFamId(){
   const id=localStorage.getItem('deviceFamId3');
   return id?parseInt(id):null;
 }
+function _fundTxForDisplay(){
+  if(_isAdminPage())return fund.transactions;
+  const fid=_myFamId();
+  if(fid==null)return fund.transactions;
+  return fund.transactions.filter(t=>Number(t.famId)===fid);
+}
 function renderPollBanner(){
   const btn=document.getElementById('pollBannerBtn');if(!btn)return;
   const openPolls=polls.filter(p=>!p.closed);
@@ -3745,11 +3751,12 @@ function renderFund(){
   if(txEl) txEl.style.display=fundTxOpen?'block':'none';
   if(arrow) arrow.textContent=fundTxOpen?'▲':'▼';
   if(!fundTxOpen||!txEl) return;
-  if(!fund.transactions.length){
+  const _txList=_fundTxForDisplay();
+  if(!_txList.length){
     txEl.innerHTML=`<div class="empty"><span class="empty-ico">📋</span>אין תנועות עדיין</div>`;
     return;
   }
-  txEl.innerHTML=`<div class="fund-tx-card" style="margin-top:6px">${[...fund.transactions].reverse().map(tx=>{
+  txEl.innerHTML=`<div class="fund-tx-card" style="margin-top:6px">${[..._txList].reverse().map(tx=>{
     const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
     return`<div class="fund-tx-row">
       <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
@@ -3779,10 +3786,11 @@ function toggleFundTx(){
   if(txEl) txEl.style.display=fundTxOpen?'block':'none';
   if(arrow) arrow.textContent=fundTxOpen?'▲':'▼';
   if(fundTxOpen){
-    if(!fund.transactions.length){
+    const _txList=_fundTxForDisplay();
+    if(!_txList.length){
       txEl.innerHTML=`<div class="empty"><span class="empty-ico">📋</span>אין תנועות עדיין</div>`;
     } else {
-      txEl.innerHTML=`<div class="fund-tx-card" style="margin-top:6px">${[...fund.transactions].reverse().map(tx=>{
+      txEl.innerHTML=`<div class="fund-tx-card" style="margin-top:6px">${[..._txList].reverse().map(tx=>{
         const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
         return`<div class="fund-tx-row">
           <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
