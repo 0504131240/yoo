@@ -4588,8 +4588,9 @@ function doDepositToCumPot(){
     const bal=fund.famBalances[key]||0;
     if(bal<roundAmt){alert('אין מספיק יתרה בקופה הראשית (₪'+Math.round(bal).toLocaleString()+')');return;}
     fund.famBalances[key]=bal-roundAmt;
+    const _cumPotFamName=(getFam(savedFamId)||{}).name?.replace('משפחת','').trim()||'';
     fund.transactions.push({id:nxtTx++,type:'payout',famId:savedFamId,amount:roundAmt,
-      desc:'העברה לקופת האירוע · '+ev.name,
+      desc:'העברה לקופת האירוע · '+ev.name+' → '+_cumPotFamName,
       date:new Date().toLocaleDateString('he-IL')});
   }
   ev.potPayments.push({famId:savedFamId,amt:roundAmt});
