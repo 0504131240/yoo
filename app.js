@@ -338,7 +338,7 @@ function testEjsEmail(){
 }
 const _cleanEmail=e=>(e||'').replace(/[​-‏‪-‮⁠﻿ ]/g,'').trim().toLowerCase();
 const _validEmail=e=>!!e&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_cleanEmail(e));
-function _ejsUrl(){return window.location.origin+window.location.pathname;}
+function _ejsUrl(){return window.location.origin+window.location.pathname.replace(/[^/]*$/,'index.html');}
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function _emailWrap(bodyHtml,headerTitle,headerIcon,urlOverride,headerSubtitle){
   const url=urlOverride!=null?urlOverride:_ejsUrl();
