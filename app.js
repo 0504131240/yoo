@@ -377,9 +377,27 @@ function sendSettledEmail(ev,famId){
   const lines=[];
   const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
   const _potTotal=Math.round((ev.potPayments||[]).filter(p=>p.famId===famId).reduce((s,p)=>s+p.amt,0));
-  if(_potTotal>0.5) lines.push(`הפקדת לקופת האירוע: ₪${_potTotal.toLocaleString()}`);
+  const _fromFundToPot=Math.round((fund.transactions||[])
+    .filter(t=>Number(t.famId)===Number(famId)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.desc||'').includes(ev.name))
+    .reduce((s,t)=>s+t.amount,0));
+  if(_potTotal>0.5){
+    if(_fromFundToPot>0.5&&_fromFundToPot===_potTotal) lines.push(`העברת מהקופה הראשית ₪${_potTotal.toLocaleString()} לקופת האירוע`);
+    else{
+      lines.push(`הפקדת לקופת האירוע: ₪${_potTotal.toLocaleString()}`);
+      if(_fromFundToPot>0.5) lines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} הועברו מהקופה הראשית`);
+    }
+  }
   const _potRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.toFid)===Number(famId)).reduce((s,t)=>s+t.amt,0));
-  if(_potRec>0.5) lines.push(`קיבלת ₪${_potRec.toLocaleString()} מקופת האירוע`);
+  const _toFundFromPot=Math.round((fund.transactions||[])
+    .filter(t=>Number(t.famId)===Number(famId)&&t.type==='deposit'&&(t.desc||'').includes('מקופת אירוע')&&(t.desc||'').includes(ev.name))
+    .reduce((s,t)=>s+t.amount,0));
+  if(_potRec>0.5){
+    if(_toFundFromPot>0.5&&_toFundFromPot===_potRec) lines.push(`הועבר מקופת האירוע ₪${_potRec.toLocaleString()} לקופה הראשית שלכם`);
+    else{
+      lines.push(`קיבלת ₪${_potRec.toLocaleString()} מקופת האירוע`);
+      if(_toFundFromPot>0.5) lines.push(`מתוכם ₪${_toFundFromPot.toLocaleString()} הועברו לקופה הראשית שלך`);
+    }
+  }
   (ev.settled||[]).forEach(s=>{
     if(s.method==='pot') return;
     const isFrom=s.fromFid!=null?Number(s.fromFid)===Number(famId):(_sfByName(s.from)||{}).id===famId;
@@ -3072,7 +3090,16 @@ function _sendCloseEvEmailOne(ev,fid){
     settleLines.push(`העברת מהקופה הראשית ₪${_fromFundToPot.toLocaleString()} לתשלום האירוע`);
   }
   const _myPotRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&s.toFid===fid).reduce((s,t)=>s+t.amt,0));
-  if(_myPotRec>0.5) settleLines.push(`קיבלת ₪${_myPotRec.toLocaleString()} מקופת האירוע`);
+  const _toFundFromPot=Math.round((fund.transactions||[])
+    .filter(t=>Number(t.famId)===Number(fid)&&t.type==='deposit'&&(t.desc||'').includes('מקופת אירוע')&&(t.desc||'').includes(ev.name))
+    .reduce((s,t)=>s+t.amount,0));
+  if(_myPotRec>0.5){
+    if(_toFundFromPot>0.5&&_toFundFromPot===_myPotRec) settleLines.push(`הועבר מקופת האירוע ₪${_myPotRec.toLocaleString()} לקופה הראשית שלכם`);
+    else{
+      settleLines.push(`קיבלת ₪${_myPotRec.toLocaleString()} מקופת האירוע`);
+      if(_toFundFromPot>0.5) settleLines.push(`מתוכם ₪${_toFundFromPot.toLocaleString()} הועברו לקופה הראשית שלך`);
+    }
+  }
   const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
   (ev.settled||[]).forEach(s=>{
     if(s.method==='pot') return;
