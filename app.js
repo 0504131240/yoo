@@ -2438,34 +2438,81 @@ function renderFamEditKids(){
     </div>`;
   }).join('');
 }
-let _kidEditId=null,_kidGender='';
-function _kidMonthDayOptions(){
-  const mSel=document.getElementById('kidBdayMonth');
-  const dSel=document.getElementById('kidBdayDay');
-  if(mSel&&!mSel.options.length){
-    mSel.appendChild(new Option('לא צוין',''));
-    HEB_MONTHS_LIST.forEach(m=>mSel.appendChild(new Option(m,m)));
-  }
-  if(dSel&&!dSel.options.length){
-    dSel.appendChild(new Option('לא צוין',''));
-    for(let i=1;i<=30;i++)dSel.appendChild(new Option(HEB_DAY_NUM[i]+' ('+i+')',i));
-  }
-}
+let _kidEditId=null,_kidGender='',_kidPickedDate=null,_kidPickerRefDate=new Date(),_kidDateTouched=false,_kidLegacyDate=null;
 function setKidGender(g){
   _kidGender=g;
   const b1=document.getElementById('kidGenderBoy'),b2=document.getElementById('kidGenderGirl');
   if(b1){b1.style.background=g==='boy'?'var(--blue-mid)':'transparent';b1.style.color=g==='boy'?'#fff':'var(--text2)';b1.style.borderColor=g==='boy'?'var(--blue-mid)':'var(--border)';}
   if(b2){b2.style.background=g==='girl'?'var(--blue-mid)':'transparent';b2.style.color=g==='girl'?'#fff':'var(--text2)';b2.style.borderColor=g==='girl'?'var(--blue-mid)':'var(--border)';}
 }
+function updateKidDateBtn(){
+  const btn=document.getElementById('kidDateBtn');if(!btn)return;
+  if(_kidPickedDate)btn.textContent='📅 '+HEB_DAY_NUM[_kidPickedDate.hebDay]+' ב'+_kidPickedDate.hebMonth+' '+toHebrewYear(_kidPickedDate.hebYear);
+  else if(_kidLegacyDate)btn.textContent='📅 '+HEB_DAY_NUM[_kidLegacyDate.hebDay]+' ב'+_kidLegacyDate.hebMonth+' (בחר שוב כדי להוסיף שנה)';
+  else btn.textContent='📅 בחר תאריך לידה';
+}
+function clearKidDate(){
+  _kidPickedDate=null;
+  _kidLegacyDate=null;
+  _kidDateTouched=true;
+  updateKidDateBtn();
+}
+function openKidDatePicker(){
+  _kidPickerRefDate=_kidPickedDate?(hebrewToGregorian(_kidPickedDate.hebYear,_kidPickedDate.hebMonth,_kidPickedDate.hebDay)||new Date()):new Date();
+  renderKidDatePicker();
+  document.getElementById('kidDatePickerModal').style.display='flex';
+}
+function closeKidDatePicker(){
+  document.getElementById('kidDatePickerModal').style.display='none';
+}
+function kidPickerPrevMonth(){
+  const days=getHebMonthDays(_kidPickerRefDate);
+  const prev=new Date(days[0]);prev.setDate(prev.getDate()-1);
+  _kidPickerRefDate=prev;
+  renderKidDatePicker();
+}
+function kidPickerNextMonth(){
+  const days=getHebMonthDays(_kidPickerRefDate);
+  const next=new Date(days[days.length-1]);next.setDate(next.getDate()+1);
+  _kidPickerRefDate=next;
+  renderKidDatePicker();
+}
+function renderKidDatePicker(){
+  const days=getHebMonthDays(_kidPickerRefDate);
+  const first=days[0];
+  const hebMonth=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(first);
+  const hebYearNum=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(first));
+  document.getElementById('kidPickerTitle').textContent=hebMonth+' '+toHebrewYear(hebYearNum);
+  const todayStr=new Date().toISOString().slice(0,10);
+  let html=HEB_DAYS_SHORT.map(d=>`<div class="fh-cal-dow">${d}</div>`).join('');
+  for(let i=0;i<first.getDay();i++)html+=`<div class="fh-cal-day other-m empty"></div>`;
+  days.forEach(dayDate=>{
+    const ds=dayDate.toISOString().slice(0,10);
+    const hebDayNumInt=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'}).format(dayDate));
+    const label=HEB_DAY_NUM[hebDayNumInt]||String(hebDayNumInt);
+    const isToday=ds===todayStr;
+    const isSel=_kidPickedDate&&_kidPickedDate.hebYear===hebYearNum&&_kidPickedDate.hebMonth===hebMonth&&_kidPickedDate.hebDay===hebDayNumInt;
+    const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':''].filter(Boolean).join(' ');
+    html+=`<div class="${cls}" onclick="selectKidPickerDay(${hebYearNum},'${hebMonth}',${hebDayNumInt})"><span style="font-size:10px;line-height:1">${label}</span></div>`;
+  });
+  document.getElementById('kidPickerGrid').innerHTML=html;
+}
+function selectKidPickerDay(hebYear,hebMonth,hebDay){
+  _kidPickedDate={hebYear,hebMonth,hebDay};
+  _kidLegacyDate=null;
+  _kidDateTouched=true;
+  updateKidDateBtn();
+  closeKidDatePicker();
+}
 function openAddKidModal(){
   if(_famEditId==null)return;
   _kidEditId=null;
-  _kidMonthDayOptions();
+  _kidPickedDate=null;
+  _kidLegacyDate=null;
+  _kidDateTouched=false;
   document.getElementById('kidModalTitle').textContent='👶 הוסף ילד';
   document.getElementById('kidName').value='';
-  document.getElementById('kidBdayMonth').value='';
-  document.getElementById('kidBdayDay').value='';
-  document.getElementById('kidBdayYear').value='';
+  updateKidDateBtn();
   setKidGender('');
   document.getElementById('kidModal').style.display='flex';
   setTimeout(()=>{const i=document.getElementById('kidName');if(i)i.focus();},50);
@@ -2474,12 +2521,13 @@ function openEditKidModal(kidId){
   const f=families.find(x=>x.id===_famEditId);if(!f)return;
   const k=(f.kids||[]).find(x=>x.id===kidId);if(!k)return;
   _kidEditId=kidId;
-  _kidMonthDayOptions();
+  _kidDateTouched=false;
+  if(k.hebDay&&k.hebMonth&&k.hebYear){_kidPickedDate={hebYear:k.hebYear,hebMonth:k.hebMonth,hebDay:k.hebDay};_kidLegacyDate=null;}
+  else if(k.hebDay&&k.hebMonth){_kidPickedDate=null;_kidLegacyDate={hebMonth:k.hebMonth,hebDay:k.hebDay};}
+  else{_kidPickedDate=null;_kidLegacyDate=null;}
   document.getElementById('kidModalTitle').textContent='✏️ ערוך ילד';
   document.getElementById('kidName').value=k.name||'';
-  document.getElementById('kidBdayMonth').value=k.hebMonth||'';
-  document.getElementById('kidBdayDay').value=k.hebDay||'';
-  document.getElementById('kidBdayYear').value=k.hebYear||'';
+  updateKidDateBtn();
   setKidGender(k.gender||'');
   document.getElementById('kidModal').style.display='flex';
 }
@@ -2490,17 +2538,20 @@ function closeKidModal(){
 function saveKid(){
   const f=families.find(x=>x.id===_famEditId);if(!f)return;
   const name=document.getElementById('kidName').value.trim();
-  const hebMonth=document.getElementById('kidBdayMonth').value;
-  const hebDay=parseInt(document.getElementById('kidBdayDay').value)||null;
-  const hebYear=parseInt(document.getElementById('kidBdayYear').value)||null;
-  const hasDate=!!(hebMonth&&hebDay);
   if(!f.kids)f.kids=[];
   if(_kidEditId!=null){
     const k=f.kids.find(x=>x.id===_kidEditId);
-    if(k){k.name=name;k.gender=_kidGender;k.hebMonth=hasDate?hebMonth:'';k.hebDay=hasDate?hebDay:null;k.hebYear=hasDate?hebYear:null;}
+    if(k){
+      k.name=name;k.gender=_kidGender;
+      if(_kidDateTouched){
+        k.hebMonth=_kidPickedDate?_kidPickedDate.hebMonth:'';
+        k.hebDay=_kidPickedDate?_kidPickedDate.hebDay:null;
+        k.hebYear=_kidPickedDate?_kidPickedDate.hebYear:null;
+      }
+    }
   }else{
     const nid=f.kids.length?Math.max(...f.kids.map(k=>k.id))+1:1;
-    f.kids.push({id:nid,name,gender:_kidGender,hebMonth:hasDate?hebMonth:'',hebDay:hasDate?hebDay:null,hebYear:hasDate?hebYear:null});
+    f.kids.push({id:nid,name,gender:_kidGender,hebMonth:_kidPickedDate?_kidPickedDate.hebMonth:'',hebDay:_kidPickedDate?_kidPickedDate.hebDay:null,hebYear:_kidPickedDate?_kidPickedDate.hebYear:null});
   }
   f.children=f.kids.length;
   save();renderFamEditKids();render();closeKidModal();
