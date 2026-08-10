@@ -154,6 +154,10 @@ const evPotOrigByFam=ev=>{
   (ev.settled||[]).filter(s=>(s.method==='pot'||s.method==='pot-refund')&&s.fromFid!=null).forEach(s=>{r[s.fromFid]=(r[s.fromFid]||0)+s.amt;});
   return r;
 };
+// How much of a family's pot deposit for this event came from the wallet (main fund)
+const evPotFromWallet=(ev,fid)=>Math.round((fund.transactions||[])
+  .filter(t=>Number(t.famId)===Number(fid)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
+  .reduce((s,t)=>s+t.amount,0));
 // Amount transferred to creditors per depositing family
 const evPotTransByFam=ev=>{
   const r={};
@@ -408,10 +412,10 @@ function sendSettledEmail(ev,famId){
     .filter(t=>Number(t.famId)===Number(famId)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
     .reduce((s,t)=>s+t.amount,0));
   if(_potTotal>0.5){
-    if(_fromFundToPot>0.5&&_fromFundToPot===_potTotal) lines.push(`העברת מהקופה הראשית ₪${_potTotal.toLocaleString()} לקופת האירוע`);
+    if(_fromFundToPot>0.5&&_fromFundToPot===_potTotal) lines.push(`העברת מהארנק ₪${_potTotal.toLocaleString()} לקופת האירוע`);
     else{
       lines.push(`הפקדת לקופת האירוע: ₪${_potTotal.toLocaleString()}`);
-      if(_fromFundToPot>0.5) lines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} הועברו מהקופה הראשית`);
+      if(_fromFundToPot>0.5) lines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} הועברו מהארנק`);
     }
   }
   const _potRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.toFid)===Number(famId)).reduce((s,t)=>s+t.amt,0));
@@ -419,10 +423,10 @@ function sendSettledEmail(ev,famId){
     .filter(t=>Number(t.famId)===Number(famId)&&t.type==='deposit'&&(t.desc||'').includes('מקופת אירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
     .reduce((s,t)=>s+t.amount,0));
   if(_potRec>0.5){
-    if(_toFundFromPot>0.5&&_toFundFromPot===_potRec) lines.push(`הועבר מקופת האירוע ₪${_potRec.toLocaleString()} לקופה הראשית שלכם`);
+    if(_toFundFromPot>0.5&&_toFundFromPot===_potRec) lines.push(`הועבר מקופת האירוע ₪${_potRec.toLocaleString()} לארנק שלכם`);
     else{
       lines.push(`קיבלת ₪${_potRec.toLocaleString()} מקופת האירוע`);
-      if(_toFundFromPot>0.5) lines.push(`מתוכם ₪${_toFundFromPot.toLocaleString()} הועברו לקופה הראשית שלך`);
+      if(_toFundFromPot>0.5) lines.push(`מתוכם ₪${_toFundFromPot.toLocaleString()} הועברו לארנק שלך`);
     }
   }
   (ev.settled||[]).forEach(s=>{
@@ -432,10 +436,10 @@ function sendSettledEmail(ev,famId){
     const sTo=(getFam(s.toFid)||{}).name?(getFam(s.toFid).name.replace('משפחת','').trim()):s.to;
     const sFrom=(getFam(s.fromFid)||{}).name?(getFam(s.fromFid).name.replace('משפחת','').trim()):s.from;
     if(isFrom){
-      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית ל${sTo}`);
+      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהארנק ל${sTo}`);
       else lines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${sTo}`);
     } else if(isTo){
-      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועבר לקופה הראשית`);
+      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועבר לארנק`);
       else lines.push(`קיבלת ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
     }
   });
@@ -446,12 +450,12 @@ function sendSettledEmail(ev,famId){
   if(_savPF>0) msg+=`מתוכם ₪${_savPF.toLocaleString()} לקופת חיסכון 💎\n`;
   if(spent>0) msg+=`הוצאת: ₪${spent.toLocaleString()}\n`;
   if(lines.length) msg+=`\nאיך סודר:\n${lines.map(l=>'• '+l).join('\n')}`;
-  if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
+  if(fundBal>0) msg+=`\n\nיתרתך בארנק: ₪${fundBal.toLocaleString()}`;
   // HTML
   const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(_savPF>0) cardRows.push(['💎 מתוכם לקופת חיסכון',`₪${_savPF.toLocaleString()}`]);
   if(spent>0) cardRows.push(['ההוצאות שלך',`₪${spent.toLocaleString()}`]);
-  if(fundBal>0) cardRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
+  if(fundBal>0) cardRows.push(['💰 יתרה בארנק',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(cardRows);
   bodyHtml+=_splitMethodBlock(ev,famId);
   if(lines.length){
@@ -506,9 +510,9 @@ function sendFundUpdateEmail(famId,changeAmt,desc){
   if(!key||!svc||!tpl){showToast('⚠️ הגדרות מייל חסרות — כנס להגדרות משפחות');return;}
   const name=f.name.replace('משפחת','').trim();
   const newBal=Math.round(fund.famBalances[String(famId)]||0);
-  const msg=`${desc}: ₪${Math.round(changeAmt).toLocaleString()}\n\nיתרתך החדשה בקופה הראשית: ₪${newBal.toLocaleString()}`;
-  const html=_emailWrap(_eCard([[desc,`₪${Math.round(changeAmt).toLocaleString()}`],['💰 יתרה חדשה בקופה',`₪${newBal.toLocaleString()}`,true]]),'עדכון קופה הראשית','🏦',_ejsUrl()+'#fund');
-  sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏦 עדכון קופה הראשית · ינקלביץ',msg,html);
+  const msg=`${desc}: ₪${Math.round(changeAmt).toLocaleString()}\n\nיתרתך החדשה בארנק: ₪${newBal.toLocaleString()}`;
+  const html=_emailWrap(_eCard([[desc,`₪${Math.round(changeAmt).toLocaleString()}`],['💰 יתרה חדשה בקופה',`₪${newBal.toLocaleString()}`,true]]),'עדכון ארנק','🏦',_ejsUrl()+'#fund');
+  sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏦 עדכון ארנק · ינקלביץ',msg,html);
 }
 
 function saveLocal(){
@@ -1353,7 +1357,7 @@ function renderHome(){
   const savBal=savingsPotBal();
   const allBal=mainBal+goalBal+evPotsBal+savBal;
   const bannerStats=[
-    {label:'קופה ראשית',amt:mainBal},
+    {label:'ארנק',amt:mainBal},
     ...(goalBal>0?[{label:'קופות מטרה',amt:goalBal}]:[]),
     ...(evPotsBal>0?[{label:'קופות אירועים',amt:evPotsBal}]:[]),
     ...(savBal>0?[{label:'קופת חיסכון',amt:savBal}]:[]),
@@ -1682,6 +1686,7 @@ function evCard(ev){
     const famPotAmt=potOrigByFam[fid]||0;
     const famPotTransAmt=potTransByFam[fid]||0;
     const famPotRefundAmt=potRefundByFam[fid]||0;
+    const famPotFromWallet=famPotAmt>0?evPotFromWallet(ev,fid):0;
     const key=ev.id+'-'+fid;
     const isExpanded=expandedCumFamilies.has(key);
     const shareKey=ev.id+'-share-'+fid;
@@ -1724,7 +1729,12 @@ function evCard(ev){
             <div class="mname" style="margin-bottom:1px">${esc(f.name.replace('משפחת','').trim())}</div>
             ${cost>0&&share>0?hasShareDetail?`<button onclick="toggleFamShare(${ev.id},${fid})" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:3px"><span style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</span><span style="font-size:10px;color:var(--text3)">${isShareExpanded?'▲':'▼'}</span></button>${shareBreakdownHtml}`:`<div style="font-size:13px;font-weight:700;color:var(--text)">חלק: ₪${share.toLocaleString()}</div>`:''}
             ${ev.savingsTotal?`<div style="font-size:11px;color:var(--green-mid);margin-top:1px">מתוכם ₪${evSavingsPerFam(ev).toLocaleString()} לקופת חיסכון 💎</div>`:''}
-            ${famPotAmt>0?`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`:''}
+            ${famPotAmt>0?(famPotFromWallet>0.5&&famPotFromWallet>=famPotAmt-0.5?
+              `<div style="font-size:11px;color:var(--amber);margin-top:1px">🏦 הועבר מהארנק ₪${famPotAmt.toLocaleString()} לקופת האירוע</div>`
+              :famPotFromWallet>0.5?
+              `<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div><div style="font-size:11px;color:var(--amber);margin-top:1px">🏦 מתוכם ₪${famPotFromWallet.toLocaleString()} מהארנק</div>`
+              :`<div style="font-size:11px;color:var(--amber);margin-top:1px">💰 הפקיד לקופה ₪${famPotAmt.toLocaleString()}</div>`
+            ):''}
             ${famPotRefundAmt>0?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${famPotRefundAmt.toLocaleString()}</div>`:''}
           </div>
         </div>
@@ -2198,7 +2208,7 @@ function renderAnnualReport(){
         <div style="font-size:22px;font-weight:800">₪${savExpYear.toLocaleString()}</div>
       </div>`:''}
     </div>
-    ${fundTx.length?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px">🏦 קופה ראשית: הופקדו ₪${fundDeposits.toLocaleString()} · שולמו ₪${fundPayouts.toLocaleString()}</div>`:''}
+    ${fundTx.length?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px">🏦 ארנק: הופקדו ₪${fundDeposits.toLocaleString()} · שולמו ₪${fundPayouts.toLocaleString()}</div>`:''}
     ${toggleHtml}
     ${_famActive?`
     <div style="font-size:13px;font-weight:800;margin-bottom:6px">👨‍👩‍👧‍👦 לפי משפחה</div>
@@ -2402,9 +2412,9 @@ function openFamDetail(famId){
     </div>`;
   }
 
-  // יתרת קופה ראשית
+  // יתרת ארנק
   html+=`<div style="margin-bottom:14px;padding:12px;background:var(--surface2);border-radius:var(--r2);display:flex;justify-content:space-between;align-items:center">
-    <span style="font-size:13px;font-weight:600;color:var(--text2)">🏦 קופה ראשית</span>
+    <span style="font-size:13px;font-weight:600;color:var(--text2)">🏦 ארנק</span>
     <span style="font-size:15px;font-weight:800;color:${mainBal>=0?'var(--green-mid)':'var(--red-mid)'}">₪${mainBal.toLocaleString()}</span>
   </div>`;
 
@@ -3121,24 +3131,24 @@ function _sendCloseEvEmailOne(ev,fid){
     .reduce((s,t)=>s+t.amount,0));
   if(_myTotalPot>0.5){
     if(_fromFundToPot>0.5&&_fromFundToPot===_myTotalPot){
-      settleLines.push(`העברת מהקופה הראשית ₪${_myTotalPot.toLocaleString()} לקופת האירוע`);
+      settleLines.push(`העברת מהארנק ₪${_myTotalPot.toLocaleString()} לקופת האירוע`);
     } else {
       settleLines.push(`הפקדת לקופת האירוע: ₪${_myTotalPot.toLocaleString()}`);
-      if(_fromFundToPot>0.5) settleLines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} הועברו מהקופה הראשית`);
+      if(_fromFundToPot>0.5) settleLines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} הועברו מהארנק`);
     }
-    if(_excessToFund>0.5) settleLines.push(`היתרה ₪${_excessToFund.toLocaleString()} עברה לקופה הראשית`);
+    if(_excessToFund>0.5) settleLines.push(`היתרה ₪${_excessToFund.toLocaleString()} עברה לארנק`);
   } else if(_fromFundToPot>0.5){
-    settleLines.push(`העברת מהקופה הראשית ₪${_fromFundToPot.toLocaleString()} לתשלום האירוע`);
+    settleLines.push(`העברת מהארנק ₪${_fromFundToPot.toLocaleString()} לתשלום האירוע`);
   }
   const _myPotRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.toFid)===Number(fid)).reduce((s,t)=>s+t.amt,0));
   const _toFundFromPot=Math.round((fund.transactions||[])
     .filter(t=>Number(t.famId)===Number(fid)&&t.type==='deposit'&&(t.desc||'').includes('מקופת אירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
     .reduce((s,t)=>s+t.amount,0));
   if(_myPotRec>0.5){
-    if(_toFundFromPot>0.5&&_toFundFromPot===_myPotRec) settleLines.push(`הועבר מקופת האירוע ₪${_myPotRec.toLocaleString()} לקופה הראשית שלכם`);
+    if(_toFundFromPot>0.5&&_toFundFromPot===_myPotRec) settleLines.push(`הועבר מקופת האירוע ₪${_myPotRec.toLocaleString()} לארנק שלכם`);
     else{
       settleLines.push(`קיבלת ₪${_myPotRec.toLocaleString()} מקופת האירוע`);
-      if(_toFundFromPot>0.5) settleLines.push(`מתוכם ₪${_toFundFromPot.toLocaleString()} הועברו לקופה הראשית שלך`);
+      if(_toFundFromPot>0.5) settleLines.push(`מתוכם ₪${_toFundFromPot.toLocaleString()} הועברו לארנק שלך`);
     }
   }
   const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
@@ -3149,10 +3159,10 @@ function _sendCloseEvEmailOne(ev,fid){
     const sFrom=(getFam(s.fromFid)||{}).name?(getFam(s.fromFid).name.replace('משפחת','').trim()):s.from;
     const sTo=(getFam(s.toFid)||{}).name?(getFam(s.toFid).name.replace('משפחת','').trim()):s.to;
     if(isFrom){
-      if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} שולמו מהקופה הראשית שלך ל${sTo}`);
+      if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} שולמו מהארנק שלך ל${sTo}`);
       else settleLines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${sTo}`);
     } else if(isTo){
-      if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועבר לקופה הראשית שלך`);
+      if(s.method==='fund') settleLines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועבר לארנק שלך`);
       else settleLines.push(`קיבלת ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
     }
   });
@@ -3164,12 +3174,12 @@ function _sendCloseEvEmailOne(ev,fid){
     msg+=`\n💳 ההוצאות שלך (${name}):\n${itemLines}\n  סה"כ: ₪${mySpent.toLocaleString()}`;
   }
   if(settleLines.length) msg+=`\n\nאיך סודר:\n${settleLines.map(l=>'• '+l).join('\n')}`;
-  if(fundBal>0) msg+=`\n\nיתרתך בקופה הראשית: ₪${fundBal.toLocaleString()}`;
+  if(fundBal>0) msg+=`\n\nיתרתך בארנק: ₪${fundBal.toLocaleString()}`;
   msg+=`\n\n✅ החשבון שלך מסודר.`;
   const _savingsPerFam=evSavingsPerFam(ev);
   const _cRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(_savingsPerFam>0) _cRows.push(['💎 לקופת חיסכון',`₪${_savingsPerFam.toLocaleString()}`]);
-  if(fundBal>0) _cRows.push(['💰 יתרה בקופה הראשית',`₪${fundBal.toLocaleString()}`]);
+  if(fundBal>0) _cRows.push(['💰 יתרה בארנק',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(_cRows);
   const _isPerFam=!ev.cumulative&&ev.totalCost==null;
   if(_isPerFam){
@@ -3266,13 +3276,13 @@ function sendEmailToFam(evId,fid){
     const potDep=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.fromFid)===Number(fid)).reduce((s,t)=>s+t.amt,0));
     const _fromFundToPot1=potDep>0.5?Math.round((fund.transactions||[]).filter(t=>Number(t.famId)===Number(fid)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name))).reduce((s,t)=>s+t.amount,0)):0;
     const _potIsFromFund1=_fromFundToPot1>0.5&&Math.abs(_fromFundToPot1-potDep)<1;
-    const msgPot=potDep>0.5?(_potIsFromFund1?`\nהעברת מהקופה הראשית ₪${potDep.toLocaleString()} לקופת האירוע`:`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`):'';
+    const msgPot=potDep>0.5?(_potIsFromFund1?`\nהעברת מהארנק ₪${potDep.toLocaleString()} לקופת האירוע`:`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`):'';
     const _savPerFam1=evSavingsPerFam(ev);
     const msg=`תזכורת: האירוע "${ev.name}"\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${spent>0?`\nשילמת: ₪${spent.toLocaleString()}`:''}${msgPot}${_savPerFam1>0?`\n💎 לקופת חיסכון: ₪${_savPerFam1.toLocaleString()}`:''}\n\n⚠️ יתרת חוב: ₪${owe.toLocaleString()}\n\nכבר שילמת? סמן כאן: ${_ejsUrl()}#confirm-${ev.id}-${fid}-${owe}`;
     const cardRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
     if(spent>0) cardRows.push(['שילמת',`₪${spent.toLocaleString()}`]);
     if(_savPerFam1>0) cardRows.push(['💎 לקופת חיסכון',`₪${_savPerFam1.toLocaleString()}`]);
-    if(potDep>0.5) cardRows.push([_potIsFromFund1?'העברת מהקופה הראשית':'הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
+    if(potDep>0.5) cardRows.push([_potIsFromFund1?'העברת מהארנק':'הפקדת לקופת האירוע',`₪${potDep.toLocaleString()}`]);
     let bodyHtml=_eCard(cardRows);
     bodyHtml+=_splitMethodBlock(ev,fid);
     // Expense breakdown table
@@ -3561,7 +3571,7 @@ function showEmailGateWelcome(fam,slot){
       <div style="font-size:16px;font-weight:700;margin-bottom:16px">ברוכים הבאים, ${esc(name)}!</div>
       <div style="background:var(--surface2);border-radius:var(--r2);padding:12px 14px;margin-bottom:12px;text-align:right">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:13px;color:var(--text2)">יתרתך בקופה הראשית</span>
+          <span style="font-size:13px;color:var(--text2)">יתרתך בארנק</span>
           <span style="font-size:14px;font-weight:700;color:${fundBal>=0?'var(--green-mid)':'var(--red-mid)'}">₪${fundBal.toLocaleString()}</span>
         </div>
       </div>
@@ -3717,7 +3727,7 @@ function renderFund(){
   // Grand total card
   document.getElementById('grandTotalAmt').textContent='₪'+grandTotal.toLocaleString();
   document.getElementById('grandTotalBreakdown').innerHTML=[
-    {label:'ראשית',amt:mainTotal,color:'rgba(255,255,255,0.8)'},
+    {label:'ארנק',amt:mainTotal,color:'rgba(255,255,255,0.8)'},
     {label:'מטרה',amt:goalTotal2,color:'#6ee7b7'},
     {label:'אירועים',amt:evPotsTotal,color:'#fbbf24'},
     {label:'חיסכון',amt:savTotal,color:'#93c5fd'},
@@ -4049,7 +4059,7 @@ function confirmDeposit(){
   const _notifyFamId=_depositFamId;
   closeDepositSheet();
   save();render();
-  sendFundUpdateEmail(_notifyFamId,amt,isDeposit?'הפקדה לקופה הראשית':'משיכה מהקופה הראשית');
+  sendFundUpdateEmail(_notifyFamId,amt,isDeposit?'הפקדה לארנק':'משיכה מהארנק');
 }
 
 
@@ -4585,7 +4595,7 @@ function renderPotModal(ev){
     </div>
     <div style="border-bottom:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;color:var(--text2);padding:8px 16px 4px">הפקדות:</div>
-      ${(()=>{const byFam={};potPayments.forEach(p=>{if(!byFam[p.famId])byFam[p.famId]=[];byFam[p.famId].push(p);});(ev.settled||[]).filter(s=>(s.method==='pot'||s.method==='pot-refund')&&s.fromFid!=null).forEach(s=>{if(!byFam[s.fromFid])byFam[s.fromFid]=[];});const ord=families.map(f=>f.id).filter(fid=>byFam[fid]);return ord.map(fid=>{const pmnts=byFam[fid]||[];const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const distFromThis=(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const refundFromThis=(ev.settled||[]).filter(s=>s.method==='pot-refund'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const tot=pmnts.reduce((s,p)=>s+p.amt,0)+distFromThis+refundFromThis;const multi=pmnts.length>1;const key=ev.id+'-pot-'+fid;const isExp=expandedPotFamilies.has(key);const delBtn=(i)=>`<button class="edit-only" onclick="deletePotDeposit(${ev.id},${fid},${i})" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:14px;padding:0 4px;font-family:var(--font)" title="מחק">🗑</button>`;const details=multi&&isExp?'<div style="background:var(--surface2);padding:6px 16px 6px 32px">'+pmnts.map((p,i)=>`<div style="font-size:12px;color:var(--text2);padding:3px 0;display:flex;justify-content:space-between;align-items:center"><span>תשלום ${i+1} · ₪${p.amt.toLocaleString()}</span>${delBtn(i)}</div>`).join('')+'</div>':'';return`<div style="border-top:1px solid var(--border)"><div style="display:flex;align-items:center;gap:10px;padding:10px 16px"><div style="width:32px;height:32px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">✓</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div><div style="font-size:12px;color:var(--green-mid);font-weight:600;margin-top:1px">₪${tot.toLocaleString()}</div>${refundFromThis>0.5?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${refundFromThis.toLocaleString()}</div>`:''}</div>${multi?`<button onclick="togglePotModalFamily(${ev.id},${fid})" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:pointer;padding:3px 8px;font-weight:700;font-family:var(--font)">${isExp?'▲ סגור':'▼ '+pmnts.length+' תשלומים'}</button>`:delBtn(0)}</div>${details}</div>`;}).join('');})()}
+      ${(()=>{const byFam={};potPayments.forEach(p=>{if(!byFam[p.famId])byFam[p.famId]=[];byFam[p.famId].push(p);});(ev.settled||[]).filter(s=>(s.method==='pot'||s.method==='pot-refund')&&s.fromFid!=null).forEach(s=>{if(!byFam[s.fromFid])byFam[s.fromFid]=[];});const ord=families.map(f=>f.id).filter(fid=>byFam[fid]);return ord.map(fid=>{const pmnts=byFam[fid]||[];const pf=getFam(fid);if(!pf)return'';const name=pf.name.replace('משפחת','').trim();const distFromThis=(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const refundFromThis=(ev.settled||[]).filter(s=>s.method==='pot-refund'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0);const tot=pmnts.reduce((s,p)=>s+p.amt,0)+distFromThis+refundFromThis;const multi=pmnts.length>1;const key=ev.id+'-pot-'+fid;const isExp=expandedPotFamilies.has(key);const fromWallet=tot>0?evPotFromWallet(ev,fid):0;const walletNote=fromWallet>0.5&&fromWallet>=tot-0.5?`<div style="font-size:11px;color:var(--amber);margin-top:1px">🏦 הועבר מהארנק ₪${tot.toLocaleString()} לקופת האירוע</div>`:fromWallet>0.5?`<div style="font-size:11px;color:var(--amber);margin-top:1px">🏦 מתוכם ₪${fromWallet.toLocaleString()} מהארנק</div>`:'';const delBtn=(i)=>`<button class="edit-only" onclick="deletePotDeposit(${ev.id},${fid},${i})" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:14px;padding:0 4px;font-family:var(--font)" title="מחק">🗑</button>`;const details=multi&&isExp?'<div style="background:var(--surface2);padding:6px 16px 6px 32px">'+pmnts.map((p,i)=>`<div style="font-size:12px;color:var(--text2);padding:3px 0;display:flex;justify-content:space-between;align-items:center"><span>תשלום ${i+1} · ₪${p.amt.toLocaleString()}</span>${delBtn(i)}</div>`).join('')+'</div>':'';return`<div style="border-top:1px solid var(--border)"><div style="display:flex;align-items:center;gap:10px;padding:10px 16px"><div style="width:32px;height:32px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">✓</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div><div style="font-size:12px;color:var(--green-mid);font-weight:600;margin-top:1px">₪${tot.toLocaleString()}</div>${walletNote}${refundFromThis>0.5?`<div style="font-size:11px;color:var(--blue-mid);margin-top:1px">↩ הוחזר עודף ₪${refundFromThis.toLocaleString()}</div>`:''}</div>${multi?`<button onclick="togglePotModalFamily(${ev.id},${fid})" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);cursor:pointer;padding:3px 8px;font-weight:700;font-family:var(--font)">${isExp?'▲ סגור':'▼ '+pmnts.length+' תשלומים'}</button>`:delBtn(0)}</div>${details}</div>`;}).join('');})()}
     </div>
     ${expRows}
     ${potTransferBtn}
@@ -4695,7 +4705,7 @@ function useFundForCumPot(){
   if(el)el.value=suggested>0?suggested:fundBal;
   _cumPotFromFund=true;
   const fundText=document.getElementById('cumPotFundText');
-  if(fundText)fundText.textContent=`🏦 יועבר מהקופה הראשית: ₪${(suggested>0?suggested:fundBal).toLocaleString()} ✓`;
+  if(fundText)fundText.textContent=`🏦 יועבר מהארנק: ₪${(suggested>0?suggested:fundBal).toLocaleString()} ✓`;
 }
 function doDepositToCumPot(){
   const amt=parseFloat(document.getElementById('cumPotAmt').value)||0;
@@ -4711,7 +4721,7 @@ function doDepositToCumPot(){
   if(fromFund){
     const key=String(savedFamId);
     const bal=fund.famBalances[key]||0;
-    if(bal<roundAmt){alert('אין מספיק יתרה בקופה הראשית (₪'+Math.round(bal).toLocaleString()+')');return;}
+    if(bal<roundAmt){alert('אין מספיק יתרה בארנק (₪'+Math.round(bal).toLocaleString()+')');return;}
     fund.famBalances[key]=bal-roundAmt;
     const _cumPotFamName=(getFam(savedFamId)||{}).name?.replace('משפחת','').trim()||'';
     fund.transactions.push({id:nxtTx++,type:'payout',famId:savedFamId,amount:roundAmt,evId:ev.id,
