@@ -4679,8 +4679,8 @@ function selectCumPotFam(famId){
   if(fundLine&&fundText){
     if(fundBal>0){
       const ev2=events.find(e=>e.id===cumPotEvId);
-      const share=ev2?Math.round(evShares(ev2)[famId]||0):fundBal;
-      const suggested=share>0?Math.min(fundBal,share):fundBal;
+      const owed=ev2?Math.round(Math.max(0,-(evAdjBalance(ev2)[famId]||0))):0;
+      const suggested=owed>0?Math.min(fundBal,owed):fundBal;
       const extra=fundBal>suggested?` (יתרה: ₪${fundBal.toLocaleString()})` :'';
       fundText.textContent=`🏦 יועבר מהקופה: ₪${suggested.toLocaleString()}${extra}`;
       fundLine.style.display='flex';
@@ -4699,8 +4699,8 @@ function useFundForCumPot(){
   const fundBal=Math.round(famFundBal(cumPotFamId));
   if(fundBal<=0)return;
   const ev=events.find(e=>e.id===cumPotEvId);
-  const share=ev?Math.round(evShares(ev)[cumPotFamId]||0):fundBal;
-  const suggested=Math.min(fundBal,share);
+  const owed=ev?Math.round(Math.max(0,-(evAdjBalance(ev)[cumPotFamId]||0))):0;
+  const suggested=owed>0?Math.min(fundBal,owed):fundBal;
   const el=document.getElementById('cumPotAmt');
   if(el)el.value=suggested>0?suggested:fundBal;
   _cumPotFromFund=true;
