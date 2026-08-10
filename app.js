@@ -843,7 +843,14 @@ function allBirthdays(){
     name:(k.name?k.name:'ילד/ה')+' ('+f.name.replace('משפחת','').trim()+')',
     hebDay:k.hebDay,hebMonth:k.hebMonth
   })));
-  return [...birthdays,...kidBdays];
+  const parentBdays=families.flatMap(f=>{
+    const fam=f.name.replace('משפחת','').trim();
+    const arr=[];
+    if(f.parent1Bday&&f.parent1Bday.hebDay&&f.parent1Bday.hebMonth)arr.push({name:(f.emailName||'הורה')+' ('+fam+')',hebDay:f.parent1Bday.hebDay,hebMonth:f.parent1Bday.hebMonth});
+    if(f.parent2Bday&&f.parent2Bday.hebDay&&f.parent2Bday.hebMonth)arr.push({name:(f.emailName2||'הורה')+' ('+fam+')',hebDay:f.parent2Bday.hebDay,hebMonth:f.parent2Bday.hebMonth});
+    return arr;
+  });
+  return [...birthdays,...kidBdays,...parentBdays];
 }
 function checkBirthdayNotifs(){
   const all=allBirthdays();
@@ -2336,7 +2343,21 @@ function openFamEditSheet(fid){
   if(b1){b1.textContent=f.email&&verified.has(f.email)?'✓':'בדוק';b1.style.color=f.email&&verified.has(f.email)?'var(--green)':'var(--text2)';b1.style.fontWeight=f.email&&verified.has(f.email)?'700':'';}
   if(b2){b2.textContent=f.email2&&verified.has(f.email2)?'✓':'בדוק';b2.style.color=f.email2&&verified.has(f.email2)?'var(--green)':'var(--text2)';b2.style.fontWeight=f.email2&&verified.has(f.email2)?'700':'';}
 
+  _p1BdayDraft=(f.parent1Bday&&f.parent1Bday.hebDay&&f.parent1Bday.hebMonth&&f.parent1Bday.hebYear)?{...f.parent1Bday}:null;
+  _p1BdayLegacy=(f.parent1Bday&&f.parent1Bday.hebDay&&f.parent1Bday.hebMonth&&!f.parent1Bday.hebYear)?{hebMonth:f.parent1Bday.hebMonth,hebDay:f.parent1Bday.hebDay}:null;
+  _p1BdayTouched=false;
+  _p2BdayDraft=(f.parent2Bday&&f.parent2Bday.hebDay&&f.parent2Bday.hebMonth&&f.parent2Bday.hebYear)?{...f.parent2Bday}:null;
+  _p2BdayLegacy=(f.parent2Bday&&f.parent2Bday.hebDay&&f.parent2Bday.hebMonth&&!f.parent2Bday.hebYear)?{hebMonth:f.parent2Bday.hebMonth,hebDay:f.parent2Bday.hebDay}:null;
+  _p2BdayTouched=false;
+  const p1Btn=document.getElementById('parent1DateBtn');if(p1Btn)p1Btn.textContent=_parentBdayBtnText(_p1BdayDraft,_p1BdayLegacy);
+  const p2Btn=document.getElementById('parent2DateBtn');if(p2Btn)p2Btn.textContent=_parentBdayBtnText(_p2BdayDraft,_p2BdayLegacy);
+
   document.getElementById('famEditOverlay').style.display='flex';
+}
+function _parentBdayBtnText(draft,legacy){
+  if(draft)return'📅 '+HEB_DAY_NUM[draft.hebDay]+' ב'+draft.hebMonth+' '+toHebrewYear(draft.hebYear);
+  if(legacy)return'📅 '+HEB_DAY_NUM[legacy.hebDay]+' ב'+legacy.hebMonth+' (בחר שוב כדי להוסיף שנה)';
+  return'📅 הוסף תאריך לידה';
 }
 function openFamDetail(famId){
   const f=getFam(famId);if(!f)return;
@@ -2439,25 +2460,45 @@ function renderFamEditKids(){
   }).join('');
 }
 let _kidEditId=null,_kidGender='',_kidPickedDate=null,_kidPickerRefDate=new Date(),_kidDateTouched=false,_kidLegacyDate=null;
+let _bdayTarget='kid';
+let _p1BdayDraft=null,_p1BdayLegacy=null,_p1BdayTouched=false;
+let _p2BdayDraft=null,_p2BdayLegacy=null,_p2BdayTouched=false;
 function setKidGender(g){
   _kidGender=g;
   const b1=document.getElementById('kidGenderBoy'),b2=document.getElementById('kidGenderGirl');
   if(b1){b1.style.background=g==='boy'?'var(--blue-mid)':'transparent';b1.style.color=g==='boy'?'#fff':'var(--text2)';b1.style.borderColor=g==='boy'?'var(--blue-mid)':'var(--border)';}
   if(b2){b2.style.background=g==='girl'?'var(--blue-mid)':'transparent';b2.style.color=g==='girl'?'#fff':'var(--text2)';b2.style.borderColor=g==='girl'?'var(--blue-mid)':'var(--border)';}
 }
+function _bdayBtnId(){return _bdayTarget==='kid'?'kidDateBtn':_bdayTarget==='p1'?'parent1DateBtn':'parent2DateBtn';}
 function updateKidDateBtn(){
-  const btn=document.getElementById('kidDateBtn');if(!btn)return;
+  const btn=document.getElementById(_bdayBtnId());if(!btn)return;
   if(_kidPickedDate)btn.textContent='📅 '+HEB_DAY_NUM[_kidPickedDate.hebDay]+' ב'+_kidPickedDate.hebMonth+' '+toHebrewYear(_kidPickedDate.hebYear);
   else if(_kidLegacyDate)btn.textContent='📅 '+HEB_DAY_NUM[_kidLegacyDate.hebDay]+' ב'+_kidLegacyDate.hebMonth+' (בחר שוב כדי להוסיף שנה)';
-  else btn.textContent='📅 בחר תאריך לידה';
+  else btn.textContent=_bdayTarget==='kid'?'📅 בחר תאריך לידה':'📅 הוסף תאריך לידה';
+}
+function _commitBdayTarget(){
+  if(_bdayTarget==='kid'){_kidDateTouched=true;}
+  else if(_bdayTarget==='p1'){_p1BdayDraft=_kidPickedDate;_p1BdayLegacy=_kidLegacyDate;_p1BdayTouched=true;}
+  else if(_bdayTarget==='p2'){_p2BdayDraft=_kidPickedDate;_p2BdayLegacy=_kidLegacyDate;_p2BdayTouched=true;}
 }
 function clearKidDate(){
   _kidPickedDate=null;
   _kidLegacyDate=null;
-  _kidDateTouched=true;
+  _commitBdayTarget();
   updateKidDateBtn();
 }
+function openParentBdayPicker(which){
+  if(_famEditId==null)return;
+  _bdayTarget=which;
+  _kidPickedDate=which==='p1'?_p1BdayDraft:_p2BdayDraft;
+  _kidLegacyDate=which==='p1'?_p1BdayLegacy:_p2BdayLegacy;
+  _kidPickerRefDate=_kidPickedDate?(hebrewToGregorian(_kidPickedDate.hebYear,_kidPickedDate.hebMonth,_kidPickedDate.hebDay)||new Date()):new Date();
+  closeKidYearList();
+  renderKidDatePicker();
+  document.getElementById('kidDatePickerModal').style.display='flex';
+}
 function openKidDatePicker(){
+  _bdayTarget='kid';
   _kidPickerRefDate=_kidPickedDate?(hebrewToGregorian(_kidPickedDate.hebYear,_kidPickedDate.hebMonth,_kidPickedDate.hebDay)||new Date()):new Date();
   closeKidYearList();
   renderKidDatePicker();
@@ -2532,13 +2573,14 @@ function renderKidDatePicker(){
 function selectKidPickerDay(hebYear,hebMonth,hebDay){
   _kidPickedDate={hebYear,hebMonth,hebDay};
   _kidLegacyDate=null;
-  _kidDateTouched=true;
+  _commitBdayTarget();
   updateKidDateBtn();
   closeKidDatePicker();
 }
 function openAddKidModal(){
   if(_famEditId==null)return;
   _kidEditId=null;
+  _bdayTarget='kid';
   _kidPickedDate=null;
   _kidLegacyDate=null;
   _kidDateTouched=false;
@@ -2553,6 +2595,7 @@ function openEditKidModal(kidId){
   const f=families.find(x=>x.id===_famEditId);if(!f)return;
   const k=(f.kids||[]).find(x=>x.id===kidId);if(!k)return;
   _kidEditId=kidId;
+  _bdayTarget='kid';
   _kidDateTouched=false;
   if(k.hebDay&&k.hebMonth&&k.hebYear){_kidPickedDate={hebYear:k.hebYear,hebMonth:k.hebMonth,hebDay:k.hebDay};_kidLegacyDate=null;}
   else if(k.hebDay&&k.hebMonth){_kidPickedDate=null;_kidLegacyDate={hebMonth:k.hebMonth,hebDay:k.hebDay};}
@@ -2613,6 +2656,16 @@ function saveFamEdit(){
   localStorage.setItem('verifiedEmails',JSON.stringify([...verified]));
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
+  if(_p1BdayTouched){
+    if(_p1BdayDraft)f.parent1Bday={...(_p1BdayDraft)};
+    else if(_p1BdayLegacy)f.parent1Bday={hebMonth:_p1BdayLegacy.hebMonth,hebDay:_p1BdayLegacy.hebDay,hebYear:null};
+    else delete f.parent1Bday;
+  }
+  if(_p2BdayTouched){
+    if(_p2BdayDraft)f.parent2Bday={...(_p2BdayDraft)};
+    else if(_p2BdayLegacy)f.parent2Bday={hebMonth:_p2BdayLegacy.hebMonth,hebDay:_p2BdayLegacy.hebDay,hebYear:null};
+    else delete f.parent2Bday;
+  }
   closeFamEditSheet();
   save();render();
 }
