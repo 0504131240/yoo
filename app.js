@@ -646,7 +646,7 @@ function showSyncStatus(msg,hideAfter){
 
 function render(){
   applyEditMode();
-  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome,renderClaimsBanner,renderVisitLog,renderNotifCenterBadge];
+  const fns=[renderHome,renderMetrics,renderOpenList,renderArchive,renderFamilies,renderFund,renderGoalFunds,renderFamilyHome,renderClaimsBanner,renderVisitLog,renderNotifCenterBadge,renderPollBanner];
   fns.forEach(fn=>{try{fn();}catch(e){console.error(fn.name,e);}});
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
@@ -1232,6 +1232,17 @@ function renderBdayList(){
 function _myFamId(){
   const id=localStorage.getItem('deviceFamId3');
   return id?parseInt(id):null;
+}
+function renderPollBanner(){
+  const btn=document.getElementById('pollBannerBtn');if(!btn)return;
+  const openPolls=polls.filter(p=>!p.closed);
+  if(!openPolls.length){btn.style.display='none';return;}
+  const fid=_myFamId();
+  const poll=openPolls.find(p=>fid==null||p.votes[String(fid)]==null)||openPolls[0];
+  const voted=fid!=null&&poll.votes[String(fid)]!=null;
+  const lbl=document.getElementById('pollBannerLbl');
+  if(lbl)lbl.textContent=voted?'תוצאות הסקר (בינתיים)':'סקר ממתין למילוי';
+  btn.style.display='flex';
 }
 function openPollSheet(){
   const s=document.getElementById('pollSheet');if(!s)return;

@@ -48,8 +48,8 @@
       <button class="fh-pill-btn" style="background:linear-gradient(135deg,#43E97B,#0ABDE3);box-shadow:0 4px 22px rgba(67,233,123,0.35)" onclick="switchShell('pay')">
         <span class="fh-pill-ico">💰</span>תשלומים
       </button>
-      <button class="fh-pill-btn" style="background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:0 4px 22px rgba(124,58,237,0.35)" onclick="openPollSheet()">
-        <span class="fh-pill-ico">🗳</span>סקרים
+      <button class="fh-pill-btn" id="pollBannerBtn" style="display:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:0 4px 22px rgba(124,58,237,0.35)" onclick="openPollSheet()">
+        <span class="fh-pill-ico">🗳</span><span id="pollBannerLbl">סקר ממתין למילוי</span>
       </button>
     </div>
     <!-- Family calendar card — below on mobile, right on desktop -->
@@ -70,9 +70,10 @@
       </div>
       <div class="fh-cal-grid" id="calGrid"></div>
       <div class="fh-cal-evlist" id="calEvList"></div>
-      <div style="padding:0 14px 14px;display:flex;gap:8px">
-        <button onclick="openCalModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
-        <button onclick="openBdayModal()" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed #e040fb;background:transparent;color:#e040fb;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
+      <div style="padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="openCalModal()" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
+        <button onclick="openBdayModal()" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #e040fb;background:transparent;color:#e040fb;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🎂 יום הולדת</button>
+        <button onclick="openNewPollModal()" class="edit-only" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #7C3AED;background:transparent;color:#7C3AED;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🗳 צור סקר</button>
       </div>
     </div>
   </div>
