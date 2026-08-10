@@ -373,10 +373,10 @@ function sendSettledEmail(ev,famId){
   const cost=evCost(ev);
   const shares=evShares(ev);
   const share=Math.round(shares[famId]||0);
-  const spent=Math.round(ev.expenses?(ev.expenses[famId]||0):(ev.expenseItems||[]).filter(it=>it.famId===famId).reduce((s,it)=>s+it.amt,0));
+  const spent=Math.round(ev.expenses?(ev.expenses[famId]||0):(ev.expenseItems||[]).filter(it=>Number(it.famId)===Number(famId)).reduce((s,it)=>s+it.amt,0));
   const lines=[];
   const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
-  const _potTotal=Math.round((ev.potPayments||[]).filter(p=>p.famId===famId).reduce((s,p)=>s+p.amt,0));
+  const _potTotal=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(famId)).reduce((s,p)=>s+p.amt,0));
   const _fromFundToPot=Math.round((fund.transactions||[])
     .filter(t=>Number(t.famId)===Number(famId)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
     .reduce((s,t)=>s+t.amount,0));
@@ -3073,12 +3073,12 @@ function _sendCloseEvEmailOne(ev,fid){
   const shares=evShares(ev);
   const share=Math.round(shares[fid]||0);
   const name=f.name.replace('משפחת','').trim();
-  const myItems=(ev.expenseItems||[]).filter(it=>it.famId===fid);
+  const myItems=(ev.expenseItems||[]).filter(it=>Number(it.famId)===Number(fid));
   const mySpent=Math.round(myItems.reduce((s,it)=>s+it.amt,0));
   const settleLines=[];
   if(mySpent>0) settleLines.push(`הוצאות שלך באירוע: ₪${mySpent.toLocaleString()}`);
-  const _myPotPend=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0));
-  const _myPotDist=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
+  const _myPotPend=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
+  const _myPotDist=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.fromFid)===Number(fid)).reduce((s,t)=>s+t.amt,0));
   const _excessToFund=Math.round((fund.transactions||[]).filter(t=>t.famId===fid&&t.type==='deposit'&&(t.desc||'').includes('החזר עודף מקופת האירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name))).reduce((s,t)=>s+t.amount,0));
   const _myTotalPot=_myPotPend+_myPotDist+_excessToFund;
   const _fromFundToPot=Math.round((fund.transactions||[])
@@ -3095,7 +3095,7 @@ function _sendCloseEvEmailOne(ev,fid){
   } else if(_fromFundToPot>0.5){
     settleLines.push(`העברת מהקופה הראשית ₪${_fromFundToPot.toLocaleString()} לתשלום האירוע`);
   }
-  const _myPotRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&s.toFid===fid).reduce((s,t)=>s+t.amt,0));
+  const _myPotRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.toFid)===Number(fid)).reduce((s,t)=>s+t.amt,0));
   const _toFundFromPot=Math.round((fund.transactions||[])
     .filter(t=>Number(t.famId)===Number(fid)&&t.type==='deposit'&&(t.desc||'').includes('מקופת אירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
     .reduce((s,t)=>s+t.amount,0));
@@ -3236,7 +3236,7 @@ function sendEmailToFam(evId,fid){
     const share=Math.round(shares[fid]||0);
     const spent=Math.round(ev.expenses[fid]||0);
     const owe=Math.round(Math.abs(b));
-    const potDep=Math.round((ev.potPayments||[]).filter(p=>p.famId===fid).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&s.fromFid===fid).reduce((s,t)=>s+t.amt,0));
+    const potDep=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0)+(ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.fromFid)===Number(fid)).reduce((s,t)=>s+t.amt,0));
     const _fromFundToPot1=potDep>0.5?Math.round((fund.transactions||[]).filter(t=>Number(t.famId)===Number(fid)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name))).reduce((s,t)=>s+t.amount,0)):0;
     const _potIsFromFund1=_fromFundToPot1>0.5&&Math.abs(_fromFundToPot1-potDep)<1;
     const msgPot=potDep>0.5?(_potIsFromFund1?`\nהעברת מהקופה הראשית ₪${potDep.toLocaleString()} לקופת האירוע`:`\nהפקדת לקופת האירוע: ₪${potDep.toLocaleString()}`):'';
@@ -4609,7 +4609,7 @@ function doDepositToCumPot(){
   // If deposit settles the family's balance, skip deposit email — the close email covers it
   const _isSettled=_potEv&&(evAdjBalance(_potEv)[savedFamId]||0)>=-0.5;
   if(!fromFund&&!_isSettled&&_potEv&&_potF&&(_potF.email||_potF.email2)){
-    const _potTotal=(_potEv.potPayments||[]).filter(p=>p.famId===savedFamId).reduce((s,p)=>s+p.amt,0);
+    const _potTotal=(_potEv.potPayments||[]).filter(p=>Number(p.famId)===Number(savedFamId)).reduce((s,p)=>s+p.amt,0);
     const _potShare=Math.round(evShares(_potEv)[savedFamId]||0);
     const _potMsg=`הפקדה של ₪${roundAmt.toLocaleString()} לקופת האירוע "${_potEv.name}" נרשמה.\n\nסה"כ הפקדות שלך לקופה זו: ₪${_potTotal.toLocaleString()}\n\n💓 נכון להיום, החלק שלך לפי ההוצאות הנוכחיות: ₪${_potShare.toLocaleString()}`;
     const _potBody=_eCard([['הפקדה',`<span style="color:#1E88D8;font-weight:700">₪${roundAmt.toLocaleString()}</span>`,false],['סה"כ הפקדות שלך',`₪${_potTotal.toLocaleString()}`,true]])+`<p style="text-align:center;margin:4px 0 0;font-size:14px;color:#555">💓 נכון להיום, החלק שלך לפי ההוצאות הנוכחיות: <strong>₪${_potShare.toLocaleString()}</strong></p>`;
