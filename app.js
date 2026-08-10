@@ -3167,6 +3167,7 @@ function _sendCloseEvEmailOne(ev,fid){
     }
   });
   const fundBal=Math.round(fund.famBalances[String(fid)]||0);
+  const _savingsPerFam=evSavingsPerFam(ev);
   let msg=`האירוע "${ev.name}" הסתיים!\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${_savingsPerFam>0?`\n💎 לקופת חיסכון: ₪${_savingsPerFam.toLocaleString()}`:''}
 `;
   if(mySpent>0){
@@ -3176,7 +3177,6 @@ function _sendCloseEvEmailOne(ev,fid){
   if(settleLines.length) msg+=`\n\nאיך סודר:\n${settleLines.map(l=>'• '+l).join('\n')}`;
   if(fundBal>0) msg+=`\n\nיתרתך בארנק: ₪${fundBal.toLocaleString()}`;
   msg+=`\n\n✅ החשבון שלך מסודר.`;
-  const _savingsPerFam=evSavingsPerFam(ev);
   const _cRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
   if(_savingsPerFam>0) _cRows.push(['💎 לקופת חיסכון',`₪${_savingsPerFam.toLocaleString()}`]);
   if(fundBal>0) _cRows.push(['💰 יתרה בארנק',`₪${fundBal.toLocaleString()}`]);
@@ -3198,52 +3198,44 @@ function _sendCloseEvEmailOne(ev,fid){
   const allItems=ev.expenseItems||[];
   if(!_isPerFam&&(allItems.length||(ev.potExpItems||[]).length)){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 פירוט כל ההוצאות:</p>`;
-    const itemsByFam={};
-    ev.participants.forEach(fid2=>{itemsByFam[fid2]=[];});
-    allItems.forEach(it=>{Object.keys(itemPayers(it)).forEach(fidStr=>{const nfid=parseInt(fidStr);if(itemsByFam[nfid])itemsByFam[nfid].push(it);});});
     const _itemShare=(it,rfid)=>Math.round(itemShareFor(ev,it,rfid));
-    let itemRows='';
-    ev.participants.forEach(fid2=>{
-      const its=itemsByFam[fid2];if(!its||!its.length)return;
-      const isMine=fid2===fid;
-      const visibleIts=isMine?its:its.filter(it=>_itemShare(it,fid)>0);
-      if(!visibleIts.length)return;
-      const pf=getFam(fid2);
-      const pname=pf?pf.name.replace('משפחת','').trim():'?';
-      visibleIts.forEach(it=>{
-        const myShare=_itemShare(it,fid);
-        const paidAmt=itemPayerAmt(it,fid2);
-        itemRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}">
-          <td style="padding:5px 6px">${_esc(it.name)}</td>
-          <td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pname)}</td>
-          <td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${paidAmt.toLocaleString()}</td>
-          <td style="padding:5px 6px;font-weight:700;color:#D97706">${myShare?'₪'+myShare.toLocaleString():'—'}</td>
-        </tr>`;
-      });
-      if(visibleIts.length>1){
-        const _totAmt=visibleIts.reduce((s,it)=>s+itemPayerAmt(it,fid2),0);
-        const _totShare=visibleIts.reduce((s,it)=>s+_itemShare(it,fid),0);
-        itemRows+=`<tr style="border-bottom:2px solid #BFDBFE${isMine?';background:#FEF9C3':''}">
-          <td colspan="2" style="padding:3px 6px;font-size:11px;color:#888;text-align:left">סה"כ ${_esc(pname)}</td>
-          <td style="padding:3px 6px;font-size:11px;font-weight:700;${isMine?'color:#D97706':'color:#555'}">₪${_totAmt.toLocaleString()}</td>
-          <td style="padding:3px 6px;font-size:11px;font-weight:700;color:#D97706">₪${_totShare.toLocaleString()}</td>
-        </tr>`;
-      }
+    // Group same-named items into one row (e.g. several separate "כרטיסים" purchases),
+    // summing amounts/shares instead of listing each purchase as its own row.
+    const _iGroups={};
+    allItems.forEach(it=>{
+      const myShare=_itemShare(it,fid);
+      const isMine=itemPayerAmt(it,fid)>0;
+      if(!isMine&&myShare<=0)return;
+      const g=_iGroups[it.name]||(_iGroups[it.name]={amt:0,share:0,payers:new Set(),isMine:false});
+      g.amt+=it.amt;g.share+=myShare;g.isMine=g.isMine||isMine;
+      itemPayerNames(it).forEach(n=>g.payers.add(n));
     });
+    let itemRows=Object.entries(_iGroups).map(([name,g])=>{
+      const payerLbl=g.payers.size>2?`${g.payers.size} משפחות`:[...g.payers].join(' + ');
+      return`<tr style="border-bottom:1px solid #f0f0f6${g.isMine?';background:#FEFCE8':''}">
+        <td style="padding:5px 6px">${_esc(name)}</td>
+        <td style="padding:5px 6px;font-size:11px;color:#666">${_esc(payerLbl)}</td>
+        <td style="padding:5px 6px;font-weight:600;${g.isMine?'color:#D97706':''}">₪${g.amt.toLocaleString()}</td>
+        <td style="padding:5px 6px;font-weight:700;color:#D97706">${g.share?'₪'+g.share.toLocaleString():'—'}</td>
+      </tr>`;
+    }).join('');
     const _potExpItems=ev.potExpItems||[];
     if(_potExpItems.length){
       const _pMethod=ev.splitMethod||'equal';
       let _pTotalW=0; const _pW={};
       ev.participants.forEach(p=>{ _pW[p]=famWeight(getFam(p),_pMethod,ev.childOverrides?.[p]); _pTotalW+=_pW[p]; });
+      const _pGroups={};
       _potExpItems.forEach(it=>{
         const myShare=_pTotalW>0?Math.round(it.amt*(_pW[fid]||0)/_pTotalW):0;
-        itemRows+=`<tr style="border-bottom:1px solid #EDE9FE;background:#F5F3FF">
-          <td style="padding:5px 6px">${_esc(it.name)}</td>
-          <td style="padding:5px 6px;font-size:11px;color:#7C3AED">קופת האירוע</td>
-          <td style="padding:5px 6px;font-weight:600;color:#7C3AED">₪${it.amt.toLocaleString()}</td>
-          <td style="padding:5px 6px;font-weight:700;color:#6D28D9">₪${myShare.toLocaleString()}</td>
-        </tr>`;
+        const g=_pGroups[it.name]||(_pGroups[it.name]={amt:0,share:0});
+        g.amt+=it.amt;g.share+=myShare;
       });
+      itemRows+=Object.entries(_pGroups).map(([name,g])=>`<tr style="border-bottom:1px solid #EDE9FE;background:#F5F3FF">
+        <td style="padding:5px 6px">${_esc(name)}</td>
+        <td style="padding:5px 6px;font-size:11px;color:#7C3AED">קופת האירוע</td>
+        <td style="padding:5px 6px;font-weight:600;color:#7C3AED">₪${g.amt.toLocaleString()}</td>
+        <td style="padding:5px 6px;font-weight:700;color:#6D28D9">₪${g.share.toLocaleString()}</td>
+      </tr>`).join('');
     }
     bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#E0F2FE"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">סכום</th><th style="padding:6px;text-align:right;color:#D97706;font-weight:700;border-bottom:2px solid #7DD3FC">החלק שלך</th></tr>${itemRows}</table>`;
     if(mySpent>0) bodyHtml+=`<p style="font-size:11px;color:#888;margin:0 0 12px;text-align:center">שורות בסגול = הוצאות שלך</p>`;
@@ -3290,20 +3282,27 @@ function sendEmailToFam(evId,fid){
     const _rPotExpItems=ev.potExpItems||[];
     if(_rAllItems.length||_rPotExpItems.length){
       bodyHtml+=`<p style="font-weight:700;margin:12px 0 8px;color:#333">💳 פירוט הוצאות:</p>`;
-      const _rByFam={};ev.participants.forEach(f2=>{_rByFam[f2]=[];});
-      _rAllItems.forEach(it=>{Object.keys(itemPayers(it)).forEach(fidStr=>{const nfid=parseInt(fidStr);if(_rByFam[nfid])_rByFam[nfid].push(it);});});
       const _rM=ev.splitMethod||'equal';let _rTW=0;const _rW={};
       ev.participants.forEach(p=>{_rW[p]=famWeight(getFam(p),_rM,ev.childOverrides?.[p]);_rTW+=_rW[p];});
       const _rShare=(it,rfid)=>Math.round(itemShareFor(ev,it,rfid));
-      let _rRows='';
-      ev.participants.forEach(f2=>{
-        const its=_rByFam[f2];if(!its||!its.length)return;
-        const isMine=f2===fid;
-        const vis=isMine?its:its.filter(it=>_rShare(it,fid)>0);if(!vis.length)return;
-        const pf=getFam(f2);const pn=pf?pf.name.replace('משפחת','').trim():'?';
-        vis.forEach(it=>{const ms=_rShare(it,fid);const pa=itemPayerAmt(it,f2);_rRows+=`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#666">${_esc(pn)}</td><td style="padding:5px 6px;font-weight:600;${isMine?'color:#D97706':''}">₪${pa.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#D97706">${ms?'₪'+ms.toLocaleString():'—'}</td></tr>`;});
+      // Group same-named items into one row (e.g. several separate "כרטיסים" purchases),
+      // summing amounts/shares instead of listing each purchase as its own row.
+      const _rGroups={};
+      _rAllItems.forEach(it=>{
+        const ms=_rShare(it,fid);
+        const isMine=itemPayerAmt(it,fid)>0;
+        if(!isMine&&ms<=0)return;
+        const g=_rGroups[it.name]||(_rGroups[it.name]={amt:0,share:0,payers:new Set(),isMine:false});
+        g.amt+=it.amt;g.share+=ms;g.isMine=g.isMine||isMine;
+        itemPayerNames(it).forEach(n=>g.payers.add(n));
       });
-      _rPotExpItems.forEach(it=>{const ms=_rTW>0?Math.round(it.amt*(_rW[fid]||0)/_rTW):0;_rRows+=`<tr style="border-bottom:1px solid #EDE9FE;background:#F5F3FF"><td style="padding:5px 6px">${_esc(it.name)}</td><td style="padding:5px 6px;font-size:11px;color:#7C3AED">קופת האירוע</td><td style="padding:5px 6px;font-weight:600;color:#7C3AED">₪${it.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#6D28D9">₪${ms.toLocaleString()}</td></tr>`;});
+      let _rRows=Object.entries(_rGroups).map(([name,g])=>{
+        const payerLbl=g.payers.size>2?`${g.payers.size} משפחות`:[...g.payers].join(' + ');
+        return`<tr style="border-bottom:1px solid #f0f0f6${g.isMine?';background:#FEFCE8':''}"><td style="padding:5px 6px">${_esc(name)}</td><td style="padding:5px 6px;font-size:11px;color:#666">${_esc(payerLbl)}</td><td style="padding:5px 6px;font-weight:600;${g.isMine?'color:#D97706':''}">₪${g.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#D97706">${g.share?'₪'+g.share.toLocaleString():'—'}</td></tr>`;
+      }).join('');
+      const _rPotGroups={};
+      _rPotExpItems.forEach(it=>{const ms=_rTW>0?Math.round(it.amt*(_rW[fid]||0)/_rTW):0;const g=_rPotGroups[it.name]||(_rPotGroups[it.name]={amt:0,share:0});g.amt+=it.amt;g.share+=ms;});
+      _rRows+=Object.entries(_rPotGroups).map(([name,g])=>`<tr style="border-bottom:1px solid #EDE9FE;background:#F5F3FF"><td style="padding:5px 6px">${_esc(name)}</td><td style="padding:5px 6px;font-size:11px;color:#7C3AED">קופת האירוע</td><td style="padding:5px 6px;font-weight:600;color:#7C3AED">₪${g.amt.toLocaleString()}</td><td style="padding:5px 6px;font-weight:700;color:#6D28D9">₪${g.share.toLocaleString()}</td></tr>`).join('');
       if(_rRows) bodyHtml+=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><tr style="background:#E0F2FE"><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">פריט</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">שילם</th><th style="padding:6px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">סכום</th><th style="padding:6px;text-align:right;color:#D97706;font-weight:700;border-bottom:2px solid #7DD3FC">החלק שלך</th></tr>${_rRows}</table>`;
     }
     bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרת חוב ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
