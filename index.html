@@ -426,38 +426,9 @@
               style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
           </div>
 
-          <div style="margin-bottom:14px;padding-top:14px;border-top:1px solid var(--border)">
-            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">📧 מייל ראשי</div>
-            <input type="text" id="famEditEmailName" placeholder="שם הנמען (למשל: יוסי)"
-              style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:6px;box-sizing:border-box">
-            <div style="display:flex;align-items:center;gap:6px">
-              <input type="email" id="famEditEmail" placeholder="כתובת מייל"
-                autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false"
-                style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:right">
-              <button type="button" id="testBtn1" onclick="testSingleEmail('famEditEmail','testBtn1')" style="flex-shrink:0;padding:8px 10px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-family:var(--font);cursor:pointer;color:var(--text2)">בדוק</button>
-            </div>
-            <button type="button" id="parent1DateBtn" onclick="openParentBdayPicker('p1')" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text2);margin-top:6px;box-sizing:border-box;cursor:pointer;text-align:center">📅 הוסף תאריך לידה</button>
-          </div>
-
-          <div style="margin-bottom:18px;padding-top:14px;border-top:1px solid var(--border)">
-            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">📧 מייל נוסף (אופציונלי)</div>
-            <input type="text" id="famEditEmailName2" placeholder="שם הנמען (למשל: שרה)"
-              style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:6px;box-sizing:border-box">
-            <div style="display:flex;align-items:center;gap:6px">
-              <input type="email" id="famEditEmail2" placeholder="כתובת מייל"
-                autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false"
-                style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:right">
-              <button type="button" id="testBtn2" onclick="testSingleEmail('famEditEmail2','testBtn2')" style="flex-shrink:0;padding:8px 10px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-family:var(--font);cursor:pointer;color:var(--text2)">בדוק</button>
-            </div>
-            <button type="button" id="parent2DateBtn" onclick="openParentBdayPicker('p2')" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text2);margin-top:6px;box-sizing:border-box;cursor:pointer;text-align:center">📅 הוסף תאריך לידה</button>
-          </div>
-
           <div style="padding-top:14px;border-top:1px solid var(--border)">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px">👶 ילדים</span>
-              <button type="button" onclick="openAddKidModal()" style="padding:5px 10px;border-radius:20px;border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">+ הוסף ילד</button>
-            </div>
-            <div id="famEditKidsList"></div>
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px">בני המשפחה</div>
+            <div id="famPeopleGrid"></div>
           </div>
 
         </div>
@@ -472,22 +443,31 @@
     </div>
   </div>
 
-  <!-- Add/edit kid modal -->
-  <div id="kidModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1300;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeKidModal()">
+  <!-- Person modal (parent or kid) -->
+  <div id="personModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1300;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closePersonModal()">
     <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:100%;max-width:340px;box-sizing:border-box">
-      <div style="font-size:15px;font-weight:700;margin-bottom:16px" id="kidModalTitle">👶 הוסף ילד</div>
-      <input type="text" id="kidName" placeholder="שם הילד/ה"
+      <div style="font-size:15px;font-weight:700;margin-bottom:16px" id="personModalTitle">👶 הוסף ילד</div>
+      <input type="text" id="personName" placeholder="שם פרטי"
         style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
-      <div style="display:flex;gap:6px;margin-bottom:14px">
-        <button type="button" id="kidGenderBoy" onclick="setKidGender('boy')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">👦 בן</button>
-        <button type="button" id="kidGenderGirl" onclick="setKidGender('girl')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">👧 בת</button>
+      <div id="personEmailWrap" style="display:none;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="email" id="personEmail" placeholder="כתובת מייל"
+            autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false"
+            style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:right">
+          <button type="button" id="personTestBtn" onclick="testSingleEmail('personEmail','personTestBtn')" style="flex-shrink:0;padding:8px 10px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-family:var(--font);cursor:pointer;color:var(--text2)">בדוק</button>
+        </div>
+      </div>
+      <div id="personGenderWrap" style="display:none;gap:6px;margin-bottom:14px">
+        <button type="button" id="personGenderBoy" onclick="setKidGender('boy')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">👦 בן</button>
+        <button type="button" id="personGenderGirl" onclick="setKidGender('girl')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">👧 בת</button>
       </div>
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">תאריך לידה עברי (אופציונלי)</div>
-      <button type="button" id="kidDateBtn" onclick="openKidDatePicker()" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:18px;box-sizing:border-box;cursor:pointer;text-align:center">📅 בחר תאריך לידה</button>
-      <div style="display:flex;gap:8px">
-        <button onclick="saveKid()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור</button>
-        <button onclick="closeKidModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+      <button type="button" id="personDateBtn" onclick="openKidDatePicker()" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:18px;box-sizing:border-box;cursor:pointer;text-align:center">📅 בחר תאריך לידה</button>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button onclick="savePerson()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור</button>
+        <button onclick="closePersonModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
       </div>
+      <button type="button" id="personDeleteBtn" onclick="deletePerson()" style="display:none;width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--red-bg);background:var(--red-bg);color:var(--red-mid);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;box-sizing:border-box">🗑 מחק</button>
     </div>
   </div>
 
