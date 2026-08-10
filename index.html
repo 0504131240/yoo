@@ -227,7 +227,7 @@
         <button type="button" class="action-btn" style="width:100%;box-sizing:border-box" onclick="openFamPicker()">👥 <span id="famPickSummary">מי משתתף</span></button>
         <div class="err-txt" id="e-fams">נא לבחור לפחות משפחה אחת</div>
       </div>
-      <div class="field">
+      <div class="field" id="splitMethodField">
         <label>חלוקת ההוצאה</label>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button type="button" class="split-btn" id="splitEqual" onclick="setSplitMethod('equal')">שווה לכל משפחה</button>
@@ -247,7 +247,7 @@
           <button id="modeCumulative" onclick="setExpMode('cumulative')" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">מצטבר</button>
         </div>
         <!-- Cumulative mode notice -->
-        <div id="cumulativeModeDiv" style="display:none;text-align:center;font-size:13px;color:var(--text2);padding:10px 0;background:var(--blue-bg);border-radius:var(--r2)">הוצאות יוזנו ישירות באירוע לאחר יצירתו</div>
+        <div id="cumulativeModeDiv" style="display:none;text-align:center;font-size:13px;color:var(--text2);padding:10px 0;background:var(--blue-bg);border-radius:var(--r2)">הוצאות יוזנו ישירות באירוע לאחר יצירתו — לכל הוצאה תבחר בנפרד איך היא מתחלקת</div>
         <!-- Total mode -->
         <div id="totalModeDiv">
           <div style="display:flex;gap:6px">
@@ -660,9 +660,11 @@
     <div id="expItemSplitSection">
       <div class="field" style="margin-top:12px">
         <label class="field-lbl">חלוקת הסכום</label>
-        <div style="display:flex;gap:6px;margin-top:6px">
-          <button type="button" id="expSplitEqualBtn" onclick="setExpItemSplitMode('equal')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">שווה</button>
-          <button type="button" id="expSplitCustomBtn" onclick="setExpItemSplitMode('custom')" style="flex:1;padding:8px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ידנית לכל משפחה</button>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <button type="button" id="expSplitEqualBtn" onclick="setExpItemMethod('equal')" style="flex:1;min-width:64px;padding:8px 6px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">שווה</button>
+          <button type="button" id="expSplitPercapitaBtn" onclick="setExpItemMethod('percapita')" style="flex:1;min-width:64px;padding:8px 6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">לפי נפשות</button>
+          <button type="button" id="expSplitWeightedBtn" onclick="setExpItemMethod('weighted')" style="flex:1;min-width:64px;padding:8px 6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">ילד = 50%</button>
+          <button type="button" id="expSplitCustomBtn" onclick="setExpItemSplitMode('custom')" style="flex:1;min-width:90px;padding:8px 6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">ידנית לכל משפחה</button>
         </div>
       </div>
     </div>

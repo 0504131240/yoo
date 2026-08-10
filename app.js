@@ -10,7 +10,7 @@ let nxtId=1,nxtFam=1,actYear='all',expanded=new Set();
 let collapsedEvents=new Set(),expandedArchGoals=new Set();
 let expandedCumFamilies=new Set();
 let expandedPotFamilies=new Set();
-let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null,addExpItemFromPot=false,addExpItemPayMode='single';
+let addExpItemEvId=null,addExpItemFamId=null,addExpItemSharedWith=null,addExpItemSplitMode='equal',_editExpItemId=null,addExpItemFromPot=false,addExpItemPayMode='single',addExpItemMethod='equal';
 const expandedExpItems=new Set();
 const expandedFamShares=new Set();
 let cumPotEvId=null,cumPotFamId=null;
@@ -68,29 +68,45 @@ const famWeight=(f,method,childOverride,parentOverride)=>{
   return 1;
 };
 const evSavingsPerFam=ev=>ev.savingsTotal?Math.round(ev.savingsTotal/((ev.participants||[]).length||1)):0;
+// Exact (unrounded) share of one expense item that a single family owes — respects
+// the item's own splitMethod override, falling back to plain-equal for an explicit
+// partial sharedWith subset, else the event's overall default method.
+const itemShareFor=(ev,it,fid)=>{
+  if(it.customSplit)return it.customSplit[String(fid)]||0;
+  const isPartialSubset=it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length;
+  const sw=isPartialSubset?it.sharedWith.filter(p=>ev.participants.includes(p)):ev.participants;
+  if(!sw.includes(fid))return 0;
+  const method=it.splitMethod!=null?it.splitMethod:(isPartialSubset?'equal':(ev.splitMethod||'equal'));
+  let itemW=0;const iw={};
+  sw.forEach(p=>{ iw[p]=famWeight(getFam(p),method,ev.childOverrides?.[p],ev.parentOverrides?.[p]); itemW+=iw[p]; });
+  return itemW?it.amt*(iw[fid]/itemW):0;
+};
 const evShares=ev=>{
-  const method=ev.splitMethod||'equal';
+  const defMethod=ev.splitMethod||'equal';
   const totalCost=evCost(ev);
-  const partialItems=(ev.expenseItems||[]).filter(it=>
-    it.customSplit||
-    (it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length)
-  );
-  const partialAmt=partialItems.reduce((s,it)=>s+it.amt,0);
-  const globalCost=totalCost-partialAmt;
-  let totalW=0; const w={};
-  ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),method,ev.childOverrides?.[fid],ev.parentOverrides?.[fid]); totalW+=w[fid]; });
-  if(!totalW) return Object.fromEntries(ev.participants.map(fid=>[fid,0]));
+  const items=ev.expenseItems||[];
   const exact={};
-  ev.participants.forEach(fid=>{ exact[fid]=globalCost*(w[fid]/totalW); });
-  partialItems.forEach(it=>{
-    if(it.customSplit){
-      Object.entries(it.customSplit).forEach(([fid,a])=>{const nfid=parseInt(fid);if(ev.participants.includes(nfid))exact[nfid]=(exact[nfid]||0)+a;});
-    }else{
-      const sw=it.sharedWith.filter(fid=>ev.participants.includes(fid));
-      if(!sw.length)return;
-      sw.forEach(fid=>{ exact[fid]=(exact[fid]||0)+it.amt/sw.length; });
-    }
+  ev.participants.forEach(fid=>{ exact[fid]=0; });
+  let itemsTotal=0;
+  // Each item is split on its own — using its own splitMethod if it has one (the
+  // per-expense override), else falling back to a subset-shared item's implicit
+  // equal split, else the event's overall default method. This lets different
+  // items in the same event use different split methods.
+  items.forEach(it=>{
+    itemsTotal+=it.amt;
+    ev.participants.forEach(fid=>{
+      const s=itemShareFor(ev,it,fid);
+      if(s)exact[fid]=(exact[fid]||0)+s;
+    });
   });
+  // Cost not accounted for by any expense item (e.g. a flat totalCost, or pot-funded
+  // expenses) falls back to the event's overall default method across everyone.
+  const remainder0=totalCost-itemsTotal;
+  if(Math.abs(remainder0)>0.0001){
+    let totalW=0; const w={};
+    ev.participants.forEach(fid=>{ w[fid]=famWeight(getFam(fid),defMethod,ev.childOverrides?.[fid],ev.parentOverrides?.[fid]); totalW+=w[fid]; });
+    if(totalW) ev.participants.forEach(fid=>{ exact[fid]=(exact[fid]||0)+remainder0*(w[fid]/totalW); });
+  }
   const floors={};
   ev.participants.forEach(fid=>{ floors[fid]=Math.floor(exact[fid]||0); });
   let remainder=Math.round(totalCost-ev.participants.reduce((s,fid)=>s+floors[fid],0));
@@ -2773,6 +2789,10 @@ function setExpMode(mode){
   document.getElementById('totalModeDiv').style.display=isTotal?'block':'none';
   document.getElementById('customModeDiv').style.display=(!isTotal&&!isCumulative)?'block':'none';
   document.getElementById('cumulativeModeDiv').style.display=isCumulative?'block':'none';
+  // Cumulative events decide the split per expense item instead of once for the whole event.
+  const smField=document.getElementById('splitMethodField');
+  if(smField)smField.style.display=isCumulative?'none':'block';
+  if(isCumulative)setSplitMethod('equal');
   ['modeTotal','modeCustom','modeCumulative'].forEach(btnId=>{
     const btn=document.getElementById(btnId);if(!btn)return;
     const active=(btnId==='modeTotal'&&isTotal)||(btnId==='modeCustom'&&mode==='custom')||(btnId==='modeCumulative'&&isCumulative);
@@ -3161,7 +3181,8 @@ function _sendCloseEvEmailOne(ev,fid){
       return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:7px 10px${isMine?';font-weight:700':''}">${pname}</td><td style="padding:7px 10px;font-weight:700;text-align:left${isMine?';color:#D97706':''}">₪${amt.toLocaleString()}</td></tr>`;
     }).join('');
     if(_famExpRows)bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 הוצאות לפי משפחה:</p><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">משפחה</th><th style="padding:8px 10px;text-align:left;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">הוצאה</th></tr>${_famExpRows}</table>`;
-  } else {
+  } else if(!ev.cumulative){
+    // Cumulative events split per-item, so a single global method badge isn't accurate here
     bodyHtml+=_splitMethodBlock(ev,fid);
   }
   const allItems=ev.expenseItems||[];
@@ -3170,17 +3191,7 @@ function _sendCloseEvEmailOne(ev,fid){
     const itemsByFam={};
     ev.participants.forEach(fid2=>{itemsByFam[fid2]=[];});
     allItems.forEach(it=>{Object.keys(itemPayers(it)).forEach(fidStr=>{const nfid=parseInt(fidStr);if(itemsByFam[nfid])itemsByFam[nfid].push(it);});});
-    const _em=ev.splitMethod||'equal';
-    let _eTotalW=0;const _eW={};
-    ev.participants.forEach(p=>{_eW[p]=famWeight(getFam(p),_em,ev.childOverrides?.[p]);_eTotalW+=_eW[p];});
-    const _itemShare=(it,rfid)=>{
-      if(it.customSplit)return it.customSplit[String(rfid)]||0;
-      const sw=it.sharedWith?it.sharedWith.filter(p=>ev.participants.includes(p)):ev.participants;
-      if(!sw.includes(rfid))return 0;
-      if(it.sharedWith)return Math.round(it.amt/sw.length);
-      const swW=sw.reduce((s,p)=>s+(_eW[p]||0),0);
-      return swW?Math.round(it.amt*(_eW[rfid]||0)/swW):0;
-    };
+    const _itemShare=(it,rfid)=>Math.round(itemShareFor(ev,it,rfid));
     let itemRows='';
     ev.participants.forEach(fid2=>{
       const its=itemsByFam[fid2];if(!its||!its.length)return;
@@ -3273,7 +3284,7 @@ function sendEmailToFam(evId,fid){
       _rAllItems.forEach(it=>{Object.keys(itemPayers(it)).forEach(fidStr=>{const nfid=parseInt(fidStr);if(_rByFam[nfid])_rByFam[nfid].push(it);});});
       const _rM=ev.splitMethod||'equal';let _rTW=0;const _rW={};
       ev.participants.forEach(p=>{_rW[p]=famWeight(getFam(p),_rM,ev.childOverrides?.[p]);_rTW+=_rW[p];});
-      const _rShare=(it,rfid)=>{if(it.customSplit)return it.customSplit[String(rfid)]||0;const sw=it.sharedWith?it.sharedWith.filter(p=>ev.participants.includes(p)):ev.participants;if(!sw.includes(rfid))return 0;if(it.sharedWith)return Math.round(it.amt/sw.length);const swW=sw.reduce((s,p)=>s+(_rW[p]||0),0);return swW?Math.round(it.amt*(_rW[rfid]||0)/swW):0;};
+      const _rShare=(it,rfid)=>Math.round(itemShareFor(ev,it,rfid));
       let _rRows='';
       ev.participants.forEach(f2=>{
         const its=_rByFam[f2];if(!its||!its.length)return;
@@ -4047,7 +4058,7 @@ function openAddExpItem(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   addExpItemEvId=evId; addExpItemFamId=null;
   addExpItemSharedWith=new Set(ev.participants);
-  addExpItemSplitMode='equal'; _editExpItemId=null; addExpItemFromPot=false;
+  addExpItemSplitMode='equal'; addExpItemMethod='equal'; _editExpItemId=null; addExpItemFromPot=false;
   const payMultiInps=document.getElementById('expItemPayMultiInputs');
   if(payMultiInps){
     payMultiInps.innerHTML=ev.participants.map(fid=>{
@@ -4092,7 +4103,7 @@ function openAddExpItem(evId){
       </div>`;
     }).join('');
   }
-  setExpItemSplitMode('equal');
+  setExpItemMethod('equal');
   _updateExpItemCustomTotal();
   document.getElementById('addExpItemOverlay').style.display='flex';
 }
@@ -4130,17 +4141,34 @@ function toggleExpFromPot(){
 }
 function closeAddExpItem(){
   document.getElementById('addExpItemOverlay').style.display='none';
-  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal'; addExpItemPayMode='single'; _editExpItemId=null; addExpItemFromPot=false;
+  addExpItemEvId=null; addExpItemFamId=null; addExpItemSplitMode='equal'; addExpItemMethod='equal'; addExpItemPayMode='single'; _editExpItemId=null; addExpItemFromPot=false;
 }
 function setExpItemSplitMode(mode){
   addExpItemSplitMode=mode;
   const isCustom=mode==='custom';
   document.getElementById('expItemSplitEqualDiv').style.display=isCustom?'none':'block';
   document.getElementById('expItemSplitCustomDiv').style.display=isCustom?'block':'none';
-  const b1=document.getElementById('expSplitEqualBtn');
-  const b2=document.getElementById('expSplitCustomBtn');
-  if(b1){b1.style.background=isCustom?'transparent':'var(--blue-mid)';b1.style.color=isCustom?'var(--text2)':'#fff';b1.style.borderColor=isCustom?'var(--border)':'var(--blue-mid)';}
-  if(b2){b2.style.background=isCustom?'var(--blue-mid)':'transparent';b2.style.color=isCustom?'#fff':'var(--text2)';b2.style.borderColor=isCustom?'var(--blue-mid)':'var(--border)';}
+  _refreshExpItemMethodBtns();
+}
+function setExpItemMethod(method){
+  addExpItemMethod=method;
+  addExpItemSplitMode='equal';
+  document.getElementById('expItemSplitEqualDiv').style.display='block';
+  document.getElementById('expItemSplitCustomDiv').style.display='none';
+  _refreshExpItemMethodBtns();
+}
+function _refreshExpItemMethodBtns(){
+  const isCustom=addExpItemSplitMode==='custom';
+  const ids={equal:'expSplitEqualBtn',percapita:'expSplitPercapitaBtn',weighted:'expSplitWeightedBtn'};
+  Object.entries(ids).forEach(([m,id])=>{
+    const b=document.getElementById(id);if(!b)return;
+    const active=!isCustom&&addExpItemMethod===m;
+    b.style.background=active?'var(--blue-mid)':'transparent';
+    b.style.color=active?'#fff':'var(--text2)';
+    b.style.borderColor=active?'var(--blue-mid)':'var(--border)';
+  });
+  const cb=document.getElementById('expSplitCustomBtn');
+  if(cb){cb.style.background=isCustom?'var(--blue-mid)':'transparent';cb.style.color=isCustom?'#fff':'var(--text2)';cb.style.borderColor=isCustom?'var(--blue-mid)':'var(--border)';}
 }
 function _updateExpItemCustomTotal(){
   const ev=events.find(e=>e.id===addExpItemEvId);if(!ev)return;
@@ -4211,7 +4239,7 @@ async function doAddExpItem(){
       const old=(ev.expenseItems||[]).find(it=>it.id===_editExpItemId);
       if(old){
         _uncreditItemPayers(ev,old);
-        old.name=name;old.amt=total;old.customSplit=customSplit;delete old.sharedWith;delete old.origAmt;delete old.origCur;
+        old.name=name;old.amt=total;old.customSplit=customSplit;delete old.sharedWith;delete old.origAmt;delete old.origCur;delete old.splitMethod;
         if(payers){old.payers=payers;delete old.famId;}else{old.famId=payFamId;delete old.payers;}
         _creditItemPayers(ev,old);
       }
@@ -4245,7 +4273,7 @@ async function doAddExpItem(){
     const old=(ev.expenseItems||[]).find(it=>it.id===_editExpItemId);
     if(old){
       _uncreditItemPayers(ev,old);
-      old.name=name;old.amt=amt;delete old.customSplit;
+      old.name=name;old.amt=amt;old.splitMethod=addExpItemMethod;delete old.customSplit;
       if(origCur!=='₪'){old.origAmt=rawAmt;old.origCur=origCur;}else{delete old.origAmt;delete old.origCur;}
       if(isPartial)old.sharedWith=sw;else delete old.sharedWith;
       if(payers){old.payers=payers;delete old.famId;}else{old.famId=payFamId;delete old.payers;}
@@ -4254,7 +4282,7 @@ async function doAddExpItem(){
   }else{
     if(!ev.expenseItems)ev.expenseItems=[];
     ev.expItemId=(ev.expItemId||0)+1;
-    const item={id:ev.expItemId,name,amt};
+    const item={id:ev.expItemId,name,amt,splitMethod:addExpItemMethod};
     if(payers)item.payers=payers;else item.famId=payFamId;
     if(origCur!=='₪'){item.origAmt=rawAmt;item.origCur=origCur;}
     if(isPartial)item.sharedWith=sw;
@@ -4311,7 +4339,7 @@ function editExpItem(evId,itemId){
     });
     _updateExpItemCustomTotal();
   } else {
-    setExpItemSplitMode('equal');
+    setExpItemMethod(item.splitMethod||'equal');
     addExpItemSharedWith=new Set(item.sharedWith||ev.participants);
     ev.participants.forEach(fid=>{
       const btn=document.getElementById('expshare-'+fid);if(!btn)return;
