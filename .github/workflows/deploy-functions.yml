@@ -28,4 +28,4 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Deploy to Firebase
-        run: npx firebase-tools deploy --only functions:sendPushOnUpdate,functions:dailyBackup,functions:weeklyDebtReminder --project yossi20361 --non-interactive --force
+        run: npx firebase-tools deploy --only functions:sendPushOnUpdate,functions:dailyBackup,functions:weeklyDebtReminder,functions:listBackups,functions:restoreFromBackup --project yossi20361 --non-interactive --force

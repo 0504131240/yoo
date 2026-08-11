@@ -3,6 +3,7 @@ const {getFirestore} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
+const {onRequest} = require('firebase-functions/v2/https');
 
 initializeApp();
 
@@ -24,6 +25,45 @@ exports.dailyBackup = onSchedule(
     await Promise.all(old.docs.map(d => d.ref.delete()));
   }
 );
+
+// --- One-time manual recovery tools (TEMPORARY — remove after use) ---
+// listBackups: read-only, lists available backup dates with a quick summary of each
+// (family/event counts) so you can tell which one to restore without guessing.
+exports.listBackups = onRequest({region: 'me-west1'}, async (req, res) => {
+  const db = getFirestore();
+  const snap = await db.collection('backups').orderBy('__name__', 'desc').limit(30).get();
+  const list = snap.docs.map(d => {
+    const data = d.data().data || {};
+    return {
+      date: d.id,
+      backedUpAt: d.data().backedUpAt,
+      families: (data.families || []).length,
+      events: (data.events || []).length,
+    };
+  });
+  res.status(200).json(list);
+});
+
+// restoreFromBackup: DESTRUCTIVE — fully overwrites appData/familyPayments with a past
+// backup. Requires confirm=YES to run. Call as:
+//   .../restoreFromBackup?date=YYYY-MM-DD&confirm=YES
+exports.restoreFromBackup = onRequest({region: 'me-west1'}, async (req, res) => {
+  const date = req.query.date;
+  const confirm = req.query.confirm;
+  if (!date || confirm !== 'YES') {
+    res.status(400).send('Usage: ?date=YYYY-MM-DD&confirm=YES — this OVERWRITES the live app data with that backup.');
+    return;
+  }
+  const db = getFirestore();
+  const snap = await db.doc(`backups/${date}`).get();
+  if (!snap.exists) {
+    res.status(404).send('No backup found for ' + date);
+    return;
+  }
+  const backupData = snap.data().data;
+  await db.doc('appData/familyPayments').set(backupData);
+  res.status(200).send('Restored appData/familyPayments from backup ' + date + ' (backed up at ' + snap.data().backedUpAt + ')');
+});
 
 // --- Push Notifications ---
 
