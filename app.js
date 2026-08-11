@@ -1540,7 +1540,7 @@ function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
   const toKey2=String(toFid);
   fund.famBalances[toKey2]=(fund.famBalances[toKey2]||0)+amt;
   fund.transactions.push({id:nxtTx++,type:'deposit',famId:toFid,amount:amt,
-    desc:'קיבלת מ'+from+' עבור "'+ev.name+'" (מהקופה)',
+    desc:'קיבלת מ'+from+' עבור "'+ev.name+'" (מהארנק)',
     date:new Date().toLocaleDateString('he-IL')});
   save();render();
 }
@@ -1552,7 +1552,7 @@ function openPartPayModal(evId,from,fromFid,to,toFid,amt,isFund,fromSettle){
     const fundBal=fund.famBalances[String(fromFid)]||0;
     if(fundBal>0){
       const fromFundAmt=Math.min(amt,fundBal);
-      fundLine=`<br><span style="color:var(--blue-mid);font-size:11px">🏦 ${fromFundAmt<amt?`₪${fromFundAmt.toLocaleString()} מהקופה + ₪${(amt-fromFundAmt).toLocaleString()} ישיר`:`₪${fromFundAmt.toLocaleString()} מהקופה (כולו)`}</span>`;
+      fundLine=`<br><span style="color:var(--blue-mid);font-size:11px">🏦 ${fromFundAmt<amt?`₪${fromFundAmt.toLocaleString()} מהארנק + ₪${(amt-fromFundAmt).toLocaleString()} ישיר`:`₪${fromFundAmt.toLocaleString()} מהארנק (כולו)`}</span>`;
     }
   }
   document.getElementById('partPayInfo').innerHTML=`<b>${esc(from)}</b> → <b>${esc(to)}</b><br>נדרש: <b style="color:var(--blue-mid)">₪${amt.toLocaleString()}</b>${fundLine}`;
@@ -1574,7 +1574,7 @@ function updatePartPayRemain(){
       const fromFund=Math.min(Math.round(paid),fundBal);
       const fromDirect=Math.round(paid)-fromFund;
       let breakdown='';
-      if(fromFund>0) breakdown+=`🏦 ₪${fromFund.toLocaleString()} מהקופה`;
+      if(fromFund>0) breakdown+=`🏦 ₪${fromFund.toLocaleString()} מהארנק`;
       if(fromDirect>0) breakdown+=(breakdown?' + ':'')+`✓ ₪${fromDirect.toLocaleString()} ישיר`;
       el.style.color='var(--text2)';
       el.innerHTML=breakdown+(rem>0.5?`<br><span style="color:var(--amber)">נשאר: ₪${rem.toLocaleString()}</span>`:'<br><span style="color:var(--green-mid)">תשלום מלא ✓</span>');
@@ -1602,13 +1602,13 @@ function confirmPartPay(){
       ev.settled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromFund,method:'fund'});
       fund.famBalances[key]=fundBal-fromFund;
       fund.transactions.push({id:nxtTx++,type:'payout',famId:_ppFromFid,amount:fromFund,
-        desc:'תשלום של '+_ppFrom+' ל'+_ppTo+' (מהקופה) · '+ev.name,
+        desc:'תשלום של '+_ppFrom+' ל'+_ppTo+' (מהארנק) · '+ev.name,
         date:new Date().toLocaleDateString('he-IL')});
       // credit the creditor's fund balance
       const toKey=String(_ppToFid);
       fund.famBalances[toKey]=(fund.famBalances[toKey]||0)+fromFund;
       fund.transactions.push({id:nxtTx++,type:'deposit',famId:_ppToFid,amount:fromFund,
-        desc:'קיבלת מ'+_ppFrom+' עבור "'+ev.name+'" (מהקופה)',
+        desc:'קיבלת מ'+_ppFrom+' עבור "'+ev.name+'" (מהארנק)',
         date:new Date().toLocaleDateString('he-IL')});
     }
     if(fromDirect>0) ev.settled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromDirect,method:'direct'});
@@ -3990,7 +3990,7 @@ function openDepositSheet(mode){
   const isDeposit=_depositMode==='deposit';
   const acc=isDeposit?'var(--blue-mid)':'var(--red-mid)';
   const titleEl=document.getElementById('depositTitle');
-  if(titleEl) titleEl.textContent=isDeposit?'הפקדה לקופה':'משיכה מהקופה';
+  if(titleEl) titleEl.textContent=isDeposit?'הפקדה לארנק':'משיכה מהארנק';
   document.getElementById('depositFields').innerHTML=`
     <input type="number" min="0" inputmode="numeric" id="depositAmt" placeholder="${isDeposit?'סכום להפקדה':'סכום למשיכה'} (₪)"
       style="width:100%;border:1.5px solid ${acc};border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;margin-bottom:14px;box-sizing:border-box">
@@ -4053,7 +4053,7 @@ function confirmDeposit(){
   fund.transactions.push({id:nxtTx++,
     type:isDeposit?'deposit':'withdraw',
     famId:_depositFamId,amount:amt,
-    desc:isDeposit?name+' הפקיד לקופה':name+' משך מהקופה',
+    desc:isDeposit?name+' הפקיד לארנק':name+' משך מהארנק',
     date:new Date().toLocaleDateString('he-IL')});
   const _notifyFamId=_depositFamId;
   closeDepositSheet();
@@ -4524,7 +4524,7 @@ function renderPotTransferModal(ev){
         <div style="font-size:11px;color:var(--text2)">מגיע לו ₪${sug.toLocaleString()}</div>
       </div>
       <button onclick="releasePotToOneM(${ev.id},${fid},false)" style="padding:7px 12px;border-radius:8px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">↗ העבר</button>
-      <button onclick="releasePotToOneM(${ev.id},${fid},true)" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 קופה</button>
+      <button onclick="releasePotToOneM(${ev.id},${fid},true)" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">🏦 ארנק</button>
     </div>`;
   }).join('');
   el.innerHTML=`
@@ -4681,7 +4681,7 @@ function selectCumPotFam(famId){
       const owed=ev2?Math.round(Math.max(0,-(evAdjBalance(ev2)[famId]||0))):0;
       const suggested=owed>0?Math.min(fundBal,owed):fundBal;
       const extra=fundBal>suggested?` (יתרה: ₪${fundBal.toLocaleString()})` :'';
-      fundText.textContent=`🏦 יועבר מהקופה: ₪${suggested.toLocaleString()}${extra}`;
+      fundText.textContent=`🏦 יועבר מהארנק: ₪${suggested.toLocaleString()}${extra}`;
       fundLine.style.display='flex';
     } else {
       fundLine.style.display='none';
