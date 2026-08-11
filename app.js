@@ -1943,13 +1943,25 @@ function releasePotToOne(evId,creditorFid,toFund){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   if(!(ev.potPayments||[]).length)return;
   const transfers=calcPotTransfers(ev).filter(t=>t.toFid===creditorFid);
-  if(!transfers.length)return;
-  const totalAmt=transfers.reduce((s,t)=>s+t.amt,0);
-  if(totalAmt<=0)return;
+  // A creditor who also deposited into the pot themselves has that deposit skipped by
+  // calcPotTransfers (it only routes between *different* families) — without adding it
+  // back here, that portion of their own money would just sit stuck in the pot forever.
+  const adjBal=evAdjBalance(ev);
+  const ownExcess=Math.round(calcPotExcessByFamily(ev)[creditorFid]||0);
+  const totalAmt=Math.min(
+    transfers.reduce((s,t)=>s+t.amt,0)+ownExcess,
+    Math.round(adjBal[creditorFid]||0)
+  );
+  if(totalAmt<=0.5)return;
   if(!ev.settled)ev.settled=[];
   transfers.forEach(t=>{
     ev.settled.push({from:t.from,fromFid:t.fromFid,to:t.to,toFid:t.toFid,amt:t.amt,method:'pot'});
   });
+  if(ownExcess>0.5){
+    const credFam=getFam(creditorFid);
+    const credName=credFam?credFam.name.replace('משפחת','').trim():'';
+    ev.settled.push({from:credName,fromFid:creditorFid,to:credName,toFid:creditorFid,amt:ownExcess,method:'pot'});
+  }
   if(toFund){
     const fam=getFam(creditorFid);if(!fam)return;
     const key=String(creditorFid);
@@ -1962,6 +1974,7 @@ function releasePotToOne(evId,creditorFid,toFund){
   const potMap={};
   ev.potPayments.forEach(p=>{potMap[p.famId]=(potMap[p.famId]||0)+p.amt;});
   transfers.forEach(t=>{potMap[t.fromFid]=(potMap[t.fromFid]||0)-t.amt;});
+  if(ownExcess>0.5)potMap[creditorFid]=(potMap[creditorFid]||0)-ownExcess;
   ev.potPayments=Object.entries(potMap).filter(([,a])=>a>0.5).map(([fid,amt])=>({famId:+fid,amt:Math.round(amt)}));
   save();render();
   if(ev.closed){const adjA=evAdjBalance(ev);ev.participants.forEach(fid=>{if(Math.abs(adjA[fid]||0)<=0.5)_sendCloseEvEmailOne(ev,fid);});}
@@ -1978,8 +1991,10 @@ function releasePotManual(evId,creditorFid,amt,toFund){
   if(amt<=0)return;
   const cred=getFam(creditorFid);if(!cred)return;
   const credName=cred.name.replace('משפחת','').trim();
+  // Include the creditor's own pot deposit as an eligible source too — otherwise
+  // their own money just sits stuck in the pot, unreleasable to anyone (see releasePotToOne).
   const potByFam={};
-  pots.forEach(p=>{if(p.famId!==creditorFid)potByFam[p.famId]=(potByFam[p.famId]||0)+p.amt;});
+  pots.forEach(p=>{potByFam[p.famId]=(potByFam[p.famId]||0)+p.amt;});
   if(!ev.settled)ev.settled=[];
   const potMap={};
   ev.potPayments.forEach(p=>{potMap[p.famId]=(potMap[p.famId]||0)+p.amt;});
