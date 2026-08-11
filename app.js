@@ -1655,6 +1655,9 @@ function evCard(ev){
   const potTotal=evPotBal(ev);
   const potExpTotalCard=evPotExpTotal(ev);
   const hasPot=potTotal>0;
+  // Keep the pot button visible even once the balance hits zero, as long as anything
+  // ever passed through it, so its history (deposits, transfers, expenses) stays reachable.
+  const hasPotHistory=hasPot||(ev.settled||[]).some(s=>s.method==='pot'||s.method==='pot-refund')||(ev.potExpItems||[]).length>0||(ev.potToSavings||[]).length>0;
   const potByFam={};
   potPayments.forEach(p=>{if(!potByFam[p.famId])potByFam[p.famId]=[];potByFam[p.famId].push(p);});
   const balanced=cost>0&&!ev.participants.some(fid=>(adjBal[fid]||0)<-0.5);
@@ -1847,7 +1850,7 @@ function evCard(ev){
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
       ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
-      ${hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${(potTotal-potExpTotalCard).toLocaleString()}${potExpTotalCard>0?` <span style="font-size:10px;opacity:.7">(הוצאות ₪${potExpTotalCard.toLocaleString()})</span>`:''}</button>`:''}
+      ${hasPotHistory?(hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${(potTotal-potExpTotalCard).toLocaleString()}${potExpTotalCard>0?` <span style="font-size:10px;opacity:.7">(הוצאות ₪${potExpTotalCard.toLocaleString()})</span>`:''}</button>`:`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">💰 קופת האירוע (₪0)</button>`):''}
       ${ev.cumulative&&cost>0?ev.closed?`<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:6px;background:var(--surface2);border:1.5px solid var(--border);font-size:12px;color:var(--text2);font-weight:600">🏁 הסתיים</span>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}` :`<button class="action-btn blue edit-only" onclick="openCloseEvModal(${ev.id})">🏁 סיים אירוע</button>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}`:balanced&&cost>0?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}
       ${cost>0?`<button class="action-btn edit-only" onclick="openEmailModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 מיילים</button>`:''}
       <button class="action-btn red edit-only" onclick="delEv(${ev.id})">🗑 מחק</button>
