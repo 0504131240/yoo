@@ -542,6 +542,7 @@ async function save(){
   _skipNextNotif=true;
   saveLocal();
   localStorage.setItem('pendingSave','1');
+  localStorage.setItem('pendingSaveAt',String(Date.now()));
   if(_saving) return;
   _saving=true;
   if(_retryTimer){clearTimeout(_retryTimer);_retryTimer=null;}
@@ -550,6 +551,7 @@ async function save(){
     const {db,doc,setDoc}=await fbInit();
     await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,visits,notifications,polls});
     localStorage.removeItem('pendingSave');
+    localStorage.removeItem('pendingSaveAt');
     showSyncStatus('✓ נשמר',2000);
   }catch(e){
     console.warn('save failed, will retry:',e);
@@ -593,7 +595,18 @@ async function load(){
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
     nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
-    // if there's a pending local save, override firebase data with local and push
+    // If a save was interrupted (network hiccup, tab closed mid-write) very recently,
+    // trust the local cache — it's genuinely newer than what Firestore has and should
+    // be re-pushed. But if the flag is old (the tab sat inactive for a while), other
+    // devices have very likely saved changes since — blindly overwriting Firestore with
+    // this stale local snapshot would silently wipe that work out, so just discard the
+    // stale flag instead and keep the fresh data we already loaded above.
+    const _pendingAt=parseInt(localStorage.getItem('pendingSaveAt')||'0');
+    const _pendingFresh=_pendingAt>0&&(Date.now()-_pendingAt)<3*60*1000;
+    if(localStorage.getItem('pendingSave')==='1'&&!_pendingFresh){
+      localStorage.removeItem('pendingSave');
+      localStorage.removeItem('pendingSaveAt');
+    }
     if(localStorage.getItem('pendingSave')==='1'){
       const localFa=localStorage.getItem('ff');const localEv=localStorage.getItem('fe');
       const localFd=localStorage.getItem('fund');const localSp=localStorage.getItem('savingsPot');
