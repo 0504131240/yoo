@@ -4690,13 +4690,14 @@ function selectCumPotFam(famId){
     if(fid===famId){btn.style.background=cl.bg;btn.style.color=cl.c;btn.style.borderColor=cl.c;}
     else{btn.style.background='transparent';btn.style.color='var(--text2)';btn.style.borderColor='var(--border)';}
   });
+  const owed=Math.round(Math.max(0,-(evAdjBalance(ev)[famId]||0)));
+  const amtEl=document.getElementById('cumPotAmt');
+  if(amtEl)amtEl.value=owed>0?owed:'';
   const fundBal=Math.round(famFundBal(famId));
   const fundLine=document.getElementById('cumPotFundLine');
   const fundText=document.getElementById('cumPotFundText');
   if(fundLine&&fundText){
     if(fundBal>0){
-      const ev2=events.find(e=>e.id===cumPotEvId);
-      const owed=ev2?Math.round(Math.max(0,-(evAdjBalance(ev2)[famId]||0))):0;
       const suggested=owed>0?Math.min(fundBal,owed):fundBal;
       const extra=fundBal>suggested?` (יתרה: ₪${fundBal.toLocaleString()})` :'';
       fundText.textContent=`🏦 יועבר מהארנק: ₪${suggested.toLocaleString()}${extra}`;
