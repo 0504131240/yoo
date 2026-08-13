@@ -4720,16 +4720,21 @@ function renderEventFamDetail(ev,fid){
   const globalPortion=Math.max(0,share-partialSum-savings);
   // Itemize the shared-cost portion: the family pays a weight-based fraction of
   // each non-partial expense item, so show e.g. "כרטיסים ₪50 · פיצה ₪30".
+  // Each expense item can have its own split method (cumulative events decide it
+  // per item), so its exact share comes from itemShareFor — not a single blanket
+  // fraction for the whole event. Pot-expense items have no per-item method of
+  // their own; they fall into evShares' "remainder" bucket, split by the event's
+  // overall default method, so they still use that blanket fraction here.
   const method=ev.splitMethod||'equal';
   let totalW=0;const wmap={};
   ev.participants.forEach(pid=>{wmap[pid]=famWeight(getFam(pid),method,ev.childOverrides?.[pid],ev.parentOverrides?.[pid]);totalW+=wmap[pid];});
   const frac=totalW?wmap[fid]/totalW:0;
   const isPartialItem=it=>it.customSplit||(it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length);
-  const globalSrc=[...(ev.expenseItems||[]).filter(it=>!isPartialItem(it)&&it.amt>0).map(it=>({name:it.name,amt:it.amt,pot:false})),
-                   ...(ev.potExpItems||[]).filter(it=>it.amt>0).map(it=>({name:it.name,amt:it.amt,pot:true}))];
+  const globalSrc=[...(ev.expenseItems||[]).filter(it=>!isPartialItem(it)&&it.amt>0).map(it=>({name:it.name,pot:false,raw:itemShareFor(ev,it,fid)})),
+                   ...(ev.potExpItems||[]).filter(it=>it.amt>0).map(it=>({name:it.name,pot:true,raw:it.amt*frac}))];
   let sharedRows=[];
   if(globalSrc.length&&globalPortion>0){
-    const raws=globalSrc.map(x=>x.amt*frac);
+    const raws=globalSrc.map(x=>x.raw);
     const floors=raws.map(v=>Math.floor(v));
     let rem=Math.round(globalPortion-floors.reduce((s,v)=>s+v,0));
     const ord=raws.map((v,i)=>({i,f:v-Math.floor(v)})).sort((a,b)=>b.f-a.f);
