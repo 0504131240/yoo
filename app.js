@@ -4822,7 +4822,9 @@ function renderEventDash(ev){
   const savPerFam=evSavingsPerFam(ev);
   const balanced=cost>0&&!ev.participants.some(fid=>(adjBal[fid]||0)<-0.5);
   const myFid=_myFamId();
-  const iAmIn=myFid!=null&&ev.participants.includes(myFid);
+  // In edit mode this is the admin's device, not a specific participating family —
+  // the device's stored identity (from an earlier public-site visit) isn't relevant here.
+  const iAmIn=!editMode&&myFid!=null&&ev.participants.includes(myFid);
 
   // ── Personal card (viewing family) ──
   let meCard='';
