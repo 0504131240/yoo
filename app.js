@@ -4606,6 +4606,8 @@ function evSettleLines(ev,famId){
       else lines.push(`קיבלתם ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
     }
   });
+  const _savPaid=Math.round((ev.savingsPaid||[]).filter(p=>Number(p.famId)===Number(famId)).reduce((s,p)=>s+p.amt,0));
+  if(_savPaid>0.5) lines.push(`שולם לקופת חיסכון ₪${_savPaid.toLocaleString()}`);
   return lines;
 }
 // Family-to-family transfers for one family in an event: both the moves that
@@ -4716,7 +4718,22 @@ function renderEventFamDetail(ev,fid){
     return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:${bg};color:${color};padding:3px 9px;border-radius:20px;white-space:nowrap">⇄ ${txt}</span>`;
   };
   const transfers=evFamTransfers(ev,fid);
-  const trInner=transfers.length?`<div style="display:flex;flex-wrap:wrap;gap:6px">${transfers.map(trChip).join('')}</div>`:`<div style="font-size:12px;color:var(--text3);text-align:center;padding:2px 0">אין העברות לסידור.</div>`;
+  // Reconciliation: explain how the fair share turns into what's left to pay —
+  // minus what they paid out of pocket and minus what was already settled
+  // (from the wallet / event pot / direct transfers / savings).
+  const owe=b<-0.5?Math.round(-b):0;
+  const getBack=b>0.5?Math.round(b):0;
+  const covered=Math.round((share-paidTotal)-owe);
+  const settleLines=evSettleLines(ev,fid);
+  const pend=transfers.filter(t=>t.pending);
+  let reconInner=row('החלק ההוגן','₪'+share.toLocaleString());
+  if(paidTotal>0)reconInner+=row('בניכוי ששילמו מהכיס','−₪'+paidTotal.toLocaleString());
+  if(settleLines.length)reconInner+=`<div style="padding:7px 0 3px;font-size:11.5px;font-weight:700;color:var(--text2)">כבר סודר:</div><ul style="margin:0 0 4px;padding-inline-start:18px;font-size:12px;color:var(--text2);line-height:1.7">${settleLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`;
+  if(covered>0)reconInner+=row('סה"כ סודר עד כה','−₪'+covered.toLocaleString());
+  reconInner+= owe>0?row('נשאר לשלם','<span style="color:var(--red)">₪'+owe.toLocaleString()+'</span>',true)
+    :getBack>0?row('מגיע לכם בחזרה','<span style="color:var(--green)">₪'+getBack.toLocaleString()+'</span>',true)
+    :row('הסטטוס','<span style="color:var(--green)">מסודרים ✓</span>',true);
+  if(pend.length)reconInner+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:9px">${pend.map(trChip).join('')}</div>`;
   el.innerHTML=`
     <div style="padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px">
       <span style="width:12px;height:12px;border-radius:50%;background:${c};flex-shrink:0"></span>
@@ -4726,7 +4743,7 @@ function renderEventFamDetail(ev,fid){
     </div>
     ${sec('💸 ההוצאות ששילמו',paidInner)}
     ${sec('⚖️ פירוט החלק שלהם באירוע',shareInner)}
-    ${sec('⇄ העברות',trInner)}
+    ${sec('💳 חישוב מה נשאר לשלם',reconInner)}
     <div style="padding:12px 16px;border-top:7px solid var(--surface2)"><button onclick="closeEventFamDetail()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button></div>`;
 }
 // ── Event dashboard modal ──────────────────
