@@ -3727,6 +3727,21 @@ function openClaimsModal(){
     const ev=events.find(e=>e.id===c.evId);const f=getFam(c.famId);
     const evName=ev?esc(ev.name):'אירוע שנמחק';
     const famName=f?esc(f.name.replace('משפחת','').trim()):'משפחה שנמחקה';
+    if(c.kind==='transfer'){
+      const tf=getFam(c.toFid);
+      const toName=tf?esc(tf.name.replace('משפחת','').trim()):'משפחה שנמחקה';
+      return`<div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="font-size:13px;margin-bottom:2px">👈 <b>${famName}</b> מעביר ל<b>${toName}</b></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:12px;color:var(--text2)">${evName} · ${esc(c.date||'')}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--green-mid)">₪${c.amt.toLocaleString()}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${ev&&f&&tf?`<button onclick="goToClaimTransfer(${c.id})" style="flex:1;padding:7px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">✓ אשר</button>`:''}
+          <button onclick="dismissClaim(${c.id})" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">✗ בטל</button>
+        </div>
+      </div>`;
+    }
     return`<div style="padding:12px 16px;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
         <div style="font-size:13px;font-weight:700">${famName}</div>
@@ -3753,6 +3768,21 @@ function goToClaimEvent(claimId,evId){
   dismissClaim(claimId);
   closeClaimsModal();
   window.location.hash='event-'+evId;
+}
+function claimTransfer(evId,fromFid,toFid,amt){
+  paymentClaims.push({id:nxtClaim++,kind:'transfer',evId,famId:fromFid,toFid,amt,date:new Date().toLocaleDateString('he-IL'),ts:Date.now()});
+  save();
+  renderClaimsBanner();
+  const ev=events.find(e=>e.id===evId);
+  if(settleModalEvId===evId&&ev)renderSettleModal(ev);
+}
+function goToClaimTransfer(claimId){
+  const c=paymentClaims.find(x=>x.id===claimId);if(!c)return;
+  const ev=events.find(e=>e.id===c.evId);const f=getFam(c.famId);const tf=getFam(c.toFid);
+  if(!ev||!f||!tf){dismissClaim(claimId);return;}
+  paymentClaims=paymentClaims.filter(x=>x.id!==claimId);
+  save();renderClaimsBanner();closeClaimsModal();
+  openPartPayModal(ev.id,f.name.replace('משפחת','').trim(),c.famId,tf.name.replace('משפחת','').trim(),c.toFid,c.amt,false,false);
 }
 
 function renderSavingsPot(){
@@ -4526,6 +4556,8 @@ function renderSettleModal(ev){
   const transfers=_allTransfers.filter(t=>!t.coveredByPot);
   const _potCoveredTransfers=_allTransfers.filter(t=>t.coveredByPot);
   const settledList=ev.settled||[];
+  const _myFid=_myFamId();
+  const _hasTransferClaim=(fromFid,toFid)=>paymentClaims.some(c=>c.kind==='transfer'&&c.evId===ev.id&&c.famId===fromFid&&c.toFid===toFid);
   const settleLines=transfers.map(t=>{
     if(t.toFid==='__savings__'){
       return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
@@ -4535,9 +4567,13 @@ function renderSettleModal(ev){
         </div>
       </div>`;
     }
+    const _claimBtn=t.fromFid===_myFid?(_hasTransferClaim(t.fromFid,t.toFid)?
+      `<span style="padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700;color:var(--text2)">⏳ ממתין לאישור</span>`:
+      `<button style="padding:6px 12px;border-radius:6px;border:1.5px solid var(--green-mid);background:var(--green-bg);color:var(--green-mid);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="claimTransfer(${ev.id},${t.fromFid},${t.toFid},${t.amt})">✓ העברתי</button>`):'';
     return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
       <span style="font-size:13px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
+        ${_claimBtn}
         <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="openPartPayModal(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},false,true)">✓ שולם</button>
       </div>
     </div>`;
@@ -5264,6 +5300,7 @@ function applyEditMode(){
   const icon=document.getElementById('lockIcon');
   if(icon)icon.textContent=editMode?'🔓':'🔒';
   if(currentShell==='home')renderFamilyHome();
+  if(editMode&&paymentClaims.some(c=>c.kind==='transfer'))openClaimsModal();
 }
 function openLockModal(){
   renderLockModal(editMode?'lock':adminPass?'unlock':'set');
