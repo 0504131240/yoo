@@ -1443,7 +1443,7 @@ function renderHome(){
         hasPot?`<span class="badge" style="background:var(--amber-bg);color:var(--amber)">💰 ₪${evNetPotBal(ev).toLocaleString()}</span>`:''
       ].filter(Boolean).join('');
       const meta=[ev.date&&ev.date!=='לא צוין'?esc(ev.date):'',ev.participants.length+' משפחות',splitShort[ev.splitMethod||'equal']].filter(Boolean).join(' · ');
-      return`<div class="hev" onclick="goToEvent(${ev.id})">
+      return`<div class="hev" onclick="openEventDash(${ev.id})">
         <div class="hev-top">
           <div class="hev-bar" style="background:${cl.c}"></div>
           <div class="hev-body">
