@@ -2783,17 +2783,21 @@ function stepParent(id,delta){
   inp.value=Math.min(2,Math.max(0,(parseInt(inp.value)||0)+delta));
   if(expMode==='total')updateTotalPreview();updateChildPickSummary();
 }
+// Cumulative events pick their split method per expense item, not once for the whole
+// event — but the family composition (used as the default headcount for any item split
+// "לפי נפשות"/"weighted") is still set once, at event level, same as percapita/weighted.
+const _wantsFamComposition=()=>splitMethod==='percapita'||splitMethod==='weighted'||expMode==='cumulative';
 function updateChildOverrideInputs(){
   const sec=document.getElementById('childOverrideSection');
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
-  if(splitMethod==='equal'||!selected.length){ sec.style.display='none'; return; }
+  if(!_wantsFamComposition()||!selected.length){ sec.style.display='none'; return; }
   sec.style.display='block';
   const ev=editingId!=null?events.find(e=>e.id===editingId):null;
   const btnStyle='width:30px;height:30px;border:none;background:var(--bg);color:var(--text);font-size:17px;font-weight:300;cursor:pointer;font-family:var(--font)';
   const inpStyle='border:none;border-right:1.5px solid var(--border);border-left:1.5px solid var(--border);border-radius:0;width:36px;height:30px;padding:0';
   const stepperWrap='display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden';
   document.getElementById('childOverrideInputs').innerHTML=selected.map(f=>{
-    const valCh=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:((splitMethod==='percapita'||splitMethod==='weighted')?famAge3PlusChildCount(f):(f.children||0));
+    const valCh=ev&&ev.childOverrides&&ev.childOverrides[f.id]!=null?ev.childOverrides[f.id]:(_wantsFamComposition()?famAge3PlusChildCount(f):(f.children||0));
     const valPa=ev&&ev.parentOverrides&&ev.parentOverrides[f.id]!=null?ev.parentOverrides[f.id]:FAM_ADULTS;
     return`<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r2)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -2832,7 +2836,7 @@ function updateChildPickSummary(){
   const el=document.getElementById('childPickSummary');if(!el)return;
   const selected=families.filter(f=>{ const c=document.getElementById('chip-'+f.id); return c&&c.classList.contains('on'); });
   if(!selected.length){el.textContent='הגדר הרכב לפי משפחה';return;}
-  const totalCh=selected.reduce((s,f)=>{ const v=formChildOverride(f.id); return s+(v!=null?v:((splitMethod==='percapita'||splitMethod==='weighted')?famAge3PlusChildCount(f):(f.children||0))); },0);
+  const totalCh=selected.reduce((s,f)=>{ const v=formChildOverride(f.id); return s+(v!=null?v:(_wantsFamComposition()?famAge3PlusChildCount(f):(f.children||0))); },0);
   const totalPa=selected.reduce((s,f)=>{ const v=formParentOverride(f.id); return s+(v!=null?v:FAM_ADULTS); },0);
   el.textContent=`${totalPa} הורים · ${totalCh} ילדים`;
 }
@@ -2892,6 +2896,7 @@ function setExpMode(mode){
     btn.style.borderColor=active?'var(--blue-mid)':'var(--border)';
   });
   if(isTotal) updateTotalPreview();
+  updateChildOverrideInputs();
 }
 function updateTotalPreview(){
   const total=parseFloat(document.getElementById('f-total')?.value)||0;
@@ -3084,8 +3089,8 @@ async function doCreate(){
   const isCumulative=expMode==='cumulative';
   const savingsTotal=Math.round(parseFloat(document.getElementById('f-savings')?.value)||0);
   const childOverrides={};const parentOverrides={};
-  if(splitMethod!=='equal') participants.forEach(fid=>{
-    childOverrides[fid]=formChildOverride(fid)??((splitMethod==='percapita'||splitMethod==='weighted')?famAge3PlusChildCount(getFam(fid)||{}):(getFam(fid)?.children||0));
+  if(splitMethod!=='equal'||isCumulative) participants.forEach(fid=>{
+    childOverrides[fid]=formChildOverride(fid)??(_wantsFamComposition()?famAge3PlusChildCount(getFam(fid)||{}):(getFam(fid)?.children||0));
     parentOverrides[fid]=formParentOverride(fid)??FAM_ADULTS;
   });
   if(editingId!=null){
@@ -3198,6 +3203,12 @@ function _sendCloseEvEmailOne(ev,fid){
   const cost=evCost(ev);
   const shares=evShares(ev);
   const share=Math.round(shares[fid]||0);
+  const _totalNfashot=ev.cumulative?ev.participants.reduce((s,fid2)=>{
+    const pf=getFam(fid2);if(!pf)return s;
+    const ch=ev.childOverrides?.[fid2]!=null?ev.childOverrides[fid2]:famAge3PlusChildCount(pf);
+    const pa=ev.parentOverrides?.[fid2]!=null?ev.parentOverrides[fid2]:FAM_ADULTS;
+    return s+ch+pa;
+  },0):0;
   const name=f.name.replace('משפחת','').trim();
   const myItems=(ev.expenseItems||[]).filter(it=>itemPayerAmt(it,fid)>0);
   const mySpent=Math.round(myItems.reduce((s,it)=>s+itemPayerAmt(it,fid),0));
@@ -3249,7 +3260,7 @@ function _sendCloseEvEmailOne(ev,fid){
   });
   const fundBal=Math.round(fund.famBalances[String(fid)]||0);
   const _savingsPerFam=evSavingsPerFam(ev);
-  let msg=`האירוע "${ev.name}" הסתיים!\n\nעלות כוללת: ₪${cost.toLocaleString()}\nהחלק שלך: ₪${share.toLocaleString()}${_savingsPerFam>0?`\n💎 לקופת חיסכון: ₪${_savingsPerFam.toLocaleString()}`:''}
+  let msg=`האירוע "${ev.name}" הסתיים!\n\nעלות כוללת: ₪${cost.toLocaleString()}${_totalNfashot>0?`\n👥 נפשות שהשתתפו: ${_totalNfashot}`:''}\nהחלק שלך: ₪${share.toLocaleString()}${_savingsPerFam>0?`\n💎 לקופת חיסכון: ₪${_savingsPerFam.toLocaleString()}`:''}
 `;
   if(mySpent>0){
     const itemLines=myItems.map(it=>`  - ${it.name}: ₪${itemPayerAmt(it,fid).toLocaleString()}`).join('\n');
@@ -3259,6 +3270,7 @@ function _sendCloseEvEmailOne(ev,fid){
   if(fundBal>0) msg+=`\n\nיתרתך בארנק: ₪${fundBal.toLocaleString()}`;
   msg+=`\n\n✅ החשבון שלך מסודר.`;
   const _cRows=[['עלות כוללת האירוע',`₪${cost.toLocaleString()}`],['החלק שלך',`₪${share.toLocaleString()}`,true]];
+  if(_totalNfashot>0) _cRows.push(['👥 נפשות שהשתתפו',String(_totalNfashot)]);
   if(_savingsPerFam>0) _cRows.push(['💎 לקופת חיסכון',`₪${_savingsPerFam.toLocaleString()}`]);
   if(fundBal>0) _cRows.push(['💰 יתרה בארנק',`₪${fundBal.toLocaleString()}`]);
   let bodyHtml=_eCard(_cRows);
@@ -4289,7 +4301,11 @@ function _renderExpItemNfashotInputs(evId){
   const wrap=document.getElementById('expItemNfashotInputs');if(!wrap)return;
   wrap.innerHTML=ev.participants.map(fid=>{
     const f=getFam(fid);if(!f)return'';
-    const def=famAge3PlusChildCount(f)+FAM_ADULTS;
+    // Default to the event-level family composition (set once when the event was created),
+    // so a percapita item needs no re-entry unless this specific item is an exception.
+    const ch=ev.childOverrides?.[fid]!=null?ev.childOverrides[fid]:famAge3PlusChildCount(f);
+    const pa=ev.parentOverrides?.[fid]!=null?ev.parentOverrides[fid]:FAM_ADULTS;
+    const def=ch+pa;
     return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       ${famAva(f,30,'flex-shrink:0')}
       <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
