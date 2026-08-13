@@ -4567,6 +4567,26 @@ function evSettleLines(ev,famId){
   });
   return lines;
 }
+// Family-to-family transfers for one family in an event: both the moves that
+// already happened (from ev.settled, direct or wallet) and the ones still
+// pending (from calcTransfers). Used to show "who paid whom" on each card.
+function evFamTransfers(ev,famId){
+  const out=[];
+  const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
+  const nm=(fid,fallback)=>{const f=getFam(fid);return f?f.name.replace('משפחת','').trim():(fallback||'');};
+  (ev.settled||[]).forEach(s=>{
+    if(s.method==='pot') return; // pot moves aren't family-to-family
+    const isFrom=s.fromFid!=null?Number(s.fromFid)===Number(famId):(_sfByName(s.from)||{}).id===famId;
+    const isTo=s.toFid!=null?Number(s.toFid)===Number(famId):(_sfByName(s.to)||{}).id===famId;
+    if(isFrom) out.push({dir:'out',pending:false,amt:Math.round(s.amt),other:nm(s.toFid,s.to)});
+    else if(isTo) out.push({dir:'in',pending:false,amt:Math.round(s.amt),other:nm(s.fromFid,s.from)});
+  });
+  calcTransfers(ev).filter(t=>!t.coveredByPot&&t.toFid!=='__savings__').forEach(t=>{
+    if(Number(t.fromFid)===Number(famId)) out.push({dir:'out',pending:true,amt:Math.round(t.amt),other:nm(t.toFid,t.to)});
+    else if(Number(t.toFid)===Number(famId)) out.push({dir:'in',pending:true,amt:Math.round(t.amt),other:nm(t.fromFid,t.from)});
+  });
+  return out;
+}
 // ── Event dashboard modal ──────────────────
 // Full-event popup opened from the total-cost bar: a "dashboard" that shows
 // general info about the event plus a personal card for the viewing family,
@@ -4663,12 +4683,15 @@ function renderEventDash(ev){
     const pill=b>0.5?`<span style="${pillBase};background:var(--green-bg);color:var(--green)">${isMe?'תקבלו':'יקבלו'} ₪${Math.round(b).toLocaleString()}</span>`
       :b<-0.5?`<span style="${pillBase};background:var(--red-bg);color:var(--red)">${isMe?'עליכם':'צריכים'} לשלם ₪${Math.round(-b).toLocaleString()}</span>`
       :`<span style="${pillBase};background:var(--surface2);color:var(--text2)">מסודרים ✓</span>`;
-    const fLines=evSettleLines(ev,fid);
-    const fGap=share-paid;
-    const howRow=fLines.length?`<div style="margin-top:7px;padding-top:7px;border-top:1px dashed var(--border)">
-      <div style="font-size:10.5px;font-weight:700;color:var(--text3);margin-bottom:3px">איך סודר${fGap>0.5?` ההפרש (₪${Math.round(fGap).toLocaleString()})`:''}</div>
-      <ul style="margin:0;padding-inline-start:16px;font-size:11px;color:var(--text2);line-height:1.6">${fLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>
-    </div>`:'';
+    const trChip=t=>{
+      const amt='₪'+t.amt.toLocaleString();const other=esc(t.other||'');
+      let txt,bg,color;
+      if(t.dir==='out'){txt=`${t.pending?'להעביר':'העבירו'} ${amt} ל${other}`;bg=t.pending?'var(--red-bg)':'var(--surface2)';color=t.pending?'var(--red)':'var(--text2)';}
+      else{txt=`${t.pending?'לקבל':'קבלו'} ${amt} מ${other}`;bg='var(--green-bg)';color='var(--green)';}
+      return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:${bg};color:${color};padding:3px 9px;border-radius:20px;white-space:nowrap">⇄ ${txt}</span>`;
+    };
+    const fTransfers=evFamTransfers(ev,fid);
+    const trRow=fTransfers.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${fTransfers.map(trChip).join('')}</div>`:'';
     return`<div style="border:1px solid ${isMe?c+'22':'var(--border)'};background:${isMe?bg:'transparent'};border-radius:12px;padding:11px 13px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
         <span style="width:11px;height:11px;border-radius:50%;background:${c};flex-shrink:0"></span>
@@ -4679,7 +4702,7 @@ function renderEventDash(ev){
         <span>💸 הוציאו <b style="color:var(--text)">₪${paid.toLocaleString()}</b></span>
         <span>⚖️ החלק ההוגן <b style="color:var(--text)">₪${share.toLocaleString()}</b></span>
       </div>
-      ${howRow}
+      ${trRow}
     </div>`;
   }).join('');
   const famSection=_dashSection('👨‍👩‍👧 מאזן משפחות',`<div style="display:flex;flex-direction:column;gap:9px">${famRows}</div>`);
