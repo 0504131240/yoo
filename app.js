@@ -79,9 +79,7 @@ const itemShareFor=(ev,it,fid)=>{
   const method=it.splitMethod!=null?it.splitMethod:(isPartialSubset?'equal':(ev.splitMethod||'equal'));
   let itemW=0;const iw={};
   sw.forEach(p=>{
-    iw[p]=(method==='percapita'&&it.nfashotOverride&&it.nfashotOverride[String(p)]!=null)
-      ?it.nfashotOverride[String(p)]
-      :famWeight(getFam(p),method,ev.childOverrides?.[p],ev.parentOverrides?.[p]);
+    iw[p]=famWeight(getFam(p),method,ev.childOverrides?.[p],ev.parentOverrides?.[p]);
     itemW+=iw[p];
   });
   return itemW?it.amt*(iw[fid]/itemW):0;
@@ -4235,7 +4233,6 @@ function openAddExpItem(evId){
       </div>`;
     }).join('');
   }
-  _renderExpItemNfashotInputs(evId);
   setExpItemMethod('equal');
   _updateExpItemCustomTotal();
   document.getElementById('addExpItemOverlay').style.display='flex';
@@ -4282,7 +4279,6 @@ function setExpItemSplitMode(mode){
   document.getElementById('expItemSplitEqualDiv').style.display=isCustom?'none':'block';
   document.getElementById('expItemSplitCustomDiv').style.display=isCustom?'block':'none';
   _refreshExpItemMethodBtns();
-  _refreshExpItemNfashotVisibility();
 }
 function setExpItemMethod(method){
   addExpItemMethod=method;
@@ -4290,33 +4286,6 @@ function setExpItemMethod(method){
   document.getElementById('expItemSplitEqualDiv').style.display='block';
   document.getElementById('expItemSplitCustomDiv').style.display='none';
   _refreshExpItemMethodBtns();
-  _refreshExpItemNfashotVisibility();
-}
-function _refreshExpItemNfashotVisibility(){
-  const div=document.getElementById('expItemNfashotDiv');if(!div)return;
-  div.style.display=(addExpItemSplitMode!=='custom'&&addExpItemMethod==='percapita')?'block':'none';
-}
-function _renderExpItemNfashotInputs(evId){
-  const ev=events.find(e=>e.id===evId);if(!ev)return;
-  const wrap=document.getElementById('expItemNfashotInputs');if(!wrap)return;
-  wrap.innerHTML=ev.participants.map(fid=>{
-    const f=getFam(fid);if(!f)return'';
-    // Default to the event-level family composition (set once when the event was created),
-    // so a percapita item needs no re-entry unless this specific item is an exception.
-    const ch=ev.childOverrides?.[fid]!=null?ev.childOverrides[fid]:famAge3PlusChildCount(f);
-    const pa=ev.parentOverrides?.[fid]!=null?ev.parentOverrides[fid]:FAM_ADULTS;
-    const def=ch+pa;
-    return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      ${famAva(f,30,'flex-shrink:0')}
-      <span style="flex:1;font-size:13px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</span>
-      <input type="number" min="0" inputmode="numeric" placeholder="${def}" id="nfashot-${fid}" style="width:60px;border:1.5px solid var(--border);border-radius:var(--r2);padding:7px 8px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);text-align:center;direction:ltr;box-sizing:border-box">
-    </div>`;
-  }).join('');
-}
-function formExpItemNfashot(fid){
-  const inp=document.getElementById('nfashot-'+fid);
-  if(inp&&inp.value!=='')return Math.max(0,parseInt(inp.value)||0);
-  return undefined;
 }
 function _refreshExpItemMethodBtns(){
   const isCustom=addExpItemSplitMode==='custom';
@@ -4430,12 +4399,6 @@ async function doAddExpItem(){
   if(errEl)errEl.style.display='none';
   const sw=[...(addExpItemSharedWith||new Set(ev.participants))].filter(fid=>ev.participants.includes(fid));
   const isPartial=sw.length>0&&sw.length<ev.participants.length;
-  let nfashotOverride=null;
-  if(addExpItemMethod==='percapita'){
-    const ov={};
-    ev.participants.forEach(fid=>{ const v=formExpItemNfashot(fid); if(v!=null)ov[String(fid)]=v; });
-    if(Object.keys(ov).length)nfashotOverride=ov;
-  }
   if(_editExpItemId!=null){
     const old=(ev.expenseItems||[]).find(it=>it.id===_editExpItemId);
     if(old){
@@ -4443,7 +4406,7 @@ async function doAddExpItem(){
       old.name=name;old.amt=amt;old.splitMethod=addExpItemMethod;delete old.customSplit;
       if(origCur!=='₪'){old.origAmt=rawAmt;old.origCur=origCur;}else{delete old.origAmt;delete old.origCur;}
       if(isPartial)old.sharedWith=sw;else delete old.sharedWith;
-      if(nfashotOverride)old.nfashotOverride=nfashotOverride;else delete old.nfashotOverride;
+      delete old.nfashotOverride;
       if(payers){old.payers=payers;delete old.famId;}else{old.famId=payFamId;delete old.payers;}
       _creditItemPayers(ev,old);
     }
@@ -4454,7 +4417,6 @@ async function doAddExpItem(){
     if(payers)item.payers=payers;else item.famId=payFamId;
     if(origCur!=='₪'){item.origAmt=rawAmt;item.origCur=origCur;}
     if(isPartial)item.sharedWith=sw;
-    if(nfashotOverride)item.nfashotOverride=nfashotOverride;
     ev.expenseItems.push(item);
     _creditItemPayers(ev,item);
     const _payNames=itemPayerNames(item).join(' + ');
@@ -4518,11 +4480,6 @@ function editExpItem(evId,itemId){
     document.getElementById('expItemAmt').value=item.origAmt||item.amt;
     const curEl=document.getElementById('expItemCur');
     if(curEl)curEl.value=item.origCur||'₪';
-    if(item.nfashotOverride){
-      Object.entries(item.nfashotOverride).forEach(([fid,v])=>{
-        const inp=document.getElementById('nfashot-'+fid);if(inp)inp.value=v;
-      });
-    }
   }
 }
 function toggleCumFamily(evId,famId){
