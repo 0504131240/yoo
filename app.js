@@ -1846,7 +1846,7 @@ function evCard(ev){
   </div>`:'';
   const collapsed=collapsedEvents.has(ev.id);
   return`<div class="ecard" id="ecard-${ev.id}">
-    <div class="ecard-head">
+    <div class="ecard-head" onclick="openEventDash(${ev.id})" style="cursor:pointer" title="לחצו לפרטי האירוע">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
         <div class="ecard-title">${esc(ev.name)}</div>
         <span class="badge ${balanced&&cost>0?'badge-green':'badge-amber'}">${balanced&&cost>0?'מאוזן':'פעיל'}</span>
@@ -4545,7 +4545,7 @@ function closeEventDash(){
   eventDashEvId=null;
 }
 function _dashSection(title,inner){
-  return`<div style="padding:14px 16px;border-top:7px solid var(--surface2)"><div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text2);margin-bottom:11px;letter-spacing:.2px">${title}</div>${inner}</div>`;
+  return`<div style="padding:16px;border-top:10px solid var(--surface2)"><div style="font-family:var(--font-head);font-size:13.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.2px">${title}</div>${inner}</div>`;
 }
 function renderEventDash(ev){
   const el=document.getElementById('eventDashContent');if(!el)return;
@@ -4595,7 +4595,7 @@ function renderEventDash(ev){
   ];
   if(hasPot)tiles.push(tile('קופת אירוע','₪'+Math.round(potBal).toLocaleString(),'var(--amber)'));
   if(ev.savingsTotal)tiles.push(tile('חיסכון','₪'+Math.round(ev.savingsTotal).toLocaleString(),'var(--blue)'));
-  const tilesHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 2px">${tiles.join('')}</div>`;
+  const tilesHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px 8px">${tiles.join('')}</div>`;
 
   // ── Family balance ──
   // Each family is a clear card: "הוציאו" = what they actually spent,
@@ -4649,7 +4649,7 @@ function renderEventDash(ev){
     </div>`;
   }).join('');
   const typeInner=typeRows.length?
-    `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="display:flex;align-items:flex-end;justify-content:${typeRows.length>5?'flex-start':'space-around'};gap:10px;height:158px;padding-top:20px;${typeRows.length>5?'min-width:'+(typeRows.length*64)+'px':''}">${typeCols}</div></div>
+    `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="display:flex;align-items:flex-end;justify-content:${typeRows.length>5?'flex-start':'space-around'};gap:10px;height:158px;padding-top:20px;max-width:640px;margin:0 auto;${typeRows.length>5?'min-width:'+(typeRows.length*64)+'px':''}">${typeCols}</div></div>
      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"><span style="font-size:12.5px;font-weight:700">סה"כ פריטים</span><span style="font-family:var(--font-head);font-size:15px;font-weight:700;color:var(--green-mid)">₪${typeTotal.toLocaleString()}</span></div>`
     :`<div style="text-align:center;color:var(--text3);font-size:12.5px;padding:6px 0">אין פריטי הוצאה — העלות מחולקת לפי משפחות בלבד.</div>`;
   const typeSection=_dashSection('📊 פירוט לפי סוג הוצאה',typeInner);
@@ -4688,12 +4688,12 @@ function renderEventDash(ev){
     </div>
     ${meCard}
     ${tilesHtml}
-    ${famSection}
     ${typeSection}
     ${trSection}
     ${potSection}
     ${savSection}
-    <div style="padding:12px 16px;border-top:7px solid var(--surface2)">
+    ${famSection}
+    <div style="padding:14px 16px;border-top:10px solid var(--surface2)">
       <button onclick="closeEventDash()" style="width:100%;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
 }
