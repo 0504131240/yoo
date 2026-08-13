@@ -28,9 +28,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);direction:rt
 .hdr-date{font-size:13px;opacity:.9;margin-top:6px}
 .sect{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-top:16px}
 .sect-t{font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text2);margin-bottom:12px}
-.fams{display:flex;flex-wrap:wrap;gap:8px}
-.fam-chip{padding:9px 16px;border:1.5px solid var(--border);border-radius:22px;background:var(--surface);color:var(--text2);font-size:13.5px;font-weight:700;font-family:var(--font);cursor:pointer;transition:.15s}
-.fam-chip.on{background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)}
+.fam-select{width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 12px;font-size:15px;font-weight:600;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B6B67' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:left 14px center;transition:.15s}
+.fam-select:focus{outline:none;border-color:var(--blue-mid)}
+.fam-select.chosen{border-color:var(--blue-mid);color:var(--blue);font-weight:700;background-color:var(--blue-bg)}
 .exp{border:1px solid var(--border);border-radius:14px;padding:13px;margin-bottom:12px;position:relative;background:var(--surface)}
 .exp-n{position:absolute;top:-9px;right:14px;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px}
 .exp-del{position:absolute;top:9px;left:9px;background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;line-height:1}
@@ -116,10 +116,11 @@ function render(){
     </div>
 
     <div class="sect">
-      <div class="sect-t">מי ממלא? (בחרו משפחה)</div>
-      <div class="fams" id="fams">
-        ${participants().map(f=>`<button class="fam-chip${selFam===f.id?' on':''}" data-fid="${f.id}">${esc(f.name.replace('משפחת','').trim())}</button>`).join('')}
-      </div>
+      <div class="sect-t">מי ממלא?</div>
+      <select class="fam-select${selFam!=null?' chosen':''}" id="famSel">
+        <option value=""${selFam==null?' selected':''} disabled>בחרו משפחה…</option>
+        ${participants().map(f=>`<option value="${f.id}"${selFam===f.id?' selected':''}>${esc(f.name.replace('משפחת','').trim())}</option>`).join('')}
+      </select>
     </div>
 
     <div class="sect">
@@ -132,9 +133,9 @@ function render(){
     <div class="err" id="err"></div>
   `;
 
-  $('fams').addEventListener('click', e=>{
-    const b=e.target.closest('[data-fid]'); if(!b) return;
-    selFam = parseInt(b.dataset.fid); syncFamChips();
+  $('famSel').addEventListener('change', e=>{
+    selFam = parseInt(e.target.value)||null;
+    e.target.classList.toggle('chosen', selFam!=null);
   });
   $('addBtn').addEventListener('click', ()=>{ readRows(); addRow(); renderRows(); });
   $('rows').addEventListener('click', e=>{
@@ -166,11 +167,6 @@ function readRows(){
   });
 }
 
-function syncFamChips(){
-  document.querySelectorAll('#fams .fam-chip').forEach(b=>{
-    b.classList.toggle('on', parseInt(b.dataset.fid)===selFam);
-  });
-}
 
 async function submit(){
   readRows();
