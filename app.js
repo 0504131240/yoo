@@ -1853,11 +1853,12 @@ function evCard(ev){
       </div>
       ${ev.date&&ev.date!=='לא צוין'?`<div class="ecard-meta">${esc(ev.date)}</div>`:''}
     </div>
-    <div class="total-cost-bar" id="totalbar-${ev.id}">
-      <span>סה"כ עלות האירוע</span>
+    <div class="total-cost-bar" id="totalbar-${ev.id}" onclick="openEventDash(${ev.id})" style="cursor:pointer" title="לחצו לפרטי האירוע">
+      <span>📊 סה"כ עלות האירוע</span>
       <span style="display:flex;align-items:center;gap:4px">
         <span id="costdisp-${ev.id}" style="color:var(--green-mid);font-size:16px">₪${cost.toLocaleString()}</span>
-        ${ev.totalCost!=null?`<button class="edit-only" onclick="startEditCost(${ev.id})" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--text3);line-height:1;opacity:.55">✏️</button>`:''}
+        ${ev.totalCost!=null?`<button class="edit-only" onclick="event.stopPropagation();startEditCost(${ev.id})" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--text3);line-height:1;opacity:.55">✏️</button>`:''}
+        <span style="font-size:13px;color:var(--text3);opacity:.7">›</span>
       </span>
     </div>
     <button class="exp-btn" onclick="toggleEvCollapse(${ev.id})">${collapsed?'▼ פרטים':'▲ סגור'}</button>
@@ -4525,6 +4526,175 @@ function renderSettleModal(ev){
     ${doneRows}
     <div style="padding:10px 16px">
       <button onclick="closeSettleModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+    </div>`;
+}
+// ── Event dashboard modal ──────────────────
+// Full-event popup opened from the total-cost bar: a "dashboard" that shows
+// general info about the event plus a personal card for the viewing family,
+// a per-family balance, an expense breakdown BY TYPE (item name), the balancing
+// transfers, and pot/savings details when relevant.
+let eventDashEvId=null;
+function openEventDash(evId){
+  eventDashEvId=evId;
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  renderEventDash(ev);
+  document.getElementById('eventDashModal').style.display='flex';
+}
+function closeEventDash(){
+  document.getElementById('eventDashModal').style.display='none';
+  eventDashEvId=null;
+}
+function _dashSection(title,inner){
+  return`<div style="padding:14px 16px;border-top:7px solid var(--surface2)"><div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text2);margin-bottom:11px;letter-spacing:.2px">${title}</div>${inner}</div>`;
+}
+function renderEventDash(ev){
+  const el=document.getElementById('eventDashContent');if(!el)return;
+  const cost=evCost(ev);
+  const shares=evShares(ev);
+  const adjBal=evAdjBalance(ev);
+  const method=ev.splitMethod||'equal';
+  const potBal=evPotBal(ev);
+  const potExpTotal=evPotExpTotal(ev);
+  const hasPot=potBal>0||potExpTotal>0||(ev.potPayments||[]).length>0;
+  const savPerFam=evSavingsPerFam(ev);
+  const balanced=cost>0&&!ev.participants.some(fid=>(adjBal[fid]||0)<-0.5);
+  const myFid=_myFamId();
+  const iAmIn=myFid!=null&&ev.participants.includes(myFid);
+
+  // ── Personal card (viewing family) ──
+  let meCard='';
+  if(iAmIn){
+    const mf=getFam(myFid);
+    const mc=col(myFid).c, mbg=col(myFid).bg;
+    const myPaid=Math.round(ev.expenses[myFid]||0);
+    const myShare=Math.round(shares[myFid]||0);
+    const mb=adjBal[myFid]||0;
+    const statLine=mb>0.5
+      ?`<span style="color:var(--green)">מקבלים ₪${Math.round(mb).toLocaleString()} 💰</span>`
+      :mb<-0.5
+      ?`<span style="color:var(--red)">עליכם לשלם ₪${Math.round(-mb).toLocaleString()}</span>`
+      :`<span style="color:var(--green)">מסודרים ✓</span>`;
+    meCard=`<div style="margin:12px 16px 0;background:${mbg};border:1px solid ${mc}33;border-radius:12px;padding:12px 14px">
+      <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:${mc};margin-bottom:8px">👤 ${esc(mf?mf.name.replace('משפחת','').trim():'המשפחה שלכם')} · המצב שלכם</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="display:flex;gap:14px">
+          <div><div style="font-size:10px;color:var(--text2)">שילמתם</div><div style="font-family:var(--font-head);font-size:15px;font-weight:700">₪${myPaid.toLocaleString()}</div></div>
+          <div><div style="font-size:10px;color:var(--text2)">החלק שלכם</div><div style="font-family:var(--font-head);font-size:15px;font-weight:700">₪${myShare.toLocaleString()}</div></div>
+        </div>
+        <div style="font-family:var(--font-head);font-size:15px;font-weight:700;text-align:left">${statLine}</div>
+      </div>
+    </div>`;
+  }
+
+  // ── Overview tiles ──
+  const tile=(label,val,color)=>`<div style="flex:1;min-width:96px;background:var(--surface2);border-radius:10px;padding:9px 11px"><div style="font-size:10.5px;color:var(--text2);margin-bottom:3px">${label}</div><div style="font-family:var(--font-head);font-size:15px;font-weight:700;color:${color||'var(--text)'}">${val}</div></div>`;
+  const tiles=[
+    tile('סה"כ עלות','₪'+cost.toLocaleString(),'var(--green-mid)'),
+    tile('חלוקה',SPLIT_LABELS[method]||method),
+    tile('משפחות',String(ev.participants.length)),
+  ];
+  if(hasPot)tiles.push(tile('קופת אירוע','₪'+Math.round(potBal).toLocaleString(),'var(--amber)'));
+  if(ev.savingsTotal)tiles.push(tile('חיסכון','₪'+Math.round(ev.savingsTotal).toLocaleString(),'var(--blue)'));
+  const tilesHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 2px">${tiles.join('')}</div>`;
+
+  // ── Family balance ──
+  // Each family is a clear card: "הוציאו" = what they actually spent,
+  // "החלק ההוגן" = what they should pay, and a status pill with the difference
+  // (לשלם / יקבלו / מסודרים). The viewing family's card is tinted + labelled "אתם".
+  const famRows=ev.participants.map(fid=>{
+    const f=getFam(fid);if(!f)return'';
+    const c=col(fid).c, bg=col(fid).bg;
+    const isMe=fid===myFid;
+    const name=esc(f.name.replace('משפחת','').trim());
+    const paid=Math.round(ev.expenses[fid]||0);
+    const share=Math.round(shares[fid]||0);
+    const b=adjBal[fid]||0;
+    const pillBase='font-family:var(--font-head);font-size:12.5px;font-weight:700;padding:4px 11px;border-radius:20px;white-space:nowrap';
+    const pill=b>0.5?`<span style="${pillBase};background:var(--green-bg);color:var(--green)">${isMe?'תקבלו':'יקבלו'} ₪${Math.round(b).toLocaleString()}</span>`
+      :b<-0.5?`<span style="${pillBase};background:var(--red-bg);color:var(--red)">${isMe?'עליכם':'צריכים'} לשלם ₪${Math.round(-b).toLocaleString()}</span>`
+      :`<span style="${pillBase};background:var(--surface2);color:var(--text2)">מסודרים ✓</span>`;
+    return`<div style="border:1px solid ${isMe?c+'22':'var(--border)'};background:${isMe?bg:'transparent'};border-radius:12px;padding:11px 13px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <span style="width:11px;height:11px;border-radius:50%;background:${c};flex-shrink:0"></span>
+        <span style="flex:1;font-family:var(--font-head);font-size:14px;font-weight:700">${name}${isMe?' <span style="font-family:var(--font);font-size:10px;color:var(--text3);font-weight:600">· אתם</span>':''}</span>
+        ${pill}
+      </div>
+      <div style="display:flex;gap:18px;font-size:11.5px;color:var(--text2)">
+        <span>💸 הוציאו <b style="color:var(--text)">₪${paid.toLocaleString()}</b></span>
+        <span>⚖️ החלק ההוגן <b style="color:var(--text)">₪${share.toLocaleString()}</b></span>
+      </div>
+    </div>`;
+  }).join('');
+  const famSection=_dashSection('👨‍👩‍👧 מאזן משפחות',`<div style="display:flex;flex-direction:column;gap:9px">${famRows}</div>`);
+
+  // ── Breakdown by expense type (item name) ──
+  const groups={};
+  const add=(name,amt,fromPot)=>{const k=(name||'').trim()||'ללא שם';if(!groups[k])groups[k]={name:k,amt:0,fromPot:false,count:0};groups[k].amt+=amt||0;groups[k].count++;if(fromPot)groups[k].fromPot=true;};
+  (ev.expenseItems||[]).forEach(it=>add(it.name,it.amt,false));
+  (ev.potExpItems||[]).forEach(it=>add(it.name,it.amt,true));
+  const typeRows=Object.values(groups).map(g=>({...g,amt:Math.round(g.amt)})).filter(g=>g.amt>0).sort((a,b)=>b.amt-a.amt);
+  const typeTotal=typeRows.reduce((s,g)=>s+g.amt,0);
+  const typeMax=typeRows.length?typeRows[0].amt:0;
+  // Column (bar) chart: one vertical bar per expense type, height ∝ amount.
+  // Scrolls horizontally when there are many types so bars never get too thin.
+  const typeCols=typeRows.map((g,i)=>{
+    const c=COLORS[i%COLORS.length].c;
+    const h=typeMax?Math.max(6,Math.round(g.amt/typeMax*100)):0;
+    const pct=typeTotal?Math.round(g.amt/typeTotal*100):0;
+    return`<div style="flex:1;min-width:54px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end">
+      <span style="font-family:var(--font-head);font-size:12px;font-weight:700;white-space:nowrap">₪${g.amt.toLocaleString()}</span>
+      <span style="font-size:9.5px;color:var(--text3);margin-bottom:4px">${pct}%</span>
+      <div style="width:100%;max-width:42px;height:${h}%;background:${c};border-radius:6px 6px 0 0"></div>
+      <span style="font-size:10.5px;margin-top:6px;color:var(--text2);text-align:center;line-height:1.15;max-width:66px">${g.fromPot?'💰 ':''}${esc(g.name)}${g.count>1?` <span style="color:var(--text3)">×${g.count}</span>`:''}</span>
+    </div>`;
+  }).join('');
+  const typeInner=typeRows.length?
+    `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="display:flex;align-items:flex-end;justify-content:${typeRows.length>5?'flex-start':'space-around'};gap:10px;height:158px;padding-top:20px;${typeRows.length>5?'min-width:'+(typeRows.length*64)+'px':''}">${typeCols}</div></div>
+     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"><span style="font-size:12.5px;font-weight:700">סה"כ פריטים</span><span style="font-family:var(--font-head);font-size:15px;font-weight:700;color:var(--green-mid)">₪${typeTotal.toLocaleString()}</span></div>`
+    :`<div style="text-align:center;color:var(--text3);font-size:12.5px;padding:6px 0">אין פריטי הוצאה — העלות מחולקת לפי משפחות בלבד.</div>`;
+  const typeSection=_dashSection('📊 פירוט לפי סוג הוצאה',typeInner);
+
+  // ── Balancing transfers (read-only summary) ──
+  const transfers=calcTransfers(ev).filter(t=>!t.coveredByPot);
+  const trInner=transfers.length?transfers.map(t=>{
+    if(t.toFid==='__savings__')return`<div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)">💎 <b>${esc(t.from)}</b> משלמים לקופת חיסכון · <b style="color:var(--blue)">₪${t.amt.toLocaleString()}</b></div>`;
+    return`<div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)">👈 <b>${esc(t.from)}</b> משלמים ל<b>${esc(t.to)}</b> · <b style="color:var(--blue)">₪${t.amt.toLocaleString()}</b></div>`;
+  }).join(''):`<div style="text-align:center;color:var(--green);font-size:13px;padding:6px 0;font-weight:700">✅ כולם מסודרים!</div>`;
+  const trSection=_dashSection('🔄 העברות לאיזון',trInner);
+
+  // ── Pot (conditional) ──
+  let potSection='';
+  if(hasPot){
+    const potDeposits=Math.round((ev.potPayments||[]).reduce((s,p)=>s+p.amt,0));
+    const kv=(l,v,color)=>`<div style="flex:1;min-width:92px;background:var(--surface2);border-radius:9px;padding:8px 10px"><div style="font-size:10px;color:var(--text2)">${l}</div><div style="font-size:13px;font-weight:800;margin-top:2px;color:${color||'var(--text)'}">${v}</div></div>`;
+    potSection=_dashSection('💰 קופת אירוע',
+      `<div style="display:flex;flex-wrap:wrap;gap:8px">${kv('יתרה בקופה','₪'+Math.round(potBal).toLocaleString(),'var(--amber)')}${potDeposits?kv('הופקד','₪'+potDeposits.toLocaleString()):''}${potExpTotal?kv('הוצא מהקופה','₪'+Math.round(potExpTotal).toLocaleString()):''}</div>`);
+  }
+
+  // ── Savings (conditional) ──
+  let savSection='';
+  if(ev.savingsTotal){
+    savSection=_dashSection('💎 קופת חיסכון',
+      `<div style="font-size:12.5px;color:var(--text)">סה"כ <b>₪${Math.round(ev.savingsTotal).toLocaleString()}</b> · <b>₪${savPerFam.toLocaleString()}</b> לכל משפחה</div>`);
+  }
+
+  el.innerHTML=`
+    <div style="padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;position:sticky;top:0;background:var(--surface);z-index:2">
+      <div style="min-width:0">
+        <div style="font-family:var(--font-head);font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${esc(ev.name)}<span style="font-family:var(--font);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${balanced&&cost>0?'var(--green-bg)':'var(--amber-bg)'};color:${balanced&&cost>0?'var(--green)':'var(--amber)'}">${balanced&&cost>0?'מאוזן':'פעיל'}</span></div>
+        ${ev.date&&ev.date!=='לא צוין'?`<div style="font-size:11px;color:var(--text2);margin-top:3px">📅 ${esc(ev.date)}</div>`:''}
+      </div>
+      <button onclick="closeEventDash()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0;flex-shrink:0;line-height:1">✕</button>
+    </div>
+    ${meCard}
+    ${tilesHtml}
+    ${famSection}
+    ${typeSection}
+    ${trSection}
+    ${potSection}
+    ${savSection}
+    <div style="padding:12px 16px;border-top:7px solid var(--surface2)">
+      <button onclick="closeEventDash()" style="width:100%;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
 }
 // ── Pot modal ──────────────────────────────

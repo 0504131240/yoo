@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700;800&family=Varela+Round&display=swap');
 :root {
   --bg: #F0F2F8; --surface: #fff; --surface2: #EEECE8;
   --border: #E0DDD8; --text: #1A1A18; --text2: #6B6B67; --text3: #A0A09B;
@@ -8,6 +8,7 @@
   --blue: #0C447C; --blue-bg: #E6F1FB; --blue-mid: #1E88D8;
   --r: 16px; --r2: 10px;
   --font: 'Rubik', -apple-system, 'Segoe UI', Arial, sans-serif;
+  --font-head: 'Varela Round', 'Rubik', -apple-system, 'Segoe UI', Arial, sans-serif;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); direction: rtl; min-height: 100vh; padding-bottom: 80px; overflow-x: hidden; }
