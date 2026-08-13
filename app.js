@@ -4697,12 +4697,17 @@ function expenseFormLink(evId){
   return location.origin+location.pathname.replace(/[^/]*$/,'form.html')+'?ev='+evId;
 }
 function shareExpenseForm(evId){
-  const ev=events.find(e=>e.id===evId);
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
   const url=expenseFormLink(evId);
-  const title=ev?`טופס הוצאות · ${ev.name}`:'טופס הוצאות';
-  if(navigator.share){navigator.share({title,text:'הוסיפו הוצאות לאירוע:',url}).catch(()=>{});return;}
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>showToast('📋 קישור הטופס הועתק')).catch(()=>prompt('העתיקו את הקישור:',url));return;}
-  prompt('העתיקו את הקישור:',url);
+  const recipients=ev.participants.map(fid=>getFam(fid)).filter(f=>f&&(f.email||f.email2))
+    .map(f=>({email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}));
+  if(!recipients.length){alert('לאף אחת מהמשפחות המשתתפות אין כתובת מייל שמורה.');return;}
+  const msg=`שילמתם משהו עבור "${ev.name}"? אפשר לדווח על ההוצאה בקישור:\n${url}`;
+  const bodyHtml=`<p style="margin:0 0 16px">שילמתם משהו עבור האירוע? דווחו על ההוצאה בקלות דרך הטופס:</p>`+
+    `<div style="text-align:center;margin:0"><a href="${_esc(url)}" style="display:inline-block;background:#1E88D8;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700">📋 פתיחת טופס הוצאות ←</a></div>`;
+  const html=_emailWrap(bodyHtml,ev.name,'📋','',ev.name);
+  sendEmailNotif(recipients,`📋 טופס הוצאות · ${ev.name}`,msg,html);
+  showToast('📧 נשלח לכל המשתתפים');
 }
 // ── Per-family detail popup (opened from a family card in the dashboard) ──
 // Shows what the family actually paid (their expense items) and how their fair
