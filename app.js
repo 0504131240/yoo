@@ -4610,6 +4610,31 @@ function evSettleLines(ev,famId){
   if(_savPaid>0.5) lines.push(`שולם לקופת חיסכון ₪${_savPaid.toLocaleString()}`);
   return lines;
 }
+// Signed breakdown of everything already settled for a family, mirroring
+// evAdjBalance's credit sources exactly (name-matched settlements, pot deposits,
+// savings) so the lines always add up to the amount that was settled.
+function evCoverLines(ev,fid){
+  const lines=[];
+  const trim=f=>{const g=getFam(f);return g?g.name.replace('משפחת','').trim():'';};
+  const byName=n=>ev.participants.find(pid=>{const f=getFam(pid);return f&&f.name.replace('משפחת','').trim()===n;});
+  (ev.settled||[]).forEach(s=>{
+    const fromFid=byName(s.from),toFid=byName(s.to),amt=Math.round(s.amt);
+    if(fromFid===Number(fid)){
+      const via=s.method==='fund'?'מהארנק':s.method==='pot'?'מקופת האירוע':'ישירות';
+      const to=toFid!=null?trim(toFid):(s.to||'');
+      lines.push({t:`שילמתם ₪${amt.toLocaleString()} ${via}${to?` ל${to}`:''}`,a:amt});
+    }
+    if(toFid===Number(fid)){
+      const from=fromFid!=null?trim(fromFid):(s.from||'');
+      lines.push({t:`קיבלתם ₪${amt.toLocaleString()}${from?` מ${from}`:''} (מתווסף לחוב)`,a:-amt});
+    }
+  });
+  const pot=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
+  if(pot>0.5)lines.push({t:`הפקדתם לקופת האירוע ₪${pot.toLocaleString()}`,a:pot});
+  const sav=Math.round((ev.savingsPaid||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
+  if(sav>0.5)lines.push({t:`שילמתם לקופת חיסכון ₪${sav.toLocaleString()}`,a:sav});
+  return lines;
+}
 // Family-to-family transfers for one family in an event: both the moves that
 // already happened (from ev.settled, direct or wallet) and the ones still
 // pending (from calcTransfers). Used to show "who paid whom" on each card.
@@ -4667,6 +4692,7 @@ function renderEventFamDetail(ev,fid){
   const b=adjBal[fid]||0;
   const paidItems=(ev.expenseItems||[]).map(it=>({name:it.name,amt:Math.round(itemPayerAmt(it,fid))})).filter(x=>x.amt>0);
   const paidTotal=paidItems.reduce((s,x)=>s+x.amt,0);
+  const paidBal=Math.round(ev.expenses[fid]||0); // authoritative "spent" used by the balance
   const partial=(ev.expenseItems||[]).flatMap(it=>{
     if(it.customSplit){const a=Math.round(it.customSplit[String(fid)]||0);return a>0?[{name:it.name,amt:a}]:[];}
     if(it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length){
@@ -4723,11 +4749,11 @@ function renderEventFamDetail(ev,fid){
   // (from the wallet / event pot / direct transfers / savings).
   const owe=b<-0.5?Math.round(-b):0;
   const getBack=b>0.5?Math.round(b):0;
-  const covered=Math.round((share-paidTotal)-owe);
-  const settleLines=evSettleLines(ev,fid);
+  const covered=Math.round((share-paidBal)-owe);
+  const settleLines=evCoverLines(ev,fid).map(x=>x.t);
   const pend=transfers.filter(t=>t.pending);
   let reconInner=row('החלק ההוגן','₪'+share.toLocaleString());
-  if(paidTotal>0)reconInner+=row('בניכוי ששילמו מהכיס','−₪'+paidTotal.toLocaleString());
+  if(paidBal>0)reconInner+=row('בניכוי ששילמו מהכיס','−₪'+paidBal.toLocaleString());
   if(settleLines.length)reconInner+=`<div style="padding:7px 0 3px;font-size:11.5px;font-weight:700;color:var(--text2)">כבר סודר:</div><ul style="margin:0 0 4px;padding-inline-start:18px;font-size:12px;color:var(--text2);line-height:1.7">${settleLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`;
   if(covered>0)reconInner+=row('סה"כ סודר עד כה','−₪'+covered.toLocaleString());
   reconInner+= owe>0?row('נשאר לשלם','<span style="color:var(--red)">₪'+owe.toLocaleString()+'</span>',true)
