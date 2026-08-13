@@ -4973,7 +4973,7 @@ function renderEventDash(ev){
     </div>
     ${meCard}
     ${tilesHtml}
-    <div style="padding:4px 16px 14px"><button onclick="shareExpenseForm(${ev.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📋 שתף טופס הוצאות למשתתפים</button></div>
+    <div style="padding:4px 16px 14px" class="edit-only"><button onclick="shareExpenseForm(${ev.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📋 שתף טופס הוצאות למשתתפים</button></div>
     ${typeSection}
     ${trSection}
     ${potSection}
