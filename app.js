@@ -233,7 +233,7 @@ async function fbInit(){
   const fsMod=await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js");
   _fbApp=appMod.initializeApp(firebaseConfig);
   const db=fsMod.getFirestore(_fbApp);
-  _fb={db,doc:fsMod.doc,getDoc:fsMod.getDoc,setDoc:fsMod.setDoc,onSnapshot:fsMod.onSnapshot};
+  _fb={db,doc:fsMod.doc,getDoc:fsMod.getDoc,setDoc:fsMod.setDoc,onSnapshot:fsMod.onSnapshot,collection:fsMod.collection};
   return _fb;
 }
 
@@ -979,6 +979,47 @@ async function startRealtimeSync(){
       _initialSync=false;
     });
   }catch(e){console.warn('realtime sync:',e);}
+}
+
+// Auto-import expenses submitted through the shared expense form (form.html).
+// Each unimported doc in `formExpenses` is added to its event as an expense
+// item (attributed to the chosen family, exactly like the in-app add), then
+// marked imported so it is not processed again.
+let _formImportUnsub=null,_importingForms=false;
+async function startFormImportSync(){
+  if(_formImportUnsub)return;
+  try{
+    const {db,doc,setDoc,collection,onSnapshot}=await fbInit();
+    _formImportUnsub=onSnapshot(collection(db,'formExpenses'),async snap=>{
+      if(_importingForms)return;
+      const pending=[];
+      snap.forEach(dref=>{const s=dref.data();if(s&&!s.imported)pending.push({_id:dref.id,...s});});
+      if(!pending.length)return;
+      _importingForms=true;
+      try{
+        let changed=false;
+        for(const sub of pending){
+          const ev=events.find(e=>e.id===sub.eventId);
+          if(!ev)continue; // event not loaded/deleted — leave pending, retry later
+          if(!ev.expenseItems)ev.expenseItems=[];
+          let added=0;
+          (sub.items||[]).forEach(it=>{
+            const amt=Math.round(it.amt||0);const nm=(it.name||'').toString().trim();
+            if(!nm||amt<=0)return;
+            ev.expItemId=(ev.expItemId||0)+1;
+            const item={id:ev.expItemId,name:nm,amt,famId:sub.famId,fromForm:true};
+            if(it.note)item.note=String(it.note);
+            ev.expenseItems.push(item);
+            _creditItemPayers(ev,item);
+            added++;
+          });
+          if(added){changed=true;addNotif('📋',`${sub.famName||'משפחה'} שלח/ה ${added} הוצאה${added===1?'':'ות'} דרך הטופס ל"${ev.name}"`);}
+          await setDoc(doc(db,'formExpenses',sub._id),{imported:true,importedAt:new Date().toISOString()},{merge:true});
+        }
+        if(changed){_skipNextNotif=true;save();render();}
+      }finally{_importingForms=false;}
+    });
+  }catch(e){console.warn('form import sync:',e);}
 }
 
 function renderMessages(){
@@ -4587,6 +4628,19 @@ function evFamTransfers(ev,famId){
   });
   return out;
 }
+// Shareable expense-form link for an event (form.html?ev=<id>), resolved
+// relative to wherever the app is currently served.
+function expenseFormLink(evId){
+  return location.origin+location.pathname.replace(/[^/]*$/,'form.html')+'?ev='+evId;
+}
+function shareExpenseForm(evId){
+  const ev=events.find(e=>e.id===evId);
+  const url=expenseFormLink(evId);
+  const title=ev?`טופס הוצאות · ${ev.name}`:'טופס הוצאות';
+  if(navigator.share){navigator.share({title,text:'הוסיפו הוצאות לאירוע:',url}).catch(()=>{});return;}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>showToast('📋 קישור הטופס הועתק')).catch(()=>prompt('העתיקו את הקישור:',url));return;}
+  prompt('העתיקו את הקישור:',url);
+}
 // ── Event dashboard modal ──────────────────
 // Full-event popup opened from the total-cost bar: a "dashboard" that shows
 // general info about the event plus a personal card for the viewing family,
@@ -4768,6 +4822,7 @@ function renderEventDash(ev){
     </div>
     ${meCard}
     ${tilesHtml}
+    <div style="padding:2px 16px 0"><button onclick="shareExpenseForm(${ev.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📋 שתף טופס הוצאות למשתתפים</button></div>
     ${typeSection}
     ${trSection}
     ${potSection}
@@ -5260,7 +5315,7 @@ async function _updateCustomTotal(){
 }
 
 applyEditMode();
-load().then(async()=>{await autoUnlockAdmin();if(window.location.hash)handleHash();startRealtimeSync();renderNotifBtn();if(_notifOk()){checkBirthdayNotifs();registerFCMToken();}});
+load().then(async()=>{await autoUnlockAdmin();if(window.location.hash)handleHash();startRealtimeSync();startFormImportSync();renderNotifBtn();if(_notifOk()){checkBirthdayNotifs();registerFCMToken();}});
 loadEjsSettings();
 loadPaymentSettings();
 window.addEventListener('hashchange',handleHash);

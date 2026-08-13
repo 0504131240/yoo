@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>טופס הוצאות · ינקלביץ</title>
+<link rel="icon" href="icon.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700;800&family=Varela+Round&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F0F2F8;--surface:#fff;--surface2:#EEECE8;--border:#E0DDD8;
+  --text:#1A1A18;--text2:#6B6B67;--text3:#A0A09B;
+  --green:#0F6E56;--green-bg:#E1F5EE;--green-mid:#1D9E75;
+  --red:#791F1F;--red-bg:#FCEBEB;--red-mid:#A32D2D;
+  --blue:#0C447C;--blue-bg:#E6F1FB;--blue-mid:#1E88D8;
+  --r:16px;--r2:10px;
+  --font:'Rubik',-apple-system,'Segoe UI',Arial,sans-serif;
+  --font-head:'Varela Round','Rubik',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;min-height:100vh;padding:18px 14px 40px}
+.wrap{max-width:560px;margin:0 auto}
+.hdr{background:linear-gradient(135deg,#0C447C 0%,#1E88D8 100%);border-radius:18px;padding:22px 20px;color:#fff;text-align:center;box-shadow:0 10px 30px rgba(12,68,124,.25)}
+.hdr-eyebrow{font-size:12px;opacity:.85;font-weight:600;margin-bottom:6px}
+.hdr-name{font-family:var(--font-head);font-size:23px;font-weight:700;line-height:1.2}
+.hdr-date{font-size:13px;opacity:.9;margin-top:6px}
+.sect{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-top:16px}
+.sect-t{font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text2);margin-bottom:12px}
+.fams{display:flex;flex-wrap:wrap;gap:8px}
+.fam-chip{padding:9px 16px;border:1.5px solid var(--border);border-radius:22px;background:var(--surface);color:var(--text2);font-size:13.5px;font-weight:700;font-family:var(--font);cursor:pointer;transition:.15s}
+.fam-chip.on{background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)}
+.exp{border:1px solid var(--border);border-radius:14px;padding:13px;margin-bottom:12px;position:relative;background:var(--surface)}
+.exp-n{position:absolute;top:-9px;right:14px;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px}
+.exp-del{position:absolute;top:9px;left:9px;background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;line-height:1}
+.fld{margin-top:11px}
+.fld:first-of-type{margin-top:4px}
+.fld label{display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px}
+.fld input,.fld textarea{width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 12px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl}
+.fld input.amt{direction:ltr;text-align:left}
+.fld textarea{resize:vertical;min-height:44px}
+.photo-soon{display:flex;align-items:center;gap:7px;margin-top:11px;padding:9px 12px;border:1.5px dashed var(--border);border-radius:var(--r2);color:var(--text3);font-size:12.5px;font-weight:600}
+.btn{width:100%;padding:13px;border-radius:var(--r2);border:none;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer}
+.btn-add{background:var(--surface);border:1.5px dashed var(--blue-mid);color:var(--blue-mid);margin-top:2px}
+.btn-send{background:var(--blue-mid);color:#fff;margin-top:16px;box-shadow:0 8px 20px rgba(30,136,216,.3)}
+.btn-send:disabled{opacity:.55;cursor:default;box-shadow:none}
+.err{color:var(--red-mid);font-size:13px;font-weight:600;text-align:center;margin-top:10px;display:none}
+.state{text-align:center;padding:60px 20px;color:var(--text2)}
+.done{text-align:center;padding:44px 20px}
+.done-ico{font-size:56px}
+.done-t{font-family:var(--font-head);font-size:22px;font-weight:700;margin-top:10px}
+.done-s{font-size:14px;color:var(--text2);margin-top:8px;line-height:1.6}
+.foot{text-align:center;font-size:11px;color:var(--text3);margin-top:22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="app"><div class="state">טוען…</div></div>
+  <div class="foot">ינקלביץ · מערכת ניהול הוצאות משפחתית</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0MZMuGBBIXckhdiOZRZXRC_NPEte7pMA",
+  authDomain: "yossi20361.firebaseapp.com",
+  projectId: "yossi20361",
+  storageBucket: "yossi20361.firebasestorage.app",
+  messagingSenderId: "789621490367",
+  appId: "1:789621490367:web:e62376e9d46a86903f7c0a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const evId = parseInt(new URLSearchParams(location.search).get('ev'));
+let ev=null, families=[], selFam=null, rows=[], seq=1;
+
+async function boot(){
+  if(!evId){ return fail('קישור לא תקין — חסר מזהה אירוע.'); }
+  let snap;
+  try{ snap = await getDoc(doc(db,'appData','familyPayments')); }
+  catch(e){ return fail('שגיאה בטעינת הנתונים. נסו שוב מאוחר יותר.'); }
+  if(!snap.exists()) return fail('לא נמצאו נתונים.');
+  const data = snap.data();
+  families = data.families||[];
+  ev = (data.events||[]).find(e=>e.id===evId);
+  if(!ev) return fail('האירוע לא נמצא (אולי נמחק).');
+  render();
+}
+
+function fail(msg){
+  $('app').innerHTML = `<div class="hdr"><div class="hdr-name">טופס הוצאות</div></div>
+    <div class="sect"><div class="state" style="padding:30px 10px">😕<br><br>${esc(msg)}</div></div>`;
+}
+
+function participants(){
+  return (ev.participants||[]).map(fid=>families.find(f=>f.id===fid)).filter(Boolean);
+}
+
+function addRow(){ rows.push({id:seq++, name:'', amt:'', note:''}); }
+
+function render(){
+  if(!rows.length) addRow();
+  const dateTxt = ev.date && ev.date!=='לא צוין' ? ev.date : '';
+  $('app').innerHTML = `
+    <div class="hdr">
+      <div class="hdr-eyebrow">📋 טופס הוספת הוצאות</div>
+      <div class="hdr-name">${esc(ev.name)}</div>
+      ${dateTxt?`<div class="hdr-date">📅 ${esc(dateTxt)}</div>`:''}
+    </div>
+
+    <div class="sect">
+      <div class="sect-t">מי ממלא? (בחרו משפחה)</div>
+      <div class="fams" id="fams">
+        ${participants().map(f=>`<button class="fam-chip${selFam===f.id?' on':''}" data-fid="${f.id}">${esc(f.name.replace('משפחת','').trim())}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-t">ההוצאות</div>
+      <div id="rows">${rows.map(rowHtml).join('')}</div>
+      <button class="btn btn-add" id="addBtn">➕ הוסף הוצאה</button>
+    </div>
+
+    <button class="btn btn-send" id="sendBtn">שליחה</button>
+    <div class="err" id="err"></div>
+  `;
+
+  $('fams').addEventListener('click', e=>{
+    const b=e.target.closest('[data-fid]'); if(!b) return;
+    selFam = parseInt(b.dataset.fid); syncFamChips();
+  });
+  $('addBtn').addEventListener('click', ()=>{ readRows(); addRow(); renderRows(); });
+  $('rows').addEventListener('click', e=>{
+    const d=e.target.closest('[data-del]'); if(!d) return;
+    readRows(); rows = rows.filter(r=>r.id!==parseInt(d.dataset.del)); if(!rows.length) addRow(); renderRows();
+  });
+  $('sendBtn').addEventListener('click', submit);
+}
+
+function rowHtml(r,i){
+  return `<div class="exp" data-row="${r.id}">
+    <span class="exp-n">הוצאה ${i+1}</span>
+    ${rows.length>1?`<button class="exp-del" data-del="${r.id}" title="הסר">🗑</button>`:''}
+    <div class="fld"><label>פירוט ההוצאה</label><input data-f="name" value="${esc(r.name)}" placeholder="למשל: בשר, שתייה, חד-פעמי" maxlength="60"></div>
+    <div class="fld"><label>סכום (₪)</label><input data-f="amt" class="amt" value="${esc(r.amt)}" inputmode="decimal" placeholder="0"></div>
+    <div class="fld"><label>הערות (לא חובה)</label><textarea data-f="note" placeholder="הערה, פירוט נוסף…" maxlength="200">${esc(r.note)}</textarea></div>
+    <div class="photo-soon">📷 צילום חשבונית — יתווסף בקרוב</div>
+  </div>`;
+}
+
+function renderRows(){
+  $('rows').innerHTML = rows.map(rowHtml).join('');
+}
+
+function readRows(){
+  document.querySelectorAll('#rows .exp').forEach(el=>{
+    const id=parseInt(el.dataset.row); const r=rows.find(x=>x.id===id); if(!r) return;
+    el.querySelectorAll('[data-f]').forEach(inp=>{ r[inp.dataset.f]=inp.value; });
+  });
+}
+
+function syncFamChips(){
+  document.querySelectorAll('#fams .fam-chip').forEach(b=>{
+    b.classList.toggle('on', parseInt(b.dataset.fid)===selFam);
+  });
+}
+
+async function submit(){
+  readRows();
+  const err=$('err');
+  if(selFam==null){ return showErr('בחרו קודם איזו משפחה ממלאת.'); }
+  const items = rows
+    .map(r=>({name:(r.name||'').trim(), amt:Math.round(parseFloat(r.amt)||0), note:(r.note||'').trim()}))
+    .filter(it=>it.name && it.amt>0);
+  if(!items.length){ return showErr('הוסיפו לפחות הוצאה אחת עם פירוט וסכום.'); }
+
+  const btn=$('sendBtn'); btn.disabled=true; btn.textContent='שולח…'; err.style.display='none';
+  const fam = families.find(f=>f.id===selFam);
+  const id = 'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  try{
+    await setDoc(doc(db,'formExpenses',id), {
+      eventId: evId,
+      eventName: ev.name,
+      famId: selFam,
+      famName: fam ? fam.name.replace('משפחת','').trim() : '',
+      items,
+      submittedAt: new Date().toISOString(),
+      imported: false
+    });
+    done(items.length);
+  }catch(e){
+    btn.disabled=false; btn.textContent='שליחה';
+    showErr('השליחה נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+  }
+}
+
+function showErr(m){ const e=$('err'); e.textContent=m; e.style.display='block'; }
+
+function done(n){
+  $('app').innerHTML = `<div class="hdr"><div class="hdr-name">${esc(ev.name)}</div></div>
+    <div class="sect"><div class="done">
+      <div class="done-ico">✅</div>
+      <div class="done-t">נשלח בהצלחה!</div>
+      <div class="done-s">${n} ${n===1?'הוצאה נשלחה':'הוצאות נשלחו'} לאירוע.<br>ההוצאות יתווספו אוטומטית.</div>
+      <button class="btn btn-add" style="margin-top:20px;max-width:220px;margin-inline:auto" onclick="location.reload()">➕ שליחת עוד</button>
+    </div></div>`;
+}
+
+boot();
+</script>
+</body>
+</html>
