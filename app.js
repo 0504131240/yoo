@@ -4528,6 +4528,45 @@ function renderSettleModal(ev){
       <button onclick="closeSettleModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
 }
+// Human-readable "how was it settled" lines for one family in an event —
+// direct transfers, wallet (קופה ראשית) payments, and event-pot movements.
+// Ported from the settled-email logic so the dashboard can explain the gap
+// between what a family paid and its fair share.
+function evSettleLines(ev,famId){
+  const lines=[];
+  const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
+  const _potTotal=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(famId)).reduce((s,p)=>s+p.amt,0));
+  const _fromFundToPot=Math.round((fund.transactions||[])
+    .filter(t=>Number(t.famId)===Number(famId)&&t.type==='payout'&&(t.desc||'').includes('העברה לקופת האירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
+    .reduce((s,t)=>s+t.amount,0));
+  if(_potTotal>0.5){
+    if(_fromFundToPot>0.5&&_fromFundToPot===_potTotal) lines.push(`העברתם מהארנק ₪${_potTotal.toLocaleString()} לקופת האירוע`);
+    else{ lines.push(`הפקדתם לקופת האירוע ₪${_potTotal.toLocaleString()}`); if(_fromFundToPot>0.5) lines.push(`מתוכם ₪${_fromFundToPot.toLocaleString()} מהארנק`); }
+  }
+  const _potRec=Math.round((ev.settled||[]).filter(s=>s.method==='pot'&&Number(s.toFid)===Number(famId)).reduce((s,t)=>s+t.amt,0));
+  const _toFundFromPot=Math.round((fund.transactions||[])
+    .filter(t=>Number(t.famId)===Number(famId)&&t.type==='deposit'&&(t.desc||'').includes('מקופת אירוע')&&(t.evId!=null?t.evId===ev.id:(t.desc||'').includes(ev.name)))
+    .reduce((s,t)=>s+t.amount,0));
+  if(_potRec>0.5){
+    if(_toFundFromPot>0.5&&_toFundFromPot===_potRec) lines.push(`הועבר מקופת האירוע ₪${_potRec.toLocaleString()} לארנק שלכם`);
+    else{ lines.push(`קיבלתם ₪${_potRec.toLocaleString()} מקופת האירוע`); if(_toFundFromPot>0.5) lines.push(`מתוכם ₪${_toFundFromPot.toLocaleString()} לארנק`); }
+  }
+  (ev.settled||[]).forEach(s=>{
+    if(s.method==='pot') return;
+    const isFrom=s.fromFid!=null?Number(s.fromFid)===Number(famId):(_sfByName(s.from)||{}).id===famId;
+    const isTo=s.toFid!=null?Number(s.toFid)===Number(famId):(_sfByName(s.to)||{}).id===famId;
+    const sTo=(getFam(s.toFid)||{}).name?(getFam(s.toFid).name.replace('משפחת','').trim()):s.to;
+    const sFrom=(getFam(s.fromFid)||{}).name?(getFam(s.fromFid).name.replace('משפחת','').trim()):s.from;
+    if(isFrom){
+      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהארנק ל${sTo}`);
+      else lines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${sTo}`);
+    } else if(isTo){
+      if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועברו לארנק`);
+      else lines.push(`קיבלתם ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
+    }
+  });
+  return lines;
+}
 // ── Event dashboard modal ──────────────────
 // Full-event popup opened from the total-cost bar: a "dashboard" that shows
 // general info about the event plus a personal card for the viewing family,
@@ -4569,20 +4608,31 @@ function renderEventDash(ev){
     const myPaid=Math.round(ev.expenses[myFid]||0);
     const myShare=Math.round(shares[myFid]||0);
     const mb=adjBal[myFid]||0;
+    const gap=myShare-myPaid; // >0: still needed to cover; <0: paid extra
     const statLine=mb>0.5
-      ?`<span style="color:var(--green)">מקבלים ₪${Math.round(mb).toLocaleString()} 💰</span>`
+      ?`<span style="color:var(--green)">מגיע לכם החזר ₪${Math.round(mb).toLocaleString()} 💰</span>`
       :mb<-0.5
       ?`<span style="color:var(--red)">עליכם לשלם ₪${Math.round(-mb).toLocaleString()}</span>`
       :`<span style="color:var(--green)">מסודרים ✓</span>`;
+    const myLines=evSettleLines(ev,myFid);
+    const howHtml=myLines.length
+      ?`<div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${mc}55">
+          <div style="font-family:var(--font-head);font-size:11.5px;font-weight:700;color:${mc};margin-bottom:5px">⚖️ איך סודר${gap>0.5?` ההפרש (₪${Math.round(gap).toLocaleString()})`:''}</div>
+          <ul style="margin:0;padding-inline-start:18px;font-size:12px;color:var(--text);line-height:1.7">${myLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>
+        </div>`
+      :(mb<-0.5?`<div style="margin-top:9px;font-size:11.5px;color:var(--red);font-weight:600">⚠️ טרם שולם — נותרו ₪${Math.round(-mb).toLocaleString()} להסדרה.</div>`:'');
+    const meRow=(lbl,sub,val)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:12.5px;color:var(--text2)">${lbl}${sub?` <span style="font-size:10px;color:var(--text3)">${sub}</span>`:''}</span><span style="font-family:var(--font-head);font-size:15px;font-weight:700">₪${val.toLocaleString()}</span></div>`;
     meCard=`<div style="margin:12px 16px 0;background:${mbg};border:1px solid ${mc}33;border-radius:12px;padding:12px 14px">
-      <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:${mc};margin-bottom:8px">👤 ${esc(mf?mf.name.replace('משפחת','').trim():'המשפחה שלכם')} · המצב שלכם</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <div style="display:flex;gap:14px">
-          <div><div style="font-size:10px;color:var(--text2)">שילמתם</div><div style="font-family:var(--font-head);font-size:15px;font-weight:700">₪${myPaid.toLocaleString()}</div></div>
-          <div><div style="font-size:10px;color:var(--text2)">החלק שלכם</div><div style="font-family:var(--font-head);font-size:15px;font-weight:700">₪${myShare.toLocaleString()}</div></div>
+      <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:${mc};margin-bottom:9px">👤 ${esc(mf?mf.name.replace('משפחת','').trim():'המשפחה שלכם')} · המצב שלכם</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${meRow('💸 שילמתם בפועל','(מהכיס)',myPaid)}
+        ${meRow('⚖️ החלק שלכם','(כמה מגיע לשלם)',myShare)}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid ${mc}33;padding-top:8px;margin-top:1px">
+          <span style="font-size:12.5px;font-weight:700">המצב שלכם</span>
+          <span style="font-family:var(--font-head);font-size:15px;font-weight:700;text-align:left">${statLine}</span>
         </div>
-        <div style="font-family:var(--font-head);font-size:15px;font-weight:700;text-align:left">${statLine}</div>
       </div>
+      ${howHtml}
     </div>`;
   }
 
@@ -4613,6 +4663,12 @@ function renderEventDash(ev){
     const pill=b>0.5?`<span style="${pillBase};background:var(--green-bg);color:var(--green)">${isMe?'תקבלו':'יקבלו'} ₪${Math.round(b).toLocaleString()}</span>`
       :b<-0.5?`<span style="${pillBase};background:var(--red-bg);color:var(--red)">${isMe?'עליכם':'צריכים'} לשלם ₪${Math.round(-b).toLocaleString()}</span>`
       :`<span style="${pillBase};background:var(--surface2);color:var(--text2)">מסודרים ✓</span>`;
+    const fLines=evSettleLines(ev,fid);
+    const fGap=share-paid;
+    const howRow=fLines.length?`<div style="margin-top:7px;padding-top:7px;border-top:1px dashed var(--border)">
+      <div style="font-size:10.5px;font-weight:700;color:var(--text3);margin-bottom:3px">איך סודר${fGap>0.5?` ההפרש (₪${Math.round(fGap).toLocaleString()})`:''}</div>
+      <ul style="margin:0;padding-inline-start:16px;font-size:11px;color:var(--text2);line-height:1.6">${fLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>
+    </div>`:'';
     return`<div style="border:1px solid ${isMe?c+'22':'var(--border)'};background:${isMe?bg:'transparent'};border-radius:12px;padding:11px 13px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
         <span style="width:11px;height:11px;border-radius:50%;background:${c};flex-shrink:0"></span>
@@ -4623,6 +4679,7 @@ function renderEventDash(ev){
         <span>💸 הוציאו <b style="color:var(--text)">₪${paid.toLocaleString()}</b></span>
         <span>⚖️ החלק ההוגן <b style="color:var(--text)">₪${share.toLocaleString()}</b></span>
       </div>
+      ${howRow}
     </div>`;
   }).join('');
   const famSection=_dashSection('👨‍👩‍👧 מאזן משפחות',`<div style="display:flex;flex-direction:column;gap:9px">${famRows}</div>`);
