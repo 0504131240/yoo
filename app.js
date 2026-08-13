@@ -4641,6 +4641,94 @@ function shareExpenseForm(evId){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>showToast('📋 קישור הטופס הועתק')).catch(()=>prompt('העתיקו את הקישור:',url));return;}
   prompt('העתיקו את הקישור:',url);
 }
+// ── Per-family detail popup (opened from a family card in the dashboard) ──
+// Shows what the family actually paid (their expense items) and how their fair
+// share in the event breaks down, plus their balance and transfers.
+let famExpModalKey=null;
+function openEventFamDetail(evId,fid){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  famExpModalKey=evId+'-'+fid;
+  renderEventFamDetail(ev,fid);
+  document.getElementById('famExpModal').style.display='flex';
+}
+function closeEventFamDetail(){
+  document.getElementById('famExpModal').style.display='none';
+  famExpModalKey=null;
+}
+function renderEventFamDetail(ev,fid){
+  const el=document.getElementById('famExpModalContent');if(!el)return;
+  const f=getFam(fid);if(!f){el.innerHTML='';return;}
+  const c=col(fid).c;
+  const name=esc(f.name.replace('משפחת','').trim());
+  const shares=evShares(ev),adjBal=evAdjBalance(ev);
+  const share=Math.round(shares[fid]||0);
+  const b=adjBal[fid]||0;
+  const paidItems=(ev.expenseItems||[]).map(it=>({name:it.name,amt:Math.round(itemPayerAmt(it,fid))})).filter(x=>x.amt>0);
+  const paidTotal=paidItems.reduce((s,x)=>s+x.amt,0);
+  const partial=(ev.expenseItems||[]).flatMap(it=>{
+    if(it.customSplit){const a=Math.round(it.customSplit[String(fid)]||0);return a>0?[{name:it.name,amt:a}]:[];}
+    if(it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length){
+      const sw=it.sharedWith.filter(id=>ev.participants.includes(id));
+      return sw.includes(fid)?[{name:it.name,amt:Math.round(it.amt/sw.length)}]:[];
+    }
+    return [];
+  });
+  const partialSum=partial.reduce((s,x)=>s+x.amt,0);
+  const savings=evSavingsPerFam(ev);
+  const globalPortion=Math.max(0,share-partialSum-savings);
+  // Itemize the shared-cost portion: the family pays a weight-based fraction of
+  // each non-partial expense item, so show e.g. "כרטיסים ₪50 · פיצה ₪30".
+  const method=ev.splitMethod||'equal';
+  let totalW=0;const wmap={};
+  ev.participants.forEach(pid=>{wmap[pid]=famWeight(getFam(pid),method,ev.childOverrides?.[pid],ev.parentOverrides?.[pid]);totalW+=wmap[pid];});
+  const frac=totalW?wmap[fid]/totalW:0;
+  const isPartialItem=it=>it.customSplit||(it.sharedWith&&it.sharedWith.length>0&&it.sharedWith.length<ev.participants.length);
+  const globalSrc=[...(ev.expenseItems||[]).filter(it=>!isPartialItem(it)&&it.amt>0).map(it=>({name:it.name,amt:it.amt,pot:false})),
+                   ...(ev.potExpItems||[]).filter(it=>it.amt>0).map(it=>({name:it.name,amt:it.amt,pot:true}))];
+  let sharedRows=[];
+  if(globalSrc.length&&globalPortion>0){
+    const raws=globalSrc.map(x=>x.amt*frac);
+    const floors=raws.map(v=>Math.floor(v));
+    let rem=Math.round(globalPortion-floors.reduce((s,v)=>s+v,0));
+    const ord=raws.map((v,i)=>({i,f:v-Math.floor(v)})).sort((a,b)=>b.f-a.f);
+    for(let k=0;rem>0&&k<ord.length;k++){floors[ord[k].i]++;rem--;}
+    sharedRows=globalSrc.map((x,i)=>({name:x.name,pot:x.pot,amt:floors[i]})).filter(x=>x.amt>0);
+  }
+  const pillBase='font-family:var(--font-head);font-size:13px;font-weight:700;padding:5px 14px;border-radius:20px;white-space:nowrap';
+  const pill=b>0.5?`<span style="${pillBase};background:var(--green-bg);color:var(--green)">יקבלו ₪${Math.round(b).toLocaleString()}</span>`
+    :b<-0.5?`<span style="${pillBase};background:var(--red-bg);color:var(--red)">צריכים לשלם ₪${Math.round(-b).toLocaleString()}</span>`
+    :`<span style="${pillBase};background:var(--surface2);color:var(--text2)">מסודרים ✓</span>`;
+  const row=(l,v,strong)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12.5px;color:var(--text2)">${l}</span><span style="font-family:var(--font-head);font-size:13px;font-weight:700${strong?';color:var(--green-mid)':''}">${v}</span></div>`;
+  const sec=(title,inner)=>`<div style="padding:13px 16px;border-top:7px solid var(--surface2)"><div style="font-family:var(--font-head);font-size:12.5px;font-weight:700;color:var(--text2);margin-bottom:8px">${title}</div>${inner}</div>`;
+  const paidInner=paidItems.length?paidItems.map(x=>row(esc(x.name),'₪'+x.amt.toLocaleString())).join('')+row('סה"כ הוציאו','₪'+paidTotal.toLocaleString(),true)
+    :`<div style="font-size:12.5px;color:var(--text3);text-align:center;padding:4px 0">לא שילמו הוצאות ישירות באירוע.</div>`;
+  const shareInner=(sharedRows.length
+      ?sharedRows.map(x=>row((x.pot?'💰 ':'')+esc(x.name),'₪'+x.amt.toLocaleString())).join('')
+      :(globalPortion>0?row('עלות כללית','₪'+globalPortion.toLocaleString()):''))
+    +partial.map(x=>row('👥 '+esc(x.name)+' <span style="font-size:10px;color:var(--text3)">(חלקי)</span>','₪'+x.amt.toLocaleString())).join('')
+    +(savings>0?row('💎 קופת חיסכון','₪'+savings.toLocaleString()):'')
+    +row('סה"כ החלק ההוגן','₪'+share.toLocaleString(),true)
+    +`<div style="font-size:11px;color:var(--text3);margin-top:6px">שיטת חלוקה: ${esc(SPLIT_LABELS[ev.splitMethod||'equal']||'')}</div>`;
+  const trChip=t=>{
+    const amt='₪'+t.amt.toLocaleString();const other=esc(t.other||'');let txt,bg,color;
+    if(t.dir==='out'){txt=`${t.pending?'להעביר':'העבירו'} ${amt} ל${other}`;bg=t.pending?'var(--red-bg)':'var(--surface2)';color=t.pending?'var(--red)':'var(--text2)';}
+    else{txt=`${t.pending?'לקבל':'קבלו'} ${amt} מ${other}`;bg='var(--green-bg)';color='var(--green)';}
+    return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:${bg};color:${color};padding:3px 9px;border-radius:20px;white-space:nowrap">⇄ ${txt}</span>`;
+  };
+  const transfers=evFamTransfers(ev,fid);
+  const trInner=transfers.length?`<div style="display:flex;flex-wrap:wrap;gap:6px">${transfers.map(trChip).join('')}</div>`:`<div style="font-size:12px;color:var(--text3);text-align:center;padding:2px 0">אין העברות לסידור.</div>`;
+  el.innerHTML=`
+    <div style="padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px">
+      <span style="width:12px;height:12px;border-radius:50%;background:${c};flex-shrink:0"></span>
+      <span style="flex:1;font-family:var(--font-head);font-size:16px;font-weight:700">${name}</span>
+      ${pill}
+      <button onclick="closeEventFamDetail()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0;line-height:1;margin-right:2px">✕</button>
+    </div>
+    ${sec('💸 ההוצאות ששילמו',paidInner)}
+    ${sec('⚖️ פירוט החלק שלהם באירוע',shareInner)}
+    ${sec('⇄ העברות',trInner)}
+    <div style="padding:12px 16px;border-top:7px solid var(--surface2)"><button onclick="closeEventFamDetail()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button></div>`;
+}
 // ── Event dashboard modal ──────────────────
 // Full-event popup opened from the total-cost bar: a "dashboard" that shows
 // general info about the event plus a personal card for the viewing family,
@@ -4746,11 +4834,12 @@ function renderEventDash(ev){
     };
     const fTransfers=evFamTransfers(ev,fid);
     const trRow=fTransfers.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${fTransfers.map(trChip).join('')}</div>`:'';
-    return`<div style="border:1px solid ${isMe?c+'22':'var(--border)'};background:${isMe?bg:'transparent'};border-radius:12px;padding:11px 13px">
+    return`<div onclick="openEventFamDetail(${ev.id},${fid})" title="לחצו לפירוט המשפחה" style="border:1px solid ${isMe?c+'22':'var(--border)'};background:${isMe?bg:'transparent'};border-radius:12px;padding:11px 13px;cursor:pointer">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
         <span style="width:11px;height:11px;border-radius:50%;background:${c};flex-shrink:0"></span>
         <span style="flex:1;font-family:var(--font-head);font-size:14px;font-weight:700">${name}${isMe?' <span style="font-family:var(--font);font-size:10px;color:var(--text3);font-weight:600">· אתם</span>':''}</span>
         ${pill}
+        <span style="font-size:13px;color:var(--text3);opacity:.6;margin-right:1px">›</span>
       </div>
       <div style="display:flex;gap:18px;font-size:11.5px;color:var(--text2)">
         <span>💸 הוציאו <b style="color:var(--text)">₪${paid.toLocaleString()}</b></span>
