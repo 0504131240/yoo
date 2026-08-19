@@ -26,6 +26,9 @@
     </div>
   </div>
 
+  <!-- Countdown clocks -->
+  <div id="countdownSection" style="margin-top:14px"></div>
+
   <!-- Summer Calendar link card -->
   <a href="https://haketz-shel-yankelevitz.vercel.app/" target="_blank"
      style="display:block;margin:14px 14px 6px;border-radius:16px;overflow:hidden;text-decoration:none;box-shadow:0 4px 20px rgba(247,151,30,0.3)">
@@ -375,6 +378,11 @@
         style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;direction:ltr;text-align:right">
       <button onclick="savePaymentSettings()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור פרטי תשלום</button>
       <div id="payStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
+    </div>
+    <div class="sec-ttl edit-only" style="margin-top:20px">📢 שליחת הודעה לכולם</div>
+    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">שולח מייל לכל המשפחות שיש להן כתובת מייל שמורה.</div>
+      <button onclick="openBroadcastModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✏️ נסח ושלח הודעה</button>
     </div>
     <div id="visitLogSection"></div>
     <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">
@@ -784,6 +792,47 @@
 <div id="potTrModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1600;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closePotTransferModal()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:420px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
     <div id="potTrModalContent"></div>
+  </div>
+</div>
+
+<!-- Broadcast email modal -->
+<div id="broadcastModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeBroadcastModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">📢 הודעה לכל המשפחות</div>
+    <div id="broadcastHint" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
+    <div class="field">
+      <label class="field-lbl">נושא</label>
+      <input type="text" id="broadcastSubject" placeholder="לדוגמה: עדכון לגבי הטיול הקרוב" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label class="field-lbl">תוכן ההודעה</label>
+      <textarea id="broadcastMsg" rows="6" placeholder="כתבו כאן את ההודעה..." style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+    <div id="broadcastErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="sendBroadcastEmail()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">📧 שלח לכולם</button>
+      <button onclick="closeBroadcastModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- New countdown modal -->
+<div id="countdownModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCountdownModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:340px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">⏱ שעון ספירה לאחור חדש</div>
+    <div class="field">
+      <label class="field-lbl">כיתוב</label>
+      <input type="text" id="countdownTitle" placeholder="לדוגמה: לחתונה של דנה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label class="field-lbl">עד לתאריך</label>
+      <input type="date" id="countdownDate" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+    </div>
+    <div id="countdownErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="saveCountdownNew()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ צור שעון</button>
+      <button onclick="closeCountdownModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
   </div>
 </div>
 </body>

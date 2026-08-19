@@ -21,7 +21,8 @@ let paymentClaims=[];
 let visits=[];
 let notifications=[];
 let polls=[];
-let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1,nxtNotif=1,nxtPoll=1;
+let countdowns=[];
+let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1,nxtNotif=1,nxtPoll=1,nxtCountdown=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
 let calHebRefDate=new Date();
@@ -272,6 +273,32 @@ async function saveEjsSettings(){
   }catch(e){}
   const st=document.getElementById('ejsStatus');
   if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
+}
+function openBroadcastModal(){
+  const subjEl=document.getElementById('broadcastSubject');if(subjEl)subjEl.value='';
+  const msgEl=document.getElementById('broadcastMsg');if(msgEl)msgEl.value='';
+  const err=document.getElementById('broadcastErr');if(err)err.style.display='none';
+  const cnt=families.filter(f=>f.email||f.email2).length;
+  const hint=document.getElementById('broadcastHint');
+  if(hint)hint.textContent=cnt?`יישלח ל-${cnt} משפחות עם כתובת מייל שמורה`:'אין משפחות עם כתובת מייל שמורה';
+  document.getElementById('broadcastModal').style.display='flex';
+}
+function closeBroadcastModal(){
+  document.getElementById('broadcastModal').style.display='none';
+}
+function sendBroadcastEmail(){
+  const subject=(document.getElementById('broadcastSubject')?.value||'').trim();
+  const msg=(document.getElementById('broadcastMsg')?.value||'').trim();
+  const err=document.getElementById('broadcastErr');
+  if(!subject||!msg){if(err){err.textContent='נא למלא נושא ותוכן';err.style.display='block';}return;}
+  const recipients=families.filter(f=>f.email||f.email2).map(f=>({email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}));
+  if(!recipients.length){if(err){err.textContent='אין משפחות עם כתובת מייל שמורה';err.style.display='block';}return;}
+  if(err)err.style.display='none';
+  const bodyHtml=`<p style="white-space:pre-wrap;margin:0">${_esc(msg)}</p>`;
+  const html=_emailWrap(bodyHtml,subject,'📢','');
+  sendEmailNotif(recipients,subject,msg,html);
+  closeBroadcastModal();
+  showToast('📧 ההודעה נשלחה לכולם');
 }
 function getPaymentSettings(){
   return{
@@ -537,6 +564,7 @@ function saveLocal(){
     localStorage.setItem('visits',JSON.stringify(visits));
     localStorage.setItem('notifications',JSON.stringify(notifications));
     localStorage.setItem('polls',JSON.stringify(polls));
+    localStorage.setItem('countdowns',JSON.stringify(countdowns));
   }catch(e){}
 }
 
@@ -552,7 +580,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,visits,notifications,polls});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,visits,notifications,polls,countdowns});
     localStorage.removeItem('pendingSave');
     localStorage.removeItem('pendingSaveAt');
     showSyncStatus('✓ נשמר',2000);
@@ -588,12 +616,14 @@ async function load(){
     visits=d.visits||[];
     notifications=d.notifications||[];
     polls=d.polls||[];
+    countdowns=d.countdowns||[];
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
     nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;
     nxtNotif=notifications.length?Math.max(...notifications.map(n=>n.id))+1:1;
     nxtPoll=polls.length?Math.max(...polls.map(p=>p.id))+1:1;
+    nxtCountdown=countdowns.length?Math.max(...countdowns.map(c=>c.id))+1:1;
     nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;
     nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;
     nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;
@@ -640,12 +670,14 @@ async function load(){
       const vst=localStorage.getItem('visits');if(vst)visits=JSON.parse(vst);
       const nts=localStorage.getItem('notifications');if(nts)notifications=JSON.parse(nts);
       const pls=localStorage.getItem('polls');if(pls)polls=JSON.parse(pls);
+      const cds=localStorage.getItem('countdowns');if(cds)countdowns=JSON.parse(cds);
       nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
       nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
       nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
       nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;
       nxtNotif=notifications.length?Math.max(...notifications.map(n=>n.id))+1:1;
       nxtPoll=polls.length?Math.max(...polls.map(p=>p.id))+1:1;
+      nxtCountdown=countdowns.length?Math.max(...countdowns.map(c=>c.id))+1:1;
       nxtId=events.reduce((a,e)=>Math.max(a,e.id),0)+1;
       nxtFam=families.reduce((a,f)=>Math.max(a,f.id),0)+1;
       nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;
@@ -767,8 +799,57 @@ function renderFamilyHome(){
   }
   renderMessages();
   renderCalendar();
+  renderCountdowns();
   renderNotifBtn();
   renderChatInput();
+}
+
+// ── Countdown clocks (home screen) ──────────────────────────
+function _countdownDaysLeft(dateStr){
+  const target=new Date(dateStr+'T00:00:00');
+  const today=new Date();today.setHours(0,0,0,0);
+  return Math.round((target-today)/86400000);
+}
+function renderCountdowns(){
+  const el=document.getElementById('countdownSection');if(!el)return;
+  const sorted=[...countdowns].sort((a,b)=>_countdownDaysLeft(a.date)-_countdownDaysLeft(b.date));
+  if(!sorted.length&&!editMode){el.innerHTML='';return;}
+  const cards=sorted.map(c=>{
+    const days=_countdownDaysLeft(c.date);
+    const big=days>0?String(days):days===0?'🎉':'—';
+    const sub=days>1?'ימים נותרו':days===1?'יום נותר':days===0?'היום!':'עבר';
+    return`<div style="position:relative;flex:1;min-width:120px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:14px 12px;color:#fff;text-align:center;box-shadow:0 4px 16px rgba(102,126,234,0.3)">
+      <button class="edit-only" onclick="deleteCountdown(${c.id})" style="position:absolute;top:6px;left:6px;border:none;background:rgba(255,255,255,0.25);color:#fff;width:20px;height:20px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;padding:0">✕</button>
+      <div style="font-family:var(--font-head);font-size:30px;font-weight:800;line-height:1">${big}</div>
+      <div style="font-size:11px;opacity:.9;margin-top:2px">${esc(sub)}</div>
+      <div style="font-size:12.5px;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</div>
+    </div>`;
+  }).join('');
+  const addBtn=`<button class="edit-only" onclick="openCountdownModal()" style="flex:1;min-width:120px;padding:14px 12px;border-radius:16px;border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ שעון חדש</button>`;
+  el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 14px 6px">${cards}${addBtn}</div>`;
+}
+function openCountdownModal(){
+  const t=document.getElementById('countdownTitle');if(t)t.value='';
+  const d=document.getElementById('countdownDate');if(d)d.value='';
+  const err=document.getElementById('countdownErr');if(err)err.style.display='none';
+  document.getElementById('countdownModal').style.display='flex';
+}
+function closeCountdownModal(){
+  document.getElementById('countdownModal').style.display='none';
+}
+function saveCountdownNew(){
+  const title=(document.getElementById('countdownTitle')?.value||'').trim();
+  const date=document.getElementById('countdownDate')?.value||'';
+  const err=document.getElementById('countdownErr');
+  if(!title||!date){if(err){err.textContent='נא למלא כיתוב ותאריך';err.style.display='block';}return;}
+  if(err)err.style.display='none';
+  countdowns.push({id:nxtCountdown++,title,date,createdAt:Date.now()});
+  closeCountdownModal();
+  save();renderCountdowns();
+}
+function deleteCountdown(id){
+  countdowns=countdowns.filter(c=>c.id!==id);
+  save();renderCountdowns();
 }
 
 function openChatSheet(){
@@ -5298,7 +5379,12 @@ function applyEditMode(){
   const icon=document.getElementById('lockIcon');
   if(icon)icon.textContent=editMode?'🔓':'🔒';
   if(currentShell==='home')renderFamilyHome();
-  if(editMode&&paymentClaims.some(c=>c.kind==='transfer'))openClaimsModal();
+}
+// Called only at the moment edit mode is actually unlocked (not on every render(),
+// which also calls applyEditMode()) — otherwise this would reopen the modal on top
+// of the admin every time anything saves, even right after they closed it.
+function _checkPendingTransferClaims(){
+  if(paymentClaims.some(c=>c.kind==='transfer'))openClaimsModal();
 }
 function openLockModal(){
   renderLockModal(editMode?'lock':adminPass?'unlock':'set');
@@ -5352,14 +5438,14 @@ function setAdminPass(){
   if(p1!==p2){if(err){err.textContent='הסיסמאות אינן תואמות';err.style.display='block';}return;}
   adminPass=p1;editMode=true;
   if(_isAdminPage())localStorage.setItem('adminRemembered','1');
-  applyEditMode();save();closeLockModal();
+  applyEditMode();_checkPendingTransferClaims();save();closeLockModal();
 }
 function submitUnlock(){
   const val=(document.getElementById('unlockInp')||{}).value||'';
   if(val===adminPass){
     editMode=true;
     if(_isAdminPage())localStorage.setItem('adminRemembered','1');
-    applyEditMode();closeLockModal();
+    applyEditMode();_checkPendingTransferClaims();closeLockModal();
   } else {
     const err=document.getElementById('passErr');if(err)err.style.display='block';
     const inp=document.getElementById('unlockInp');if(inp){inp.value='';inp.focus();}
@@ -5421,19 +5507,19 @@ async function doBiometricUnlock(){
   const btn=document.getElementById('biometricBtn');
   if(btn){btn.disabled=true;btn.textContent='⏳ מאמת...';}
   const ok=await tryBiometric();
-  if(ok){editMode=true;applyEditMode();closeLockModal();}
+  if(ok){editMode=true;applyEditMode();_checkPendingTransferClaims();closeLockModal();}
   else if(btn){btn.disabled=false;btn.textContent='👆 כניסה עם טביעת אצבע';}
 }
 async function autoUnlockAdmin(){
   if(!_isAdminPage()||editMode)return;
   if(adminPass&&localStorage.getItem('adminRemembered')==='1'){
     editMode=true;
-    applyEditMode();
+    applyEditMode();_checkPendingTransferClaims();
     return;
   }
   if(adminPass&&localStorage.getItem('biometricCredId')){
     const ok=await tryBiometric();
-    if(ok){editMode=true;localStorage.setItem('adminRemembered','1');applyEditMode();return;}
+    if(ok){editMode=true;localStorage.setItem('adminRemembered','1');applyEditMode();_checkPendingTransferClaims();return;}
   }
   openLockModal();
 }
