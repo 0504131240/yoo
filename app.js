@@ -3694,6 +3694,21 @@ function openEmailGateModal(){
 }
 function closeEmailGateModal(){
   const modal=document.getElementById('emailGateModal');if(modal)modal.style.display='none';
+  maybePromptFamilyUpdate();
+}
+// One-time (per device) nudge for a regular, non-edit-mode visitor to confirm/update
+// their own family's names and birthdates — reuses the existing family-edit sheet,
+// which already covers exactly that. Fires right after the email gate confirms who
+// they are, so it never shows before an identity is known. Marked done as soon as it's
+// shown once, whether they save changes or just close it, so it can never nag on repeat
+// visits from someone whose info was already correct.
+function maybePromptFamilyUpdate(){
+  if(editMode||localStorage.getItem('famInfoPromptDone')==='1')return;
+  const fid=_myFamId();if(fid==null)return;
+  if(!getFam(fid))return;
+  localStorage.setItem('famInfoPromptDone','1');
+  openFamEditSheet(fid);
+  showToast('📋 רגע — כדאי לוודא ששמות וימי הולדת מעודכנים',5000);
 }
 function submitEmailGate(){
   const email=_cleanEmail(document.getElementById('emailGateInput')?.value||'');
