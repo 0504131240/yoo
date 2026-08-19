@@ -827,8 +827,13 @@ function renderCountdowns(){
       ?`<div style="font-family:var(--font-head);font-size:24px;font-weight:800;line-height:1">${p.days}<span style="font-size:12px;font-weight:600"> ${p.days===1?'יום':'ימים'}</span></div>
         <div style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-top:3px;direction:ltr">${_fmt2(p.hours)}:${_fmt2(p.mins)}:${_fmt2(p.secs)}</div>`
       :`<div style="font-family:var(--font-head);font-size:26px;font-weight:800;line-height:1">🎉</div><div style="font-size:11px;opacity:.9;margin-top:2px">הגיע היום!</div>`;
+    const emojiHtml=c.emoji?`<div style="font-size:${c.emojiSize||32}px;line-height:1;margin-bottom:4px">${esc(c.emoji)}</div>`:'';
     return`<div style="position:relative;flex:1;min-width:120px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:14px 12px;color:#fff;text-align:center;box-shadow:0 4px 16px rgba(102,126,234,0.3)">
-      <button class="edit-only" onclick="deleteCountdown(${c.id})" style="position:absolute;top:6px;left:6px;border:none;background:rgba(255,255,255,0.25);color:#fff;width:20px;height:20px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;padding:0">✕</button>
+      <div class="edit-only" style="position:absolute;top:6px;left:6px;display:flex;gap:4px">
+        <button onclick="openCountdownModal(${c.id})" style="border:none;background:rgba(255,255,255,0.25);color:#fff;width:20px;height:20px;border-radius:50%;font-size:11px;line-height:1;cursor:pointer;padding:0">✏️</button>
+        <button onclick="deleteCountdown(${c.id})" style="border:none;background:rgba(255,255,255,0.25);color:#fff;width:20px;height:20px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;padding:0">✕</button>
+      </div>
+      ${emojiHtml}
       ${body}
       <div style="font-size:12.5px;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</div>
     </div>`;
@@ -837,22 +842,52 @@ function renderCountdowns(){
   el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 14px 6px">${cards}${addBtn}</div>`;
   if(sorted.length)_countdownTickTimer=setInterval(renderCountdowns,1000);
 }
-function openCountdownModal(){
-  const t=document.getElementById('countdownTitle');if(t)t.value='';
-  const d=document.getElementById('countdownDate');if(d)d.value='';
+let _editCountdownId=null,_countdownEmojiSize=32;
+function openCountdownModal(id){
+  _editCountdownId=id!=null?id:null;
+  const c=id!=null?countdowns.find(x=>x.id===id):null;
+  const t=document.getElementById('countdownTitle');if(t)t.value=c?c.title:'';
+  const d=document.getElementById('countdownDate');if(d)d.value=c?c.date:'';
+  const e=document.getElementById('countdownEmoji');if(e)e.value=c?(c.emoji||''):'';
+  _countdownEmojiSize=c&&c.emojiSize?c.emojiSize:32;
+  updateCountdownEmojiPreview();
   const err=document.getElementById('countdownErr');if(err)err.style.display='none';
+  const mTitle=document.getElementById('countdownModalTitle');if(mTitle)mTitle.textContent=c?'✏️ עריכת שעון':'⏱ שעון ספירה לאחור חדש';
+  const saveBtn=document.getElementById('countdownSaveBtn');if(saveBtn)saveBtn.textContent=c?'✓ שמור שינויים':'✓ צור שעון';
   document.getElementById('countdownModal').style.display='flex';
 }
 function closeCountdownModal(){
   document.getElementById('countdownModal').style.display='none';
+  _editCountdownId=null;
 }
-function saveCountdownNew(){
+function pickCountdownEmoji(e){
+  const inp=document.getElementById('countdownEmoji');if(inp)inp.value=e;
+  updateCountdownEmojiPreview();
+}
+function stepCountdownEmojiSize(delta){
+  _countdownEmojiSize=Math.max(16,Math.min(80,_countdownEmojiSize+delta));
+  updateCountdownEmojiPreview();
+}
+function updateCountdownEmojiPreview(){
+  const inp=document.getElementById('countdownEmoji');
+  const val=(inp?.value||'').trim();
+  const prev=document.getElementById('countdownEmojiPreview');
+  if(prev){prev.textContent=val;prev.style.fontSize=_countdownEmojiSize+'px';}
+  const lbl=document.getElementById('countdownEmojiSizeLbl');if(lbl)lbl.textContent=_countdownEmojiSize+'px';
+}
+function saveCountdown(){
   const title=(document.getElementById('countdownTitle')?.value||'').trim();
   const date=document.getElementById('countdownDate')?.value||'';
+  const emoji=(document.getElementById('countdownEmoji')?.value||'').trim();
   const err=document.getElementById('countdownErr');
   if(!title||!date){if(err){err.textContent='נא למלא כיתוב ותאריך';err.style.display='block';}return;}
   if(err)err.style.display='none';
-  countdowns.push({id:nxtCountdown++,title,date,createdAt:Date.now()});
+  if(_editCountdownId!=null){
+    const c=countdowns.find(x=>x.id===_editCountdownId);
+    if(c){c.title=title;c.date=date;c.emoji=emoji;c.emojiSize=_countdownEmojiSize;}
+  }else{
+    countdowns.push({id:nxtCountdown++,title,date,emoji,emojiSize:_countdownEmojiSize,createdAt:Date.now()});
+  }
   closeCountdownModal();
   save();renderCountdowns();
 }

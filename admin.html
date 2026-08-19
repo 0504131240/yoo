@@ -816,10 +816,10 @@
   </div>
 </div>
 
-<!-- New countdown modal -->
+<!-- New/edit countdown modal -->
 <div id="countdownModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeCountdownModal()">
-  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:340px;box-sizing:border-box">
-    <div style="font-size:15px;font-weight:700;margin-bottom:12px">⏱ שעון ספירה לאחור חדש</div>
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:340px;max-height:88vh;overflow-y:auto;box-sizing:border-box">
+    <div id="countdownModalTitle" style="font-size:15px;font-weight:700;margin-bottom:12px">⏱ שעון ספירה לאחור חדש</div>
     <div class="field">
       <label class="field-lbl">כיתוב</label>
       <input type="text" id="countdownTitle" placeholder="לדוגמה: לחתונה של דנה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box">
@@ -828,9 +828,32 @@
       <label class="field-lbl">עד לתאריך</label>
       <input type="date" id="countdownDate" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
     </div>
+    <div class="field" style="margin-top:10px">
+      <label class="field-lbl">אימוג'י (אופציונלי)</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="text" id="countdownEmoji" maxlength="4" placeholder="🎉" oninput="updateCountdownEmojiPreview()" style="width:52px;text-align:center;font-size:20px;border:1.5px solid var(--border);border-radius:var(--r2);padding:6px 4px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+        <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden;flex-shrink:0">
+          <button type="button" onclick="stepCountdownEmojiSize(-4)" style="width:30px;height:32px;border:none;background:var(--bg);color:var(--text);font-size:16px;cursor:pointer;font-family:var(--font)">−</button>
+          <span id="countdownEmojiSizeLbl" style="width:38px;text-align:center;font-size:11px;color:var(--text2)">32px</span>
+          <button type="button" onclick="stepCountdownEmojiSize(4)" style="width:30px;height:32px;border:none;background:var(--bg);color:var(--text);font-size:16px;cursor:pointer;font-family:var(--font)">+</button>
+        </div>
+        <span id="countdownEmojiPreview" style="flex:1;text-align:center;line-height:1"></span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button type="button" onclick="pickCountdownEmoji('🎉')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">🎉</button>
+        <button type="button" onclick="pickCountdownEmoji('🎂')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">🎂</button>
+        <button type="button" onclick="pickCountdownEmoji('❤️')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">❤️</button>
+        <button type="button" onclick="pickCountdownEmoji('🎓')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">🎓</button>
+        <button type="button" onclick="pickCountdownEmoji('✈️')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">✈️</button>
+        <button type="button" onclick="pickCountdownEmoji('🏖️')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">🏖️</button>
+        <button type="button" onclick="pickCountdownEmoji('👰')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">👰</button>
+        <button type="button" onclick="pickCountdownEmoji('⏰')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer">⏰</button>
+        <button type="button" onclick="pickCountdownEmoji('')" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:11px;color:var(--text2);cursor:pointer">נקה</button>
+      </div>
+    </div>
     <div id="countdownErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center"></div>
     <div style="display:flex;gap:8px;margin-top:14px">
-      <button onclick="saveCountdownNew()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ צור שעון</button>
+      <button id="countdownSaveBtn" onclick="saveCountdown()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ צור שעון</button>
       <button onclick="closeCountdownModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
   </div>
