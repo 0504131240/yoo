@@ -2840,6 +2840,7 @@ function savePerson(){
     }
     f.children=f.kids.length;
   }
+  f.namesConfirmed=true;
   save();renderFamPeopleGrid();render();closePersonModal();
 }
 function deletePerson(){
@@ -2865,6 +2866,7 @@ function saveFamEdit(){
   f.name=name;
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
+  f.namesConfirmed=true;
   closeFamEditSheet();
   save();render();
 }
@@ -3696,19 +3698,19 @@ function closeEmailGateModal(){
   const modal=document.getElementById('emailGateModal');if(modal)modal.style.display='none';
   maybePromptFamilyUpdate();
 }
-// One-time (per device) nudge for a regular, non-edit-mode visitor to confirm/update
-// their own family's names and birthdates — reuses the existing family-edit sheet,
-// which already covers exactly that. Fires right after the email gate confirms who
-// they are, so it never shows before an identity is known. Marked done as soon as it's
-// shown once, whether they save changes or just close it, so it can never nag on repeat
-// visits from someone whose info was already correct.
+// Nudge for a regular, non-edit-mode visitor to confirm/update their own family's
+// names and birthdates — reuses the existing family-edit sheet, which already covers
+// exactly that. Fires right after the email gate confirms who they are, on every
+// device/visit, until the family (from any device) actually saves — f.namesConfirmed
+// is part of the synced `families` data, not a per-device localStorage flag, so once
+// saved it stays done everywhere. Saving is the actual "done" signal (set in
+// saveFamEdit/savePerson), not merely opening or closing the sheet.
 function maybePromptFamilyUpdate(){
-  if(editMode||localStorage.getItem('famInfoPromptDone')==='1')return;
+  if(editMode)return;
   const fid=_myFamId();if(fid==null)return;
-  if(!getFam(fid))return;
-  localStorage.setItem('famInfoPromptDone','1');
+  const f=getFam(fid);if(!f||f.namesConfirmed)return;
   openFamEditSheet(fid);
-  showToast('📋 רגע — כדאי לוודא ששמות וימי הולדת מעודכנים',5000);
+  showToast('📋 רגע — כדאי לוודא ששמות וימי הולדת מעודכנים, ולשמור',5000);
 }
 function submitEmailGate(){
   const email=_cleanEmail(document.getElementById('emailGateInput')?.value||'');
