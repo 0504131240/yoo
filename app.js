@@ -2841,6 +2841,7 @@ function savePerson(){
     f.children=f.kids.length;
   }
   f.namesConfirmed=true;
+  if(!editMode)addNotif('👪',f.name+' עדכנ/ה פרטים אישיים');
   save();renderFamPeopleGrid();render();closePersonModal();
 }
 function deletePerson(){
@@ -2867,6 +2868,7 @@ function saveFamEdit(){
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
   f.namesConfirmed=true;
+  if(!editMode)addNotif('👪',f.name+' עדכנ/ה את פרטי המשפחה');
   closeFamEditSheet();
   save();render();
 }
