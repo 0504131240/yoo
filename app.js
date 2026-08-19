@@ -805,28 +805,37 @@ function renderFamilyHome(){
 }
 
 // ── Countdown clocks (home screen) ──────────────────────────
-function _countdownDaysLeft(dateStr){
-  const target=new Date(dateStr+'T00:00:00');
-  const today=new Date();today.setHours(0,0,0,0);
-  return Math.round((target-today)/86400000);
+// Target is midnight (00:00:00) at the start of the chosen date; days/hours/
+// minutes/seconds are all derived from one live ms-diff, re-rendered every
+// second while any countdown is showing, so the clock actually ticks.
+let _countdownTickTimer=null;
+const _fmt2=n=>String(n).padStart(2,'0');
+function _countdownParts(dateStr){
+  const diff=new Date(dateStr+'T00:00:00').getTime()-Date.now();
+  if(diff<=0)return null;
+  const totalSec=Math.floor(diff/1000);
+  return{days:Math.floor(totalSec/86400),hours:Math.floor((totalSec%86400)/3600),mins:Math.floor((totalSec%3600)/60),secs:totalSec%60};
 }
 function renderCountdowns(){
   const el=document.getElementById('countdownSection');if(!el)return;
-  const sorted=[...countdowns].sort((a,b)=>_countdownDaysLeft(a.date)-_countdownDaysLeft(b.date));
+  if(_countdownTickTimer){clearInterval(_countdownTickTimer);_countdownTickTimer=null;}
+  const sorted=[...countdowns].sort((a,b)=>new Date(a.date)-new Date(b.date));
   if(!sorted.length&&!editMode){el.innerHTML='';return;}
   const cards=sorted.map(c=>{
-    const days=_countdownDaysLeft(c.date);
-    const big=days>0?String(days):days===0?'🎉':'—';
-    const sub=days>1?'ימים נותרו':days===1?'יום נותר':days===0?'היום!':'עבר';
+    const p=_countdownParts(c.date);
+    const body=p
+      ?`<div style="font-family:var(--font-head);font-size:24px;font-weight:800;line-height:1">${p.days}<span style="font-size:12px;font-weight:600"> ${p.days===1?'יום':'ימים'}</span></div>
+        <div style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-top:3px;direction:ltr">${_fmt2(p.hours)}:${_fmt2(p.mins)}:${_fmt2(p.secs)}</div>`
+      :`<div style="font-family:var(--font-head);font-size:26px;font-weight:800;line-height:1">🎉</div><div style="font-size:11px;opacity:.9;margin-top:2px">הגיע היום!</div>`;
     return`<div style="position:relative;flex:1;min-width:120px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:14px 12px;color:#fff;text-align:center;box-shadow:0 4px 16px rgba(102,126,234,0.3)">
       <button class="edit-only" onclick="deleteCountdown(${c.id})" style="position:absolute;top:6px;left:6px;border:none;background:rgba(255,255,255,0.25);color:#fff;width:20px;height:20px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;padding:0">✕</button>
-      <div style="font-family:var(--font-head);font-size:30px;font-weight:800;line-height:1">${big}</div>
-      <div style="font-size:11px;opacity:.9;margin-top:2px">${esc(sub)}</div>
+      ${body}
       <div style="font-size:12.5px;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</div>
     </div>`;
   }).join('');
   const addBtn=`<button class="edit-only" onclick="openCountdownModal()" style="flex:1;min-width:120px;padding:14px 12px;border-radius:16px;border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ שעון חדש</button>`;
   el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 14px 6px">${cards}${addBtn}</div>`;
+  if(sorted.length)_countdownTickTimer=setInterval(renderCountdowns,1000);
 }
 function openCountdownModal(){
   const t=document.getElementById('countdownTitle');if(t)t.value='';
