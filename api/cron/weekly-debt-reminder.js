@@ -1,6 +1,6 @@
 // GET /api/cron/weekly-debt-reminder — runs on Vercel's schedule (see
 // vercel.json). Same CRON_SECRET protection as daily-backup.
-const { getDb } = require('../_lib/firebaseAdmin');
+const { getDb, getMessaging } = require('../_lib/firebaseAdmin');
 const { evAdjBalance } = require('../_lib/debtCalc');
 
 function _escHtml(s) {
@@ -82,24 +82,49 @@ module.exports = async (req, res) => {
     });
   });
 
-  let sentCount = 0;
+  let emailsSent = 0, pushesSent = 0;
   for (const [fidStr, debts] of Object.entries(debtsByFam)) {
-    const fam = families.find(f => f.id === parseInt(fidStr));
+    const fid = parseInt(fidStr);
+    const fam = families.find(f => f.id === fid);
     if (!fam) continue;
-    const addrs = [fam.email, fam.email2].filter(Boolean);
-    if (!addrs.length) continue;
     const famName = fam.name.replace('משפחת', '').trim();
     const totalDebt = debts.reduce((s, d) => s + d.owe, 0);
-    const { message, html } = debtEmailContent(famName, debts, totalDebt);
-    for (const email of addrs) {
-      try {
-        await sendViaEmailJS(publicKey, serviceId, templateId, email, famName, '⚠️ תזכורת שבועית: חוב פתוח · ינקלביץ', message, html);
-        sentCount++;
-      } catch (e) {
-        console.error('weeklyDebtReminder email failed for', email, e);
+
+    const addrs = [fam.email, fam.email2].filter(Boolean);
+    if (addrs.length) {
+      const { message, html } = debtEmailContent(famName, debts, totalDebt);
+      for (const email of addrs) {
+        try {
+          await sendViaEmailJS(publicKey, serviceId, templateId, email, famName, '⚠️ תזכורת שבועית: חוב פתוח · ינקלביץ', message, html);
+          emailsSent++;
+        } catch (e) {
+          console.error('weeklyDebtReminder email failed for', email, e);
+        }
       }
+    }
+
+    // Push: only to this family's own registered device(s) — not a
+    // broadcast to everyone, since the debt is specific to them.
+    try {
+      const tokSnap = await db.collection('fcmTokens').where('famId', '==', fid).get();
+      const tokenDocs = tokSnap.docs.filter(d => d.data().token);
+      if (tokenDocs.length) {
+        const resp = await getMessaging().sendEachForMulticast({
+          tokens: tokenDocs.map(d => d.data().token),
+          notification: { title: '⚠️ תזכורת שבועית: חוב פתוח', body: `סה"כ ₪${totalDebt.toLocaleString()}` },
+          webpush: {
+            notification: { icon: 'https://yankeleviz.vercel.app/icon.jpg', dir: 'rtl', lang: 'he' },
+            fcmOptions: { link: 'https://yankeleviz.vercel.app/' },
+          },
+        });
+        pushesSent += resp.successCount;
+        const toDelete = tokenDocs.filter((_, i) => !resp.responses[i]?.success);
+        await Promise.all(toDelete.map(d => d.ref.delete()));
+      }
+    } catch (e) {
+      console.error('weeklyDebtReminder push failed for fam', fid, e);
     }
   }
 
-  res.status(200).json({ ok: true, sent: sentCount });
+  res.status(200).json({ ok: true, emailsSent, pushesSent });
 };
