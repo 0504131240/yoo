@@ -10,7 +10,7 @@ const { getDb, getMessaging, checkAdminPass } = require('./_lib/firebaseAdmin');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-  const { adminPass, title, body } = req.body || {};
+  const { adminPass, title, body, target } = req.body || {};
   if (!title || !body) { res.status(400).json({ error: 'title and body required' }); return; }
 
   const db = getDb();
@@ -27,11 +27,17 @@ module.exports = async (req, res) => {
     admin: 'https://yankeleviz.vercel.app/admin.html',
     index: 'https://yankeleviz.vercel.app/',
   };
+  // target:'admin' restricts delivery to admin-registered devices only —
+  // used for events that matter to the admin (money movement, family
+  // self-edits) but would just be noise on every other family member's
+  // phone. Anything else (the default) reaches everyone.
   const groups = { admin: [], index: [] };
   tokSnap.docs.forEach(d => {
     const data = d.data();
     if (!data.token) return;
-    (groups[data.page === 'admin' ? 'admin' : 'index']).push(d);
+    const page = data.page === 'admin' ? 'admin' : 'index';
+    if (target === 'admin' && page !== 'admin') return;
+    groups[page].push(d);
   });
 
   let sent = 0, registered = 0, deleted = 0;

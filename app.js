@@ -1092,7 +1092,7 @@ function allBirthdays(){
   });
   return [...kidBdays,...parentBdays];
 }
-function checkBirthdayNotifs(){
+async function checkBirthdayNotifs(){
   const all=allBirthdays();
   if(!_notifOk()||!all.length)return;
   const today=new Date(),todayStr=today.toDateString();
@@ -1100,13 +1100,26 @@ function checkBirthdayNotifs(){
   localStorage.setItem('bdayNotifDate',todayStr);
   const dayFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'});
   const monthFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'});
+  const {db,doc,getDoc,setDoc}=await fbInit();
   for(let i=0;i<=7;i++){
     const d=new Date(today);d.setDate(d.getDate()+i);
     const hd=parseInt(dayFmt.format(d)),hm=monthFmt.format(d);
-    all.filter(b=>b.hebDay===hd&&b.hebMonth===hm).forEach(b=>{
-      if(i===0)showNotif('🎂 יום הולדת היום!','יום הולדת שמח ל'+b.name+'!');
-      else showNotif('🎂 יום הולדת בעוד '+i+' ימים','של '+b.name);
-    });
+    for(const b of all.filter(b=>b.hebDay===hd&&b.hebMonth===hm)){
+      const title=i===0?'🎂 יום הולדת היום!':'🎂 יום הולדת בעוד '+i+' ימים';
+      const body=i===0?'יום הולדת שמח ל'+b.name+'!':'של '+b.name;
+      // Every device with notifications on runs this same check
+      // independently each day. Claim the (date, offset, person) combo in
+      // Firestore first — only the device that wins the claim actually
+      // pushes, so the same birthday doesn't get broadcast to everyone
+      // once per open device.
+      const claimId=(todayStr+'_'+i+'_'+b.name).replace(/[^a-zA-Z0-9א-ת]+/g,'_').slice(0,300);
+      try{
+        const ref=doc(db,'bdayNotifClaims',claimId);
+        if((await getDoc(ref)).exists())continue;
+        await setDoc(ref,{ts:Date.now()});
+      }catch(e){continue;}
+      _sendPush(title,body);
+    }
   }
 }
 
@@ -1839,7 +1852,7 @@ function confirmPartPay(){
         date:new Date().toLocaleDateString('he-IL')});
     }
     if(fromDirect>0) ev.settled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromDirect,method:'direct'});
-    addNotif('✓',_ppFrom+' העביר ל'+_ppTo+' ₪'+paid.toLocaleString()+' עבור "'+ev.name+'"');
+    addNotif('✓',_ppFrom+' העביר ל'+_ppTo+' ₪'+paid.toLocaleString()+' עבור "'+ev.name+'"','admin');
     save();render();
     if(ev.closed){
       const adjAfter=evAdjBalance(ev);
@@ -2883,7 +2896,7 @@ function savePerson(){
     f.children=f.kids.length;
   }
   f.namesConfirmed=true;
-  if(!editMode)addNotif('👪',f.name+' עדכנ/ה פרטים אישיים');
+  if(!editMode)addNotif('👪',f.name+' עדכנ/ה פרטים אישיים','admin');
   save();renderFamPeopleGrid();render();closePersonModal();
 }
 function deletePerson(){
@@ -2910,7 +2923,7 @@ function saveFamEdit(){
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
   f.namesConfirmed=true;
-  if(!editMode)addNotif('👪',f.name+' עדכנ/ה את פרטי המשפחה');
+  if(!editMode)addNotif('👪',f.name+' עדכנ/ה את פרטי המשפחה','admin');
   closeFamEditSheet();
   save();render();
 }
@@ -3808,18 +3821,22 @@ function renderVisitLog(){
     <div class="sec-ttl edit-only" style="margin-top:20px">👥 מי נכנס לאפליקציה</div>
     <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:10px 14px;margin-bottom:12px">${rows}</div>`;
 }
-function addNotif(icon,text){
+// pushTarget: 'all' (default) reaches every registered device; 'admin'
+// reaches only devices registered from admin.html — for events that matter
+// to the admin (money movement, family self-edits) but would just be noise
+// for every other family member's phone.
+function addNotif(icon,text,pushTarget){
   notifications.unshift({id:nxtNotif++,icon,text,ts:Date.now()});
   if(notifications.length>200)notifications.length=200;
   renderNotifCenterBadge();
-  _sendPush(icon+' ינקלביץ',text);
+  _sendPush(icon+' ינקלביץ',text,pushTarget);
 }
 // Fires a real device push (via the /api/notify Vercel function → FCM) for
 // every in-app notification-center event, so family members get it even
 // when the app is closed — not just the in-app bell. Best-effort: silently
 // ignored if it fails (e.g. offline, or the API route isn't deployed yet).
-function _sendPush(title,body){
-  fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,title,body})}).catch(()=>{});
+function _sendPush(title,body,target){
+  fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,title,body,target:target||'all'})}).catch(()=>{});
 }
 function _notifLastSeen(){return parseInt(localStorage.getItem('notifLastSeen')||'0');}
 function renderNotifCenterBadge(){
@@ -3915,7 +3932,7 @@ function closeClaimConfirmModal(){
 }
 function submitPaymentClaim(evId,famId,amt){
   paymentClaims.push({id:nxtClaim++,evId,famId,amt,date:new Date().toLocaleDateString('he-IL'),ts:Date.now()});
-  _sendPush('💸 אישור תשלום חדש','₪'+amt.toLocaleString()+' · לבדיקה באפליקציה');
+  _sendPush('💸 אישור תשלום חדש','₪'+amt.toLocaleString()+' · לבדיקה באפליקציה','admin');
   save();
   const el=document.getElementById('claimConfirmContent');
   if(el) el.innerHTML=`
@@ -3989,7 +4006,7 @@ function goToClaimEvent(claimId,evId){
 }
 function claimTransfer(evId,fromFid,toFid,amt){
   paymentClaims.push({id:nxtClaim++,kind:'transfer',evId,famId:fromFid,toFid,amt,date:new Date().toLocaleDateString('he-IL'),ts:Date.now()});
-  _sendPush('💸 אישור תשלום חדש','₪'+amt.toLocaleString()+' · לבדיקה באפליקציה');
+  _sendPush('💸 אישור תשלום חדש','₪'+amt.toLocaleString()+' · לבדיקה באפליקציה','admin');
   save();
   renderClaimsBanner();
   const ev=events.find(e=>e.id===evId);
