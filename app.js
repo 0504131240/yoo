@@ -1005,6 +1005,7 @@ function sendChatMsg(){
   const text=(textEl?.value||'').trim();
   if(!text||!author)return;
   messages.push({id:nxtMsg++,author,text,ts:Date.now()});
+  _sendPush('💬 הודעה חדשה',(author?author+': ':'')+text);
   if(textEl){textEl.value='';textEl.focus();}
   save();renderMessages();
 }
@@ -1015,6 +1016,7 @@ let _skipNextNotif=false,_initialSync=true,_realtimeUnsub=null;
 
 function _notifOk(){return 'Notification' in window&&Notification.permission==='granted';}
 
+let _fcmForegroundBound=false;
 async function registerFCMToken(){
   if(!('serviceWorker' in navigator)) throw new Error('הדפדפן לא תומך ב-Service Worker');
   if(!_fbApp) await fbInit();
@@ -1028,6 +1030,18 @@ async function registerFCMToken(){
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
   await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now()});
   console.log('FCM token saved OK');
+  // Background pushes (tab closed/hidden) are shown automatically by
+  // sw.js's onBackgroundMessage. But by design, Chrome does NOT auto-show
+  // anything for a push that arrives while the tab is open and focused —
+  // that case has to be handled here, in the page itself, or it's silently
+  // dropped (the most common reason "the notification never popped").
+  if(!_fcmForegroundBound){
+    _fcmForegroundBound=true;
+    msgMod.onMessage(messaging,payload=>{
+      const n=payload.notification||{};
+      showNotif(n.title||'ינקלביץ',n.body||'');
+    });
+  }
 }
 
 async function requestNotifPerm(){
@@ -3902,6 +3916,7 @@ function closeClaimConfirmModal(){
 }
 function submitPaymentClaim(evId,famId,amt){
   paymentClaims.push({id:nxtClaim++,evId,famId,amt,date:new Date().toLocaleDateString('he-IL'),ts:Date.now()});
+  _sendPush('💸 אישור תשלום חדש','₪'+amt.toLocaleString()+' · לבדיקה באפליקציה');
   save();
   const el=document.getElementById('claimConfirmContent');
   if(el) el.innerHTML=`
@@ -3975,6 +3990,7 @@ function goToClaimEvent(claimId,evId){
 }
 function claimTransfer(evId,fromFid,toFid,amt){
   paymentClaims.push({id:nxtClaim++,kind:'transfer',evId,famId:fromFid,toFid,amt,date:new Date().toLocaleDateString('he-IL'),ts:Date.now()});
+  _sendPush('💸 אישור תשלום חדש','₪'+amt.toLocaleString()+' · לבדיקה באפליקציה');
   save();
   renderClaimsBanner();
   const ev=events.find(e=>e.id===evId);
