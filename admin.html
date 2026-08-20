@@ -44,8 +44,9 @@
     <div class="fh-pill-btns">
       <!-- Countdown clocks — above the chat button, beside the calendar on desktop -->
       <div id="countdownSection"></div>
-      <button class="fh-pill-btn" style="background:linear-gradient(135deg,#FF6B9D,#FF4757);box-shadow:0 4px 22px rgba(255,71,87,0.35)" onclick="openChatSheet()">
+      <button class="fh-pill-btn" style="position:relative;background:linear-gradient(135deg,#FF6B9D,#FF4757);box-shadow:0 4px 22px rgba(255,71,87,0.35)" onclick="openChatSheet()">
         <span class="fh-pill-ico">💬</span>צ'אט
+        <span id="chatUnreadBadge" style="display:none;position:absolute;top:8px;left:16px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#fff;color:#FF4757;font-size:12px;font-weight:800;align-items:center;justify-content:center;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.25)"></span>
       </button>
       <button class="fh-pill-btn" style="background:linear-gradient(135deg,#43E97B,#0ABDE3);box-shadow:0 4px 22px rgba(67,233,123,0.35)" onclick="switchShell('pay')">
         <span class="fh-pill-ico">💰</span>תשלומים

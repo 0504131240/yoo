@@ -931,10 +931,14 @@ function openChatSheet(){
   s.classList.add('open');
   const ml=document.getElementById('msgList');
   if(ml)setTimeout(()=>ml.scrollTop=ml.scrollHeight,50);
+  localStorage.setItem('chatLastSeen',String(Date.now()));
+  renderChatBadge();
 }
 function closeChatSheet(){
   const s=document.getElementById('chatSheet');
   if(s)s.classList.remove('open');
+  localStorage.setItem('chatLastSeen',String(Date.now()));
+  renderChatBadge();
 }
 
 function openCalModal(){
@@ -1188,7 +1192,21 @@ async function startFormImportSync(){
   }catch(e){console.warn('form import sync:',e);}
 }
 
+// Unread-count badge on the chat button, WhatsApp-style: counts messages
+// from OTHERS newer than the last time the chat sheet was opened (set in
+// openChatSheet), hidden entirely while the sheet is currently open.
+function renderChatBadge(){
+  const badge=document.getElementById('chatUnreadBadge');if(!badge)return;
+  const sheetOpen=document.getElementById('chatSheet')?.classList.contains('open');
+  if(sheetOpen){badge.style.display='none';return;}
+  const lastSeen=parseInt(localStorage.getItem('chatLastSeen')||'0');
+  const myName=_myChatName();
+  const unread=messages.filter(m=>m.ts>lastSeen&&m.author!==myName).length;
+  if(unread>0){badge.style.display='flex';badge.textContent=unread>99?'99+':String(unread);}
+  else badge.style.display='none';
+}
 function renderMessages(){
+  renderChatBadge();
   const el=document.getElementById('msgList');if(!el)return;
   if(!messages.length){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">עדיין אין הודעות — שלח את הראשון 💬</div>';
