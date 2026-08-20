@@ -26,11 +26,28 @@ exports.dailyBackup = onSchedule(
   }
 );
 
-// --- One-time manual recovery tools (TEMPORARY — remove after use) ---
+// --- Manual recovery tools ---
+// Both endpoints require ?adminPass=... matching the app's own admin password
+// (stored on appData/familyPayments, same one used to unlock edit mode in the
+// app). Without this, these URLs were reachable by anyone on the internet —
+// including scanners/bots — with restoreFromBackup able to wipe the live data.
+// Fails closed if no admin password has been set yet in the app.
+async function _checkAdminPass(db, req, res) {
+  const supplied = req.query.adminPass;
+  const snap = await db.doc('appData/familyPayments').get();
+  const real = snap.exists ? snap.data().adminPass : '';
+  if (!real || !supplied || supplied !== real) {
+    res.status(401).send('Unauthorized — pass ?adminPass=<the app admin password>');
+    return false;
+  }
+  return true;
+}
+
 // listBackups: read-only, lists available backup dates with a quick summary of each
 // (family/event counts) so you can tell which one to restore without guessing.
-exports.listBackups = onRequest({region: 'me-west1'}, async (req, res) => {
+exports.listBackups = onRequest({region: 'me-west1', maxInstances: 3}, async (req, res) => {
   const db = getFirestore();
+  if (!(await _checkAdminPass(db, req, res))) return;
   const snap = await db.collection('backups').orderBy('__name__', 'desc').limit(30).get();
   const list = snap.docs.map(d => {
     const data = d.data().data || {};
@@ -46,15 +63,16 @@ exports.listBackups = onRequest({region: 'me-west1'}, async (req, res) => {
 
 // restoreFromBackup: DESTRUCTIVE — fully overwrites appData/familyPayments with a past
 // backup. Requires confirm=YES to run. Call as:
-//   .../restoreFromBackup?date=YYYY-MM-DD&confirm=YES
-exports.restoreFromBackup = onRequest({region: 'me-west1'}, async (req, res) => {
+//   .../restoreFromBackup?date=YYYY-MM-DD&confirm=YES&adminPass=...
+exports.restoreFromBackup = onRequest({region: 'me-west1', maxInstances: 3}, async (req, res) => {
   const date = req.query.date;
   const confirm = req.query.confirm;
   if (!date || confirm !== 'YES') {
-    res.status(400).send('Usage: ?date=YYYY-MM-DD&confirm=YES — this OVERWRITES the live app data with that backup.');
+    res.status(400).send('Usage: ?date=YYYY-MM-DD&confirm=YES&adminPass=... — this OVERWRITES the live app data with that backup.');
     return;
   }
   const db = getFirestore();
+  if (!(await _checkAdminPass(db, req, res))) return;
   const snap = await db.doc(`backups/${date}`).get();
   if (!snap.exists) {
     res.status(404).send('No backup found for ' + date);
@@ -89,7 +107,7 @@ async function sendPushToAll(db, title, body) {
 }
 
 exports.sendPushOnUpdate = onDocumentUpdated(
-  {document: 'appData/familyPayments', region: 'me-west1'},
+  {document: 'appData/familyPayments', region: 'me-west1', maxInstances: 5},
   async (event) => {
   const before = event.data.before.data();
   const after  = event.data.after.data();
