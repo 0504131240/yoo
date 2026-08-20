@@ -816,28 +816,35 @@ function _countdownParts(dateStr,timeStr){
   const totalSec=Math.floor(diff/1000);
   return{days:Math.floor(totalSec/86400),hours:Math.floor((totalSec%86400)/3600),mins:Math.floor((totalSec%3600)/60),secs:totalSec%60};
 }
+// Renders the actual card look (gradient bg, emoji, digits, title) shared
+// verbatim between the live home-screen cards and the modal's edit preview,
+// so what you see while editing really is the same markup, not a mockup.
+function _countdownCardHTML(c){
+  const p=_countdownParts(c.date,c.time);
+  const bg1=c.bg1||'#667eea',bg2=c.bg2||'#764ba2',tc=c.textColor||'#ffffff';
+  const body=p
+    ?`<div style="font-family:var(--font-head);font-size:24px;font-weight:800;line-height:1">${p.days}<span style="font-size:12px;font-weight:600"> ${p.days===1?'יום':'ימים'}</span></div>
+      <div style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-top:3px;direction:ltr">${_fmt2(p.hours)}:${_fmt2(p.mins)}:${_fmt2(p.secs)}</div>`
+    :`<div style="font-family:var(--font-head);font-size:26px;font-weight:800;line-height:1">🎉</div><div style="font-size:11px;opacity:.9;margin-top:2px">הגיע היום!</div>`;
+  const emojiHtml=c.emoji?`<div style="font-size:${c.emojiSize||32}px;line-height:1;margin-bottom:4px">${esc(c.emoji)}</div>`:'';
+  return`<div style="background:linear-gradient(135deg,${bg1},${bg2});border-radius:16px;padding:14px 12px;color:${tc};text-align:center;box-shadow:0 4px 16px rgba(102,126,234,0.3)">
+    ${emojiHtml}
+    ${body}
+    <div style="font-size:12.5px;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title||'')}</div>
+  </div>`;
+}
 function renderCountdowns(){
   const el=document.getElementById('countdownSection');if(!el)return;
   if(_countdownTickTimer){clearInterval(_countdownTickTimer);_countdownTickTimer=null;}
   const sorted=[...countdowns].sort((a,b)=>new Date(a.date+'T'+(a.time||'00:00'))-new Date(b.date+'T'+(b.time||'00:00')));
   if(!sorted.length&&!editMode){el.innerHTML='';return;}
-  const cards=sorted.map(c=>{
-    const p=_countdownParts(c.date,c.time);
-    const body=p
-      ?`<div style="font-family:var(--font-head);font-size:24px;font-weight:800;line-height:1">${p.days}<span style="font-size:12px;font-weight:600"> ${p.days===1?'יום':'ימים'}</span></div>
-        <div style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-top:3px;direction:ltr">${_fmt2(p.hours)}:${_fmt2(p.mins)}:${_fmt2(p.secs)}</div>`
-      :`<div style="font-family:var(--font-head);font-size:26px;font-weight:800;line-height:1">🎉</div><div style="font-size:11px;opacity:.9;margin-top:2px">הגיע היום!</div>`;
-    const emojiHtml=c.emoji?`<div style="font-size:${c.emojiSize||32}px;line-height:1;margin-bottom:4px">${esc(c.emoji)}</div>`:'';
-    return`<div style="position:relative;flex:1;min-width:120px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;padding:14px 12px;color:#fff;text-align:center;box-shadow:0 4px 16px rgba(102,126,234,0.3)">
-      <div class="edit-only" style="position:absolute;top:6px;left:6px;display:flex;gap:4px">
+  const cards=sorted.map(c=>`<div style="position:relative;flex:1;min-width:120px">
+      <div class="edit-only" style="position:absolute;top:6px;left:6px;display:flex;gap:4px;z-index:2">
         <button onclick="openCountdownModal(${c.id})" style="border:none;background:rgba(255,255,255,0.25);color:#fff;width:20px;height:20px;border-radius:50%;font-size:11px;line-height:1;cursor:pointer;padding:0">✏️</button>
         <button onclick="deleteCountdown(${c.id})" style="border:none;background:rgba(255,255,255,0.25);color:#fff;width:20px;height:20px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;padding:0">✕</button>
       </div>
-      ${emojiHtml}
-      ${body}
-      <div style="font-size:12.5px;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</div>
-    </div>`;
-  }).join('');
+      ${_countdownCardHTML(c)}
+    </div>`).join('');
   const addBtn=`<button class="edit-only" onclick="openCountdownModal()" style="flex:1;min-width:120px;padding:14px 12px;border-radius:16px;border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ שעון חדש</button>`;
   el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 14px 6px">${cards}${addBtn}</div>`;
   if(sorted.length)_countdownTickTimer=setInterval(renderCountdowns,1000);
@@ -850,8 +857,11 @@ function openCountdownModal(id){
   const d=document.getElementById('countdownDate');if(d)d.value=c?c.date:'';
   const tm=document.getElementById('countdownTime');if(tm)tm.value=c?(c.time||'00:00'):'00:00';
   const e=document.getElementById('countdownEmoji');if(e)e.value=c?(c.emoji||''):'';
+  const b1=document.getElementById('countdownBg1');if(b1)b1.value=c&&c.bg1?c.bg1:'#667eea';
+  const b2=document.getElementById('countdownBg2');if(b2)b2.value=c&&c.bg2?c.bg2:'#764ba2';
+  const tc=document.getElementById('countdownTextColor');if(tc)tc.value=c&&c.textColor?c.textColor:'#ffffff';
   _countdownEmojiSize=c&&c.emojiSize?c.emojiSize:32;
-  updateCountdownEmojiPreview();
+  updateCountdownPreview();
   const err=document.getElementById('countdownErr');if(err)err.style.display='none';
   const mTitle=document.getElementById('countdownModalTitle');if(mTitle)mTitle.textContent=c?'✏️ עריכת שעון':'⏱ שעון ספירה לאחור חדש';
   const saveBtn=document.getElementById('countdownSaveBtn');if(saveBtn)saveBtn.textContent=c?'✓ שמור שינויים':'✓ צור שעון';
@@ -863,32 +873,49 @@ function closeCountdownModal(){
 }
 function pickCountdownEmoji(e){
   const inp=document.getElementById('countdownEmoji');if(inp)inp.value=e;
-  updateCountdownEmojiPreview();
+  updateCountdownPreview();
 }
 function stepCountdownEmojiSize(delta){
   _countdownEmojiSize=Math.max(16,Math.min(80,_countdownEmojiSize+delta));
-  updateCountdownEmojiPreview();
+  updateCountdownPreview();
 }
-function updateCountdownEmojiPreview(){
+// Refreshes both the small emoji swatch next to the size stepper and the
+// full "story-style" card preview at the top of the modal, so every change
+// (title, date, emoji, size, colors) is reflected on the actual card look
+// immediately, before saving.
+function updateCountdownPreview(){
   const inp=document.getElementById('countdownEmoji');
   const val=(inp?.value||'').trim();
   const prev=document.getElementById('countdownEmojiPreview');
   if(prev){prev.textContent=val;prev.style.fontSize=_countdownEmojiSize+'px';}
   const lbl=document.getElementById('countdownEmojiSizeLbl');if(lbl)lbl.textContent=_countdownEmojiSize+'px';
+  const card=document.getElementById('countdownPreviewCard');
+  if(card){
+    const title=(document.getElementById('countdownTitle')?.value||'').trim()||'האירוע שלי';
+    const date=document.getElementById('countdownDate')?.value||new Date(Date.now()+3*86400000).toISOString().slice(0,10);
+    const time=document.getElementById('countdownTime')?.value||'00:00';
+    const bg1=document.getElementById('countdownBg1')?.value||'#667eea';
+    const bg2=document.getElementById('countdownBg2')?.value||'#764ba2';
+    const textColor=document.getElementById('countdownTextColor')?.value||'#ffffff';
+    card.innerHTML=_countdownCardHTML({title,date,time,emoji:val,emojiSize:_countdownEmojiSize,bg1,bg2,textColor});
+  }
 }
 function saveCountdown(){
   const title=(document.getElementById('countdownTitle')?.value||'').trim();
   const date=document.getElementById('countdownDate')?.value||'';
   const time=document.getElementById('countdownTime')?.value||'00:00';
   const emoji=(document.getElementById('countdownEmoji')?.value||'').trim();
+  const bg1=document.getElementById('countdownBg1')?.value||'#667eea';
+  const bg2=document.getElementById('countdownBg2')?.value||'#764ba2';
+  const textColor=document.getElementById('countdownTextColor')?.value||'#ffffff';
   const err=document.getElementById('countdownErr');
   if(!title||!date){if(err){err.textContent='נא למלא כיתוב ותאריך';err.style.display='block';}return;}
   if(err)err.style.display='none';
   if(_editCountdownId!=null){
     const c=countdowns.find(x=>x.id===_editCountdownId);
-    if(c){c.title=title;c.date=date;c.time=time;c.emoji=emoji;c.emojiSize=_countdownEmojiSize;}
+    if(c){c.title=title;c.date=date;c.time=time;c.emoji=emoji;c.emojiSize=_countdownEmojiSize;c.bg1=bg1;c.bg2=bg2;c.textColor=textColor;}
   }else{
-    countdowns.push({id:nxtCountdown++,title,date,time,emoji,emojiSize:_countdownEmojiSize,createdAt:Date.now()});
+    countdowns.push({id:nxtCountdown++,title,date,time,emoji,emojiSize:_countdownEmojiSize,bg1,bg2,textColor,createdAt:Date.now()});
   }
   closeCountdownModal();
   save();renderCountdowns();
