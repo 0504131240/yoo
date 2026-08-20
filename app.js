@@ -570,7 +570,6 @@ function saveLocal(){
 
 let _retryTimer=null;
 async function save(){
-  _skipNextNotif=true;
   saveLocal();
   localStorage.setItem('pendingSave','1');
   localStorage.setItem('pendingSaveAt',String(Date.now()));
@@ -1016,7 +1015,7 @@ function sendChatMsg(){
 
 // ── Notifications & Real-time ──────────────────────────────────────────────
 
-let _skipNextNotif=false,_initialSync=true,_realtimeUnsub=null;
+let _initialSync=true,_realtimeUnsub=null;
 
 function _notifOk(){return 'Notification' in window&&Notification.permission==='granted';}
 
@@ -1119,24 +1118,6 @@ async function startRealtimeSync(){
       if(!snap.exists())return;
       const d=snap.data();
       const snapMsgs=d.messages||[];
-      const snapEvs=d.events||[];
-      const snapExpCount=snapEvs.reduce((s,e)=>s+(e.expenseItems||[]).length,0);
-      if(!_initialSync&&_notifOk()&&!_skipNextNotif&&!document.hidden){
-        const lastMsgId=parseInt(localStorage.getItem('lastMsgId')||'0');
-        const lastEvId=parseInt(localStorage.getItem('lastEvId')||'0');
-        const lastExpCount=parseInt(localStorage.getItem('lastExpCount')||'0');
-        const myName=_myChatName();
-        snapMsgs.filter(m=>m.id>lastMsgId&&m.author!==myName)
-          .forEach(m=>showNotif('💬 הודעה חדשה',(m.author?m.author+': ':'')+m.text));
-        snapEvs.filter(e=>e.id>lastEvId)
-          .forEach(e=>showNotif('📅 אירוע חדש',e.name));
-        if(snapExpCount>lastExpCount&&lastExpCount>0)
-          showNotif('💰 הוצאה חדשה','נוספה הוצאה חדשה לאירוע');
-      }
-      _skipNextNotif=false;
-      if(snapMsgs.length)localStorage.setItem('lastMsgId',String(Math.max(...snapMsgs.map(m=>m.id))));
-      if(snapEvs.length)localStorage.setItem('lastEvId',String(Math.max(...snapEvs.map(e=>e.id))));
-      localStorage.setItem('lastExpCount',String(snapExpCount));
       if(!_initialSync&&!_saving){
         const snapMax=snapMsgs.length?Math.max(...snapMsgs.map(m=>m.id)):0;
         const localMax=messages.length?Math.max(...messages.map(m=>m.id)):0;
@@ -1186,7 +1167,7 @@ async function startFormImportSync(){
           if(added){changed=true;addNotif('📋',`${sub.famName||'משפחה'} שלח/ה ${added} הוצאה${added===1?'':'ות'} דרך הטופס ל"${ev.name}"`);}
           await setDoc(doc(db,'formExpenses',sub._id),{imported:true,importedAt:new Date().toISOString()},{merge:true});
         }
-        if(changed){_skipNextNotif=true;save();render();}
+        if(changed){save();render();}
       }finally{_importingForms=false;}
     });
   }catch(e){console.warn('form import sync:',e);}
