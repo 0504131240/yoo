@@ -3799,6 +3799,14 @@ function addNotif(icon,text){
   notifications.unshift({id:nxtNotif++,icon,text,ts:Date.now()});
   if(notifications.length>200)notifications.length=200;
   renderNotifCenterBadge();
+  _sendPush(icon+' ינקלביץ',text);
+}
+// Fires a real device push (via the /api/notify Vercel function → FCM) for
+// every in-app notification-center event, so family members get it even
+// when the app is closed — not just the in-app bell. Best-effort: silently
+// ignored if it fails (e.g. offline, or the API route isn't deployed yet).
+function _sendPush(title,body){
+  fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,title,body})}).catch(()=>{});
 }
 function _notifLastSeen(){return parseInt(localStorage.getItem('notifLastSeen')||'0');}
 function renderNotifCenterBadge(){

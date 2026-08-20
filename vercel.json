@@ -19,5 +19,9 @@
         { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/cron/daily-backup", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/weekly-debt-reminder", "schedule": "0 7 * * 0" }
   ]
 }
