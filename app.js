@@ -810,8 +810,8 @@ function renderFamilyHome(){
 // second while any countdown is showing, so the clock actually ticks.
 let _countdownTickTimer=null;
 const _fmt2=n=>String(n).padStart(2,'0');
-function _countdownParts(dateStr){
-  const diff=new Date(dateStr+'T00:00:00').getTime()-Date.now();
+function _countdownParts(dateStr,timeStr){
+  const diff=new Date(dateStr+'T'+(timeStr||'00:00')+':00').getTime()-Date.now();
   if(diff<=0)return null;
   const totalSec=Math.floor(diff/1000);
   return{days:Math.floor(totalSec/86400),hours:Math.floor((totalSec%86400)/3600),mins:Math.floor((totalSec%3600)/60),secs:totalSec%60};
@@ -819,10 +819,10 @@ function _countdownParts(dateStr){
 function renderCountdowns(){
   const el=document.getElementById('countdownSection');if(!el)return;
   if(_countdownTickTimer){clearInterval(_countdownTickTimer);_countdownTickTimer=null;}
-  const sorted=[...countdowns].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const sorted=[...countdowns].sort((a,b)=>new Date(a.date+'T'+(a.time||'00:00'))-new Date(b.date+'T'+(b.time||'00:00')));
   if(!sorted.length&&!editMode){el.innerHTML='';return;}
   const cards=sorted.map(c=>{
-    const p=_countdownParts(c.date);
+    const p=_countdownParts(c.date,c.time);
     const body=p
       ?`<div style="font-family:var(--font-head);font-size:24px;font-weight:800;line-height:1">${p.days}<span style="font-size:12px;font-weight:600"> ${p.days===1?'יום':'ימים'}</span></div>
         <div style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-top:3px;direction:ltr">${_fmt2(p.hours)}:${_fmt2(p.mins)}:${_fmt2(p.secs)}</div>`
@@ -848,6 +848,7 @@ function openCountdownModal(id){
   const c=id!=null?countdowns.find(x=>x.id===id):null;
   const t=document.getElementById('countdownTitle');if(t)t.value=c?c.title:'';
   const d=document.getElementById('countdownDate');if(d)d.value=c?c.date:'';
+  const tm=document.getElementById('countdownTime');if(tm)tm.value=c?(c.time||'00:00'):'00:00';
   const e=document.getElementById('countdownEmoji');if(e)e.value=c?(c.emoji||''):'';
   _countdownEmojiSize=c&&c.emojiSize?c.emojiSize:32;
   updateCountdownEmojiPreview();
@@ -878,15 +879,16 @@ function updateCountdownEmojiPreview(){
 function saveCountdown(){
   const title=(document.getElementById('countdownTitle')?.value||'').trim();
   const date=document.getElementById('countdownDate')?.value||'';
+  const time=document.getElementById('countdownTime')?.value||'00:00';
   const emoji=(document.getElementById('countdownEmoji')?.value||'').trim();
   const err=document.getElementById('countdownErr');
   if(!title||!date){if(err){err.textContent='נא למלא כיתוב ותאריך';err.style.display='block';}return;}
   if(err)err.style.display='none';
   if(_editCountdownId!=null){
     const c=countdowns.find(x=>x.id===_editCountdownId);
-    if(c){c.title=title;c.date=date;c.emoji=emoji;c.emojiSize=_countdownEmojiSize;}
+    if(c){c.title=title;c.date=date;c.time=time;c.emoji=emoji;c.emojiSize=_countdownEmojiSize;}
   }else{
-    countdowns.push({id:nxtCountdown++,title,date,emoji,emojiSize:_countdownEmojiSize,createdAt:Date.now()});
+    countdowns.push({id:nxtCountdown++,title,date,time,emoji,emojiSize:_countdownEmojiSize,createdAt:Date.now()});
   }
   closeCountdownModal();
   save();renderCountdowns();

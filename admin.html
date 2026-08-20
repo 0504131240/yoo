@@ -741,7 +741,10 @@
     </div>
     <div class="field" style="margin-top:10px">
       <label class="field-lbl">עד לתאריך</label>
-      <input type="date" id="countdownDate" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+      <div style="display:flex;gap:8px">
+        <input type="date" id="countdownDate" style="flex:1.4;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+        <input type="time" id="countdownTime" value="00:00" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
     </div>
     <div class="field" style="margin-top:10px">
       <label class="field-lbl">אימוג'י (אופציונלי)</label>
