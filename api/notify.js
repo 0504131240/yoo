@@ -19,7 +19,8 @@ module.exports = async (req, res) => {
   const tokSnap = await db.collection('fcmTokens').get();
   const tokenDocs = tokSnap.docs;
   const tokens = tokenDocs.map(d => d.data().token).filter(Boolean);
-  if (!tokens.length) { res.status(200).json({ sent: 0 }); return; }
+  console.log(`notify: ${tokens.length} registered token(s) found`);
+  if (!tokens.length) { res.status(200).json({ sent: 0, registered: 0 }); return; }
 
   const resp = await getMessaging().sendEachForMulticast({
     tokens,
@@ -30,8 +31,13 @@ module.exports = async (req, res) => {
     },
   });
 
+  resp.responses.forEach((r, i) => {
+    if (!r.success) console.log(`notify: token ${i} failed — ${r.error?.code || r.error?.message || 'unknown error'}`);
+  });
+
   const toDelete = tokenDocs.filter((_, i) => !resp.responses[i]?.success);
   await Promise.all(toDelete.map(d => d.ref.delete()));
 
-  res.status(200).json({ sent: resp.successCount });
+  console.log(`notify: sent ${resp.successCount}/${tokens.length}, removed ${toDelete.length} invalid token(s)`);
+  res.status(200).json({ sent: resp.successCount, registered: tokens.length });
 };
