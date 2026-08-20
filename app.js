@@ -1031,7 +1031,7 @@ async function registerFCMToken(){
   const {db,doc,setDoc}=await fbInit();
   let did=localStorage.getItem('fcmDeviceId');
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
-  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now()});
+  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index'});
   console.log('FCM token saved OK');
   // Background pushes (tab closed/hidden) are shown automatically by
   // sw.js's onBackgroundMessage. But by design, Chrome does NOT auto-show

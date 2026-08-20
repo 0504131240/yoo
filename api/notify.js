@@ -17,27 +17,44 @@ module.exports = async (req, res) => {
   if (!(await checkAdminPass(db, adminPass))) { res.status(401).json({ error: 'unauthorized' }); return; }
 
   const tokSnap = await db.collection('fcmTokens').get();
-  const tokenDocs = tokSnap.docs;
-  const tokens = tokenDocs.map(d => d.data().token).filter(Boolean);
-  console.log(`notify: ${tokens.length} registered token(s) found`);
-  if (!tokens.length) { res.status(200).json({ sent: 0, registered: 0 }); return; }
+  console.log(`notify: ${tokSnap.size} registered token(s) found`);
+  if (tokSnap.empty) { res.status(200).json({ sent: 0, registered: 0 }); return; }
 
-  const resp = await getMessaging().sendEachForMulticast({
-    tokens,
-    notification: { title, body },
-    webpush: {
-      notification: { icon: 'https://yankeleviz.vercel.app/icon.jpg', dir: 'rtl', lang: 'he' },
-      fcmOptions: { link: 'https://yankeleviz.vercel.app/' },
-    },
+  // Devices registered from admin.html should land back on admin.html when
+  // the notification is tapped, not on the public family page (and vice
+  // versa) — registerFCMToken() records which page each token came from.
+  const LINKS = {
+    admin: 'https://yankeleviz.vercel.app/admin.html',
+    index: 'https://yankeleviz.vercel.app/',
+  };
+  const groups = { admin: [], index: [] };
+  tokSnap.docs.forEach(d => {
+    const data = d.data();
+    if (!data.token) return;
+    (groups[data.page === 'admin' ? 'admin' : 'index']).push(d);
   });
 
-  resp.responses.forEach((r, i) => {
-    if (!r.success) console.log(`notify: token ${i} failed — ${r.error?.code || r.error?.message || 'unknown error'}`);
-  });
+  let sent = 0, registered = 0, deleted = 0;
+  for (const [page, docs] of Object.entries(groups)) {
+    if (!docs.length) continue;
+    registered += docs.length;
+    const resp = await getMessaging().sendEachForMulticast({
+      tokens: docs.map(d => d.data().token),
+      notification: { title, body },
+      webpush: {
+        notification: { icon: 'https://yankeleviz.vercel.app/icon.jpg', dir: 'rtl', lang: 'he' },
+        fcmOptions: { link: LINKS[page] },
+      },
+    });
+    sent += resp.successCount;
+    resp.responses.forEach((r, i) => {
+      if (!r.success) console.log(`notify[${page}]: token ${i} failed — ${r.error?.code || r.error?.message || 'unknown error'}`);
+    });
+    const toDelete = docs.filter((_, i) => !resp.responses[i]?.success);
+    deleted += toDelete.length;
+    await Promise.all(toDelete.map(d => d.ref.delete()));
+  }
 
-  const toDelete = tokenDocs.filter((_, i) => !resp.responses[i]?.success);
-  await Promise.all(toDelete.map(d => d.ref.delete()));
-
-  console.log(`notify: sent ${resp.successCount}/${tokens.length}, removed ${toDelete.length} invalid token(s)`);
-  res.status(200).json({ sent: resp.successCount, registered: tokens.length });
+  console.log(`notify: sent ${sent}/${registered}, removed ${deleted} invalid token(s)`);
+  res.status(200).json({ sent, registered });
 };

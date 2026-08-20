@@ -13,9 +13,14 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(payload => {
   const title = payload.notification?.title || 'ינקלביץ';
   const body  = payload.notification?.body  || '';
+  // The server picks admin.html vs index.html per-recipient (see
+  // api/notify.js) and sends it as fcmOptions.link — use that rather than
+  // guessing from this script's own location, which is always "/" and used
+  // to send admin-registered devices to the wrong page on click.
+  const url = payload.fcmOptions?.link || (self.location.origin + '/');
   self.registration.showNotification(title, {
     body, icon:'/icon.jpg', dir:'rtl', lang:'he',
-    data:{url: self.location.origin + self.location.pathname.replace(/\/[^/]*$/,'/')}
+    data:{url}
   });
 });
 self.addEventListener('notificationclick', e => {
@@ -23,7 +28,12 @@ self.addEventListener('notificationclick', e => {
   const target = e.notification.data?.url || self.location.origin;
   e.waitUntil(
     clients.matchAll({type:'window',includeUncontrolled:true})
-      .then(cls => { const w=cls.find(c=>c.url.startsWith(self.location.origin)); return w?w.focus():clients.openWindow(target); })
+      .then(cls => {
+        const exact = cls.find(c => c.url.startsWith(target));
+        if (exact) return exact.focus();
+        const anyOrigin = cls.find(c => c.url.startsWith(self.location.origin));
+        return anyOrigin ? anyOrigin.focus() : clients.openWindow(target);
+      })
   );
 });
 
