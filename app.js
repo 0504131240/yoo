@@ -3998,10 +3998,16 @@ function _sendPush(title,body,target){
 function _notifLastSeen(){return parseInt(localStorage.getItem('notifLastSeen')||'0');}
 function renderNotifCenterBadge(){
   const badge=document.getElementById('notifCenterBadge');if(!badge)return;
+  const btn=document.getElementById('floatingNotifBtn');
   const seen=_notifLastSeen();
   const unread=notifications.filter(n=>n.ts>seen).length;
-  if(unread>0){badge.style.display='flex';badge.textContent=unread>99?'99+':String(unread);}
-  else badge.style.display='none';
+  if(unread>0){
+    badge.style.display='flex';badge.textContent=unread>99?'99+':String(unread);
+    if(btn)btn.style.display='flex';
+  }else{
+    badge.style.display='none';
+    if(btn)btn.style.display='none';
+  }
 }
 function openNotifCenter(){
   const modal=document.getElementById('notifCenterModal');if(!modal)return;

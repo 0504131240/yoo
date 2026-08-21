@@ -185,11 +185,16 @@
     <div class="topbar-sub" id="topSub">ניהול הוצאות וחובות</div>
   </div>
   <div style="display:flex;gap:8px;flex-shrink:0">
-    <button class="btn-add" id="nb-notifcenter" onclick="openNotifCenter()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);position:relative">🔔<span id="notifCenterBadge" style="display:none;position:absolute;top:-4px;left:-4px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:var(--red-mid,#d33);color:#fff;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1"></span></button>
     <button class="btn-add edit-only" id="nb-families" onclick="goTab('families',this)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">👥</button>
     <button class="btn-add edit-only" onclick="showForm()">+ אירוע חדש</button>
   </div>
 </div>
+
+<!-- Floating notifications button — hidden entirely unless there's something unread -->
+<button id="floatingNotifBtn" onclick="openNotifCenter()" title="התראות" style="display:none;position:fixed;top:14px;left:14px;z-index:400;width:44px;height:44px;border-radius:50%;border:none;background:var(--blue-mid);color:#fff;font-size:19px;box-shadow:0 4px 14px rgba(0,0,0,0.3);cursor:pointer;align-items:center;justify-content:center">
+  🔔
+  <span id="notifCenterBadge" style="position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--red-mid,#d33);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1"></span>
+</button>
 
 <div id="notifCenterModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeNotifCenter()">
   <div style="background:var(--bg);border-radius:var(--r2);max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
