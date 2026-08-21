@@ -789,6 +789,10 @@ function switchShell(s){
   if(s==='home'){renderFamilyHome();setTimeout(()=>{const sh=document.getElementById('shell-home');if(sh)sh.scrollTop=0;},10);}
   if(s==='pay')goTab('home',document.getElementById('nb-home'));
 }
+function openFamiliesFromHome(){
+  switchShell('pay');
+  goTab('families',document.getElementById('nb-families'));
+}
 
 const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const HEB_DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
@@ -1331,8 +1335,10 @@ function renderCalendar(){
   const todayStr=new Date().toISOString().slice(0,10);
   const _allBdays=allBirthdays();
   const _allYahr=allYahrzeits();
+  const _allAnniv=allAnniversaries();
   const bdayByDate={};
   const yahrByDate={};
+  const annivByDate={};
   let html='';
   let hebDays=null;
   if(calHebrew){
@@ -1353,15 +1359,18 @@ function renderCalendar(){
       const evOnDay=calItems.filter(c=>c.date===ds);
       const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
       const yahrOnDay=_allYahr.filter(y=>y.hebDay===hebDayNumInt&&y.hebMonth===hebMonthName);
+      const annivOnDay=_allAnniv.filter(a=>a.hebDay===hebDayNumInt&&a.hebMonth===hebMonthName);
       if(bdayOnDay.length)bdayByDate[ds]=bdayOnDay;
       if(yahrOnDay.length)yahrByDate[ds]=yahrOnDay;
-      const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;const hasYahr=yahrOnDay.length>0;
-      const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':(hasYahr?'has-yahrzeit':''))].filter(Boolean).join(' ');
+      if(annivOnDay.length)annivByDate[ds]=annivOnDay;
+      const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;const hasYahr=yahrOnDay.length>0;const hasAnniv=annivOnDay.length>0;
+      const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':(hasYahr?'has-yahrzeit':(hasAnniv?'has-anniv':'')))].filter(Boolean).join(' ');
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
         <span style="font-size:10px;line-height:1">${label}</span>
         ${hasEv?`<span class="fh-cal-day-ev">${evOnDay.map(c=>c.title.slice(0,5)).join(',')}</span>`:''}
         ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayOnDay.map(b=>b.name.slice(0,4)).join(',')}</span>`:''}
         ${!hasEv&&!hasBday&&hasYahr?`<span class="fh-cal-day-ev" style="color:#555">🕯️${yahrOnDay.map(y=>y.name.slice(0,4)).join(',')}</span>`:''}
+        ${!hasEv&&!hasBday&&!hasYahr&&hasAnniv?`<span class="fh-cal-day-ev" style="color:#B8860B">💍${annivOnDay.map(a=>a.name.slice(0,4)).join(',')}</span>`:''}
       </div>`;
     }
   } else {
@@ -1380,20 +1389,23 @@ function renderCalendar(){
       const evOnDay=calItems.filter(c=>c.date===ds);
       const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
       const yahrOnDay=_allYahr.filter(y=>y.hebDay===hebDayNumInt&&y.hebMonth===hebMonthName);
+      const annivOnDay=_allAnniv.filter(a=>a.hebDay===hebDayNumInt&&a.hebMonth===hebMonthName);
       if(bdayOnDay.length)bdayByDate[ds]=bdayOnDay;
       if(yahrOnDay.length)yahrByDate[ds]=yahrOnDay;
-      const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;const hasYahr=yahrOnDay.length>0;
-      const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':(hasYahr?'has-yahrzeit':''))].filter(Boolean).join(' ');
+      if(annivOnDay.length)annivByDate[ds]=annivOnDay;
+      const hasEv=evOnDay.length>0;const hasBday=bdayOnDay.length>0;const hasYahr=yahrOnDay.length>0;const hasAnniv=annivOnDay.length>0;
+      const cls=['fh-cal-day',isToday?'today':'',isSel?'sel':'',hasEv?'has-ev':(hasBday?'has-bday':(hasYahr?'has-yahrzeit':(hasAnniv?'has-anniv':'')))].filter(Boolean).join(' ');
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
         <span style="font-size:12px;line-height:1">${d}</span>
         ${hasEv?`<span class="fh-cal-day-ev">${evOnDay.map(c=>c.title.slice(0,5)).join(',')}</span>`:''}
         ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayOnDay.map(b=>b.name.slice(0,4)).join(',')}</span>`:''}
         ${!hasEv&&!hasBday&&hasYahr?`<span class="fh-cal-day-ev" style="color:#555">🕯️${yahrOnDay.map(y=>y.name.slice(0,4)).join(',')}</span>`:''}
+        ${!hasEv&&!hasBday&&!hasYahr&&hasAnniv?`<span class="fh-cal-day-ev" style="color:#B8860B">💍${annivOnDay.map(a=>a.name.slice(0,4)).join(',')}</span>`:''}
       </div>`;
     }
   }
   gridEl.innerHTML=html;
-  renderCalEvList(hebDays,bdayByDate,yahrByDate);
+  renderCalEvList(hebDays,bdayByDate,yahrByDate,annivByDate);
 }
 
 function selectCalDay(ds){
@@ -1401,10 +1413,11 @@ function selectCalDay(ds){
   renderCalendar();
 }
 
-function renderCalEvList(hebDays,bdayByDate,yahrByDate){
+function renderCalEvList(hebDays,bdayByDate,yahrByDate,annivByDate){
   const el=document.getElementById('calEvList');if(!el)return;
   bdayByDate=bdayByDate||{};
   yahrByDate=yahrByDate||{};
+  annivByDate=annivByDate||{};
   let dateFilter;
   if(calSelDay){
     dateFilter=ds=>ds===calSelDay;
@@ -1420,7 +1433,9 @@ function renderCalEvList(hebDays,bdayByDate,yahrByDate){
     .flatMap(([ds,bdays])=>bdays.map(b=>({type:'bday',date:ds,item:b})));
   const yahrList=Object.entries(yahrByDate).filter(([ds])=>dateFilter(ds))
     .flatMap(([ds,yahrs])=>yahrs.map(y=>({type:'yahrzeit',date:ds,item:y})));
-  const list=[...evList,...bdayList,...yahrList].sort((a,b)=>a.date.localeCompare(b.date));
+  const annivList=Object.entries(annivByDate).filter(([ds])=>dateFilter(ds))
+    .flatMap(([ds,annivs])=>annivs.map(a=>({type:'anniversary',date:ds,item:a})));
+  const list=[...evList,...bdayList,...yahrList,...annivList].sort((a,b)=>a.date.localeCompare(b.date));
   if(!list.length){el.innerHTML='';return;}
   el.innerHTML=list.map(({type,date,item})=>{
     const d=new Date(date+'T00:00:00');
@@ -1450,6 +1465,17 @@ function renderCalEvList(hebDays,bdayByDate,yahrByDate){
         </div>
         <button onclick="openYahrzeitModal(${item.id})" class="edit-only" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>
         <button onclick="deleteYahrzeit(${item.id})" class="edit-only" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>
+      </div>`;
+    }
+    if(type==='anniversary'){
+      const years=item.hebYear?(_currentHebYear()-item.hebYear):null;
+      return`<div class="fh-cal-ev">
+        <div class="fh-cal-ev-dot" style="background:#B8860B"></div>
+        <div class="fh-cal-ev-info">
+          <div class="fh-cal-ev-name">💍 ${esc(item.name)} — יום נישואין${years!=null&&years>0?' ('+years+' שנים)':''}</div>
+          <div class="fh-cal-ev-date">${lbl}</div>
+        </div>
+        <button onclick="openFamEditSheet(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>
       </div>`;
     }
     return`<div class="fh-cal-ev">
@@ -2390,7 +2416,7 @@ function renderFamilies(){
     return`<div class="fcard" onclick="openFamDetail(${f.id})" style="cursor:pointer">
       ${famAva(f, 38)}
       <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}<span class="edit-only">${(()=>{const v=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));const hasEmail=f.email||f.email2;const allOk=(f.email?v.has(f.email):true)&&(f.email2?v.has(f.email2):true);return hasEmail?(allOk?' · ✅':'· 📧'):'';})()}</span></div></div>
-      <button class="action-btn edit-only" onclick="event.stopPropagation();openFamEditSheet(${f.id})">✏️ ערוך</button>
+      <button class="action-btn" onclick="event.stopPropagation();openFamEditSheet(${f.id})">✏️ ערוך</button>
     </div>`;
   }).join('');
 }
@@ -2516,6 +2542,13 @@ function famAva(f, size=34, extra=''){
 }
 let _famEditId=null;
 let _famEditPhoto=undefined;
+// undefined = untouched this sheet-open (don't overwrite f.anniversary*),
+// null = explicitly cleared, {hebYear,hebMonth,hebDay} = a new pick. Kept
+// separate from the shared _kidPickedDate/_kidLegacyDate (which the same
+// picker also uses for kid/parent birthdays and yahrzeits) so editing a
+// kid's birthday partway through the sheet can never leak into — or wipe —
+// the family's own anniversary date.
+let _famAnniversaryPending=undefined;
 let _reposImgSize=null,_reposOffset={x:0,y:0},_reposDragging=false,_reposStart=null;
 let _reposZoom=1,_reposBaseW=0,_reposBaseH=0,_pinchStartDist=null,_pinchStartZoom=1;
 function previewFamPhoto(inp){
@@ -2650,8 +2683,24 @@ function openFamEditSheet(fid){
     else { preview.innerHTML=`<span style="background:${cl.bg};color:${cl.c};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">${ini(f.name)}</span>`; }
   }
   if(clearBtn) clearBtn.style.display=f.photo?'inline-block':'none';
+  _famAnniversaryPending=undefined;
+  updateFamAnniversaryBtn(f);
   renderFamPeopleGrid();
   document.getElementById('famEditOverlay').style.display='flex';
+}
+function updateFamAnniversaryBtn(f){
+  const btn=document.getElementById('famAnniversaryDateBtn');if(!btn)return;
+  if(f.anniversaryDay&&f.anniversaryMonth&&f.anniversaryYear)btn.textContent='📅 '+HEB_DAY_NUM[f.anniversaryDay]+' ב'+f.anniversaryMonth+' '+toHebrewYear(f.anniversaryYear);
+  else if(f.anniversaryDay&&f.anniversaryMonth)btn.textContent='📅 '+HEB_DAY_NUM[f.anniversaryDay]+' ב'+f.anniversaryMonth;
+  else btn.textContent='📅 בחר תאריך נישואין';
+}
+function openFamAnniversaryPicker(){
+  const f=families.find(x=>x.id===_famEditId);if(!f)return;
+  _dateBtnTargetId='famAnniversaryDateBtn';_dateBtnPlaceholder='📅 בחר תאריך נישואין';
+  if(f.anniversaryDay&&f.anniversaryMonth&&f.anniversaryYear){_kidPickedDate={hebYear:f.anniversaryYear,hebMonth:f.anniversaryMonth,hebDay:f.anniversaryDay};_kidLegacyDate=null;}
+  else if(f.anniversaryDay&&f.anniversaryMonth){_kidPickedDate=null;_kidLegacyDate={hebMonth:f.anniversaryMonth,hebDay:f.anniversaryDay};}
+  else{_kidPickedDate=null;_kidLegacyDate=null;}
+  openKidDatePicker();
 }
 function renderFamPeopleGrid(){
   const el=document.getElementById('famPeopleGrid');if(!el)return;
@@ -2771,6 +2820,7 @@ function updateKidDateBtn(){
 function clearKidDate(){
   _kidPickedDate=null;
   _kidLegacyDate=null;
+  if(_dateBtnTargetId==='famAnniversaryDateBtn')_famAnniversaryPending=null;
   updateKidDateBtn();
 }
 function openKidDatePicker(){
@@ -2848,6 +2898,7 @@ function renderKidDatePicker(){
 function selectKidPickerDay(hebYear,hebMonth,hebDay){
   _kidPickedDate={hebYear,hebMonth,hebDay};
   _kidLegacyDate=null;
+  if(_dateBtnTargetId==='famAnniversaryDateBtn')_famAnniversaryPending={hebYear,hebMonth,hebDay};
   updateKidDateBtn();
   closeKidDatePicker();
 }
@@ -2996,6 +3047,12 @@ function deleteYahrzeit(id){
 function allYahrzeits(){
   return yahrzeits;
 }
+function allAnniversaries(){
+  return families.filter(f=>f.anniversaryDay&&f.anniversaryMonth).map(f=>({
+    id:f.id,name:f.name.replace('משפחת','').trim(),
+    hebDay:f.anniversaryDay,hebMonth:f.anniversaryMonth,hebYear:f.anniversaryYear
+  }));
+}
 function _currentHebYear(){
   return parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(new Date()));
 }
@@ -3009,6 +3066,11 @@ function saveFamEdit(){
   f.name=name;
   if(_famEditPhoto!==undefined) f.photo=_famEditPhoto||undefined;
   _famEditPhoto=undefined;
+  if(_famAnniversaryPending!==undefined){
+    if(_famAnniversaryPending){f.anniversaryDay=_famAnniversaryPending.hebDay;f.anniversaryMonth=_famAnniversaryPending.hebMonth;f.anniversaryYear=_famAnniversaryPending.hebYear;}
+    else{delete f.anniversaryDay;delete f.anniversaryMonth;delete f.anniversaryYear;}
+  }
+  _famAnniversaryPending=undefined;
   f.namesConfirmed=true;
   if(!editMode)addNotif('👪',f.name+' עדכנ/ה את פרטי המשפחה','admin');
   closeFamEditSheet();

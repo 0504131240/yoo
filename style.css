@@ -304,6 +304,7 @@ body:not(.at-home){padding-bottom:140px}
 .fh-cal-day.has-ev{background:var(--amber-bg)}
 .fh-cal-day.has-bday{background:#FDE8E8}
 .fh-cal-day.has-yahrzeit{background:#EAEAEA}
+.fh-cal-day.has-anniv{background:#FCF3D8}
 .fh-cal-day.today.has-ev{background:var(--blue-mid)!important}
 .fh-cal-day-ev{font-size:8px;font-weight:700;color:var(--amber);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:0 2px;line-height:1.1}
 .fh-cal-day.today .fh-cal-day-ev{color:rgba(255,255,255,.85)}
