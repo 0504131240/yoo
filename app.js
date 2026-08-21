@@ -2431,7 +2431,7 @@ function renderFamilies(){
     return`<div class="fcard" onclick="openFamDetail(${f.id})" style="cursor:pointer">
       ${famAva(f, 38)}
       <div style="flex:1"><div class="fname">${esc(f.name)}</div><div class="fevents">${cnt} אירועים${f.children?' · '+f.children+' ילדים':''}<span class="edit-only">${(()=>{const v=new Set(JSON.parse(localStorage.getItem('verifiedEmails')||'[]'));const hasEmail=f.email||f.email2;const allOk=(f.email?v.has(f.email):true)&&(f.email2?v.has(f.email2):true);return hasEmail?(allOk?' · ✅':'· 📧'):'';})()}</span></div></div>
-      <button class="action-btn" onclick="event.stopPropagation();openFamEditSheet(${f.id})">✏️ ערוך</button>
+      ${(editMode||f.id===_myFamId())?`<button class="action-btn" onclick="event.stopPropagation();openFamEditSheet(${f.id})">✏️ ערוך</button>`:''}
     </div>`;
   }).join('');
   // Rendered into both the admin "ניהול משפחות" tab list and the
