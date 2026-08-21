@@ -2998,7 +2998,10 @@ function deletePerson(){
   if(_personMode==='p1'||_personMode==='p2'){
     if(!confirm('למחוק את פרטי ההורה?'))return;
     const isP1=_personMode==='p1';
-    if(isP1){f.email='';f.emailName='';delete f.parent1Bday;}else{f.email2='';f.emailName2='';delete f.parent2Bday;}
+    // Email is admin-managed (see personEmailWrap's edit-only gate) — a family
+    // member deleting their own name/birthday here must not silently wipe out
+    // the notification email the admin set up for them.
+    if(isP1){if(editMode)f.email='';f.emailName='';delete f.parent1Bday;}else{if(editMode)f.email2='';f.emailName2='';delete f.parent2Bday;}
   }else{
     if(_personKidId==null)return;
     if(!confirm('למחוק ילד זה?'))return;
