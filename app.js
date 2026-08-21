@@ -2760,6 +2760,26 @@ function openFamDetail(famId){
     </div>
   </div>`;
 
+  // ילדים ותאריכי לידה
+  if(f.kids&&f.kids.length){
+    html+=`<div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">👶 ילדים</div>
+      ${f.kids.map(k=>{
+        const icon=k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👶';
+        let dateTxt='';
+        if(k.hebDay&&k.hebMonth){
+          dateTxt=HEB_DAY_NUM[k.hebDay]+' ב'+k.hebMonth+(k.hebYear?' '+toHebrewYear(k.hebYear):'');
+          const age=kidAge(k);
+          if(age!=null)dateTxt+=k.gender==='boy'?' (בן '+age+')':k.gender==='girl'?' (בת '+age+')':' ('+age+')';
+        }
+        return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px;color:var(--text)">${icon} ${esc(k.name||'ילד/ה')}</span>
+          <span style="font-size:12px;color:var(--text2)">${dateTxt||'אין תאריך לידה'}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
   // מיילים
   const emails=[f.email,f.email2].filter(Boolean);
   if(emails.length){
