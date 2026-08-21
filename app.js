@@ -1106,13 +1106,13 @@ function renderNotifBtn(){
 function allBirthdays(){
   const kidBdays=families.flatMap(f=>(f.kids||[]).filter(k=>k.hebDay&&k.hebMonth).map(k=>({
     name:(k.name?k.name:'ילד/ה')+' ('+f.name.replace('משפחת','').trim()+')',
-    hebDay:k.hebDay,hebMonth:k.hebMonth
+    hebDay:k.hebDay,hebMonth:k.hebMonth,hebYear:k.hebYear||null,gender:k.gender||''
   })));
   const parentBdays=families.flatMap(f=>{
     const fam=f.name.replace('משפחת','').trim();
     const arr=[];
-    if(f.parent1Bday&&f.parent1Bday.hebDay&&f.parent1Bday.hebMonth)arr.push({name:(f.emailName||'הורה')+' ('+fam+')',hebDay:f.parent1Bday.hebDay,hebMonth:f.parent1Bday.hebMonth});
-    if(f.parent2Bday&&f.parent2Bday.hebDay&&f.parent2Bday.hebMonth)arr.push({name:(f.emailName2||'הורה')+' ('+fam+')',hebDay:f.parent2Bday.hebDay,hebMonth:f.parent2Bday.hebMonth});
+    if(f.parent1Bday&&f.parent1Bday.hebDay&&f.parent1Bday.hebMonth)arr.push({name:(f.emailName||'הורה')+' ('+fam+')',hebDay:f.parent1Bday.hebDay,hebMonth:f.parent1Bday.hebMonth,hebYear:f.parent1Bday.hebYear||null,gender:''});
+    if(f.parent2Bday&&f.parent2Bday.hebDay&&f.parent2Bday.hebMonth)arr.push({name:(f.emailName2||'הורה')+' ('+fam+')',hebDay:f.parent2Bday.hebDay,hebMonth:f.parent2Bday.hebMonth,hebYear:f.parent2Bday.hebYear||null,gender:''});
     return arr;
   });
   return [...kidBdays,...parentBdays];
@@ -1462,10 +1462,12 @@ function renderCalEvList(hebDays,bdayByDate,yahrByDate,annivByDate){
       ?HEB_DAY_NUM[parseInt(latDayFmt.format(d))]+' ב'+monthFmt.format(d)+' '+toHebrewYear(hebYNum)
       :d.toLocaleDateString('he-IL',{day:'numeric',month:'long'});
     if(type==='bday'){
+      const age=item.hebYear?(hebYNum-item.hebYear):null;
+      const balloon=(age!=null&&age>0)?`<span class="bday-balloon">${esc(item.gender==='boy'?'בן '+age:item.gender==='girl'?'בת '+age:String(age))}</span>`:'';
       return`<div class="fh-cal-ev">
         <div class="fh-cal-ev-dot" style="background:#c0392b"></div>
         <div class="fh-cal-ev-info">
-          <div class="fh-cal-ev-name">🎂 ${esc(item.name)} — יום הולדת</div>
+          <div class="fh-cal-ev-name">🎂 ${esc(item.name)}${balloon} — יום הולדת</div>
           <div class="fh-cal-ev-date">${lbl}</div>
         </div>
       </div>`;
@@ -2766,15 +2768,18 @@ function openFamDetail(famId){
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">👶 ילדים</div>
       ${f.kids.map(k=>{
         const icon=k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👶';
-        let dateTxt='';
+        let dateTxt='',ageBadge='';
         if(k.hebDay&&k.hebMonth){
           dateTxt=HEB_DAY_NUM[k.hebDay]+' ב'+k.hebMonth+(k.hebYear?' '+toHebrewYear(k.hebYear):'');
           const age=kidAge(k);
-          if(age!=null)dateTxt+=k.gender==='boy'?' (בן '+age+')':k.gender==='girl'?' (בת '+age+')':' ('+age+')';
+          if(age!=null){
+            const txt=k.gender==='boy'?'בן '+age:k.gender==='girl'?'בת '+age:String(age);
+            ageBadge=`<span class="bday-balloon">${esc(txt)}</span>`;
+          }
         }
         return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
           <span style="font-size:13px;color:var(--text)">${icon} ${esc(k.name||'ילד/ה')}</span>
-          <span style="font-size:12px;color:var(--text2)">${dateTxt||'אין תאריך לידה'}</span>
+          <span style="font-size:12px;color:var(--text2)">${dateTxt||'אין תאריך לידה'}${ageBadge}</span>
         </div>`;
       }).join('')}
     </div>`;
