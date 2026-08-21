@@ -51,9 +51,6 @@
       <button class="fh-pill-btn" style="background:linear-gradient(135deg,#43E97B,#0ABDE3);box-shadow:0 4px 22px rgba(67,233,123,0.35)" onclick="switchShell('pay')">
         <span class="fh-pill-ico">💰</span>תשלומים
       </button>
-      <button class="fh-pill-btn" style="background:linear-gradient(135deg,#38BDF8,#0EA5E9);box-shadow:0 4px 22px rgba(14,165,233,0.35)" onclick="openFamiliesFromHome()">
-        <span class="fh-pill-ico">👥</span>ניהול משפחות
-      </button>
       <button class="fh-pill-btn" id="pollBannerBtn" style="display:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:0 4px 22px rgba(124,58,237,0.35)" onclick="openPollSheet()">
         <span class="fh-pill-ico">🗳</span><span id="pollBannerLbl">סקר ממתין למילוי</span>
       </button>
@@ -189,6 +186,7 @@
   </div>
   <div style="display:flex;gap:8px;flex-shrink:0">
     <button class="btn-add" id="nb-notifcenter" onclick="openNotifCenter()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);position:relative">🔔<span id="notifCenterBadge" style="display:none;position:absolute;top:-4px;left:-4px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:var(--red-mid,#d33);color:#fff;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1"></span></button>
+    <button class="btn-add edit-only" id="nb-families" onclick="goTab('families',this)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">👥</button>
     <button class="btn-add" onclick="openLockModal()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:16px"><span id="lockIcon">🔒</span></button>
     <button class="btn-add edit-only" onclick="showForm()">+ אירוע חדש</button>
   </div>
@@ -525,6 +523,9 @@
   <button id="mn-pay" class="mn-btn" onclick="switchShell('pay')">
     <span class="mn-in"><span class="mn-ico">💰</span>תשלומים</span>
   </button>
+  <button class="mn-btn" onclick="openFamiliesFromHome()">
+    <span class="mn-in"><span class="mn-ico">👥</span>משפחות</span>
+  </button>
 </div>
 
 <!-- Chat bottom sheet -->
@@ -823,6 +824,29 @@
     <div style="display:flex;gap:8px;margin-top:14px">
       <button id="countdownSaveBtn" onclick="saveCountdown()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ צור שעון</button>
       <button onclick="closeCountdownModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- Families management overlay, opened directly from the home screen's
+     bottom nav (👥 משפחות) — stays on the home shell the whole time, no
+     shell/tab switch, so closing it just returns to the home screen as-is.
+     Shows only the family cards (name/photo/kids/parents editing via the
+     existing famEditOverlay below) — not the admin-only settings
+     (EmailJS, treasurer payment details, broadcast) that still live in the
+     full "ניהול משפחות" tab, reachable by admins via the edit-only 👥
+     button in the topbar. -->
+<div id="familiesHomeOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamiliesHomeOverlay()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:400px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">👥 ניהול משפחות</span>
+      <button onclick="closeFamiliesHomeOverlay()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div id="famListHome"></div>
+    </div>
+    <div class="edit-only" style="padding:12px 18px;border-top:1px solid var(--border);flex-shrink:0;text-align:center">
+      <button onclick="closeFamiliesHomeOverlay();switchShell('pay');goTab('families',document.getElementById('nb-families'))" style="background:none;border:none;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer;text-decoration:underline">⚙️ עוד הגדרות למנהל (מייל, גזבר, הודעה לכולם)</button>
     </div>
   </div>
 </div>

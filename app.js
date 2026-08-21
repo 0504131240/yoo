@@ -790,8 +790,11 @@ function switchShell(s){
   if(s==='pay')goTab('home',document.getElementById('nb-home'));
 }
 function openFamiliesFromHome(){
-  switchShell('pay');
-  goTab('families',document.getElementById('nb-families'));
+  renderFamilies();
+  document.getElementById('familiesHomeOverlay').style.display='flex';
+}
+function closeFamiliesHomeOverlay(){
+  document.getElementById('familiesHomeOverlay').style.display='none';
 }
 
 const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
@@ -2411,7 +2414,7 @@ function renderArchive(){
   }).join('');
 }
 function renderFamilies(){
-  document.getElementById('famList').innerHTML=families.map(f=>{
+  const html=families.map(f=>{
     const cl=col(f.id);const cnt=events.filter(e=>e.participants.includes(f.id)).length;
     return`<div class="fcard" onclick="openFamDetail(${f.id})" style="cursor:pointer">
       ${famAva(f, 38)}
@@ -2419,6 +2422,11 @@ function renderFamilies(){
       <button class="action-btn" onclick="event.stopPropagation();openFamEditSheet(${f.id})">✏️ ערוך</button>
     </div>`;
   }).join('');
+  // Rendered into both the admin "ניהול משפחות" tab list and the
+  // lightweight home-screen overlay (familiesHomeOverlay) — whichever of
+  // the two is currently in the DOM/open, this keeps it in sync.
+  const el1=document.getElementById('famList');if(el1)el1.innerHTML=html;
+  const el2=document.getElementById('famListHome');if(el2)el2.innerHTML=html;
 }
 function _extractYear(str){
   if(!str)return null;
