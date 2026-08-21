@@ -796,6 +796,13 @@ function openFamiliesFromHome(){
 function closeFamiliesHomeOverlay(){
   document.getElementById('familiesHomeOverlay').style.display='none';
 }
+function openFundDetail(){
+  renderFund();
+  document.getElementById('fundDetailOverlay').style.display='flex';
+}
+function closeFundDetail(){
+  document.getElementById('fundDetailOverlay').style.display='none';
+}
 
 const HEB_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const HEB_DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
@@ -1661,7 +1668,7 @@ function renderHome(){
     ...(savBal>0?[{label:'קופת חיסכון',amt:savBal}]:[]),
   ];
   document.getElementById('homeBanner').innerHTML=`
-    <div class="home-banner" onclick="goTab('fund',document.getElementById('nb-fund'))" style="cursor:pointer">
+    <div class="home-banner" onclick="openFundDetail()" style="cursor:pointer">
       <div class="home-banner-lbl">סך כל הקופות</div>
       <div class="home-banner-amt">₪${allBal.toLocaleString()}</div>
       ${bannerStats.length>1?`<div class="home-banner-row">${bannerStats.map(s=>`
@@ -1766,7 +1773,7 @@ function goToEvent(evId){
   },50);
 }
 function goToGoalFund(goalId){
-  goTab('fund',document.getElementById('nb-fund'));
+  openFundDetail();
   setTimeout(()=>{
     const el=document.getElementById('gfund-'+goalId);
     if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
@@ -3865,7 +3872,8 @@ function _enterPayShell(){
 function handleHash(){
   const h=(window.location.hash||'').replace('#','');
   if(!h||h==='home'){goTab('home',document.getElementById('nb-home'),true);return;}
-  const tabMap={events:'nb-events',fund:'nb-fund',families:'nb-families'};
+  if(h==='fund'){_enterPayShell();openFundDetail();return;}
+  const tabMap={events:'nb-events',families:'nb-families'};
   if(tabMap[h]){_enterPayShell();goTab(h,document.getElementById(tabMap[h]),true);return;}
   if(h.startsWith('event-')){
     const id=parseInt(h.slice(6));if(isNaN(id))return;
@@ -4436,7 +4444,7 @@ function reopenGoalFund(goalId){
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
   g.archived=false;expandedArchGoals.delete(goalId);
   save();render();
-  goTab('fund',document.getElementById('nb-fund'));
+  openFundDetail();
 }
 function toggleArchGoalExp(goalId){
   if(expandedArchGoals.has(goalId))expandedArchGoals.delete(goalId);else expandedArchGoals.add(goalId);
@@ -5870,8 +5878,8 @@ window.addEventListener('hashchange',handleHash);
 
 // Swipe between tabs
 (function(){
-  const TABS=['home','events','archive','fund'];
-  const NAV={home:'nb-home',events:'nb-events',fund:'nb-fund'};
+  const TABS=['home','events','archive'];
+  const NAV={home:'nb-home',events:'nb-events'};
   const OVERLAYS=['newFormOverlay','famPickOverlay','childOverrideOverlay','expenseOverlay','famEditOverlay','depositOverlay','goalFormOverlay','goalDepositOverlay','addExpItemOverlay','cumPotOverlay'];
   let sx=0,sy=0,st=0,hBlocked=false;
   function _isHScroll(el){while(el&&el!==document.body){const ox=getComputedStyle(el).overflowX;if((ox==='auto'||ox==='scroll')&&el.scrollWidth>el.clientWidth+2)return true;el=el.parentElement;}return false;}

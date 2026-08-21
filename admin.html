@@ -233,6 +233,8 @@
     </div>
 
     <div id="homeEvSection"></div>
+
+    <button onclick="goTab('archive',null)" style="width:100%;margin-top:10px;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🗂️ ארכיון אירועים</button>
   </div>
 
   <!-- EVENTS -->
@@ -412,92 +414,6 @@
     <div id="visitLogSection"></div>
   </div>
 
-  <!-- FUND -->
-  <div class="view" id="view-fund">
-
-    <!-- Grand total summary card -->
-    <div id="grandTotalCard" style="background:var(--text);border-radius:var(--r);padding:20px 20px 16px;margin-bottom:14px">
-      <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:6px;text-align:center;letter-spacing:.5px">סך כל הקופות</div>
-      <div id="grandTotalAmt" style="font-size:38px;font-weight:800;color:#fff;letter-spacing:-1px;text-align:center;margin-bottom:12px">₪0</div>
-      <div id="grandTotalBreakdown" style="display:flex;justify-content:center;gap:16px;border-top:1px solid rgba(255,255,255,0.15);padding-top:10px"></div>
-    </div>
-
-    <!-- Main fund card with family balances inside -->
-    <div class="fund-section-title">💰 ארנק</div>
-    <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px 16px 14px;margin-bottom:8px">
-      <div style="text-align:center;margin-bottom:4px">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:2px">יתרה</div>
-        <div id="fundBalAmt" style="font-size:32px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪0</div>
-      </div>
-      <div id="fundFamSummary" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"></div>
-    </div>
-
-    <!-- Action buttons -->
-    <div style="display:flex;gap:8px;margin-bottom:18px;justify-content:flex-end" class="edit-only">
-      <button onclick="openDepositSheet('withdraw')" style="padding:7px 16px;border-radius:20px;border:1.5px solid var(--red-mid);background:transparent;color:var(--red-mid);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↑ משיכה</button>
-      <button onclick="openDepositSheet('deposit')" style="padding:7px 16px;border-radius:20px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↓ הפקדה</button>
-    </div>
-
-    <!-- Event pots section -->
-    <div id="eventPotsSection" style="margin-bottom:18px"></div>
-
-    <!-- Savings pot section -->
-    <div id="savingsPotSection" style="margin-bottom:18px"></div>
-
-    <!-- Deposit/Withdraw modal -->
-    <div id="depositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeDepositSheet()">
-      <div id="depositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
-        <div id="depositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופה</div>
-        <div id="depositFields"></div>
-        <div style="display:flex;gap:8px;margin-top:14px">
-          <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmDeposit()">✓ אשר הפקדה</button>
-          <button onclick="closeDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Goal funds -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;margin-top:18px">
-      <div class="fund-section-title" style="margin-bottom:0">🎯 קופות למטרה</div>
-      <button class="fund-dep-btn edit-only" onclick="openGoalForm()">+ קופה חדשה</button>
-    </div>
-
-    <!-- New goal fund modal -->
-    <div id="goalFormOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalForm()">
-      <div id="goalFormSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
-        <div style="font-size:14px;font-weight:700;margin-bottom:12px">קופה חדשה למטרה</div>
-        <input type="text" id="goalName" placeholder="שם הקופה (לדוגמה: מתנה לסבא)"
-          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
-        <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
-          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
-        <div style="display:flex;gap:8px;margin-top:14px">
-          <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="addGoalFund()">✓ צור קופה</button>
-          <button onclick="closeGoalForm()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="goalFundsList" style="margin-bottom:14px"></div>
-
-    <!-- Goal deposit modal -->
-    <div id="goalDepositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalDepositSheet()">
-      <div id="goalDepositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
-        <div id="goalDepositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
-        <div id="goalDepositFields"></div>
-        <div style="display:flex;gap:8px;margin-top:14px">
-          <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
-          <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:14px">
-      <button onclick="toggleFundTx()" id="fundTxToggle" style="width:100%;padding:11px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;text-align:right;display:flex;align-items:center;justify-content:space-between">
-        <span>📋 היסטוריית תנועות</span><span id="fundTxArrow">▼</span>
-      </button>
-      <div id="fundTxList" style="display:none"></div>
-    </div>
-  </div>
 
 </div>
 
@@ -512,10 +428,10 @@
   <button class="nav-btn active" id="nb-home" onclick="goTab('home',this)">
     <span class="nav-in"><span class="nav-icon">🏠</span>בית</span>
   </button>
-  <button class="nav-btn" id="nb-events" onclick="goTab('events',this)">
+  <button class="nav-btn edit-only" id="nb-events" onclick="goTab('events',this)">
     <span class="nav-in"><span class="nav-icon">📅</span>אירועים</span>
   </button>
-  <button class="nav-btn" id="nb-fund" onclick="goTab('fund',this)">
+  <button class="nav-btn edit-only" id="nb-fund" onclick="openFundDetail()">
     <span class="nav-in"><span class="nav-icon">🏦</span>קופה</span>
   </button>
 </nav>
@@ -852,6 +768,102 @@
     </div>
     <div class="edit-only" style="padding:12px 18px;border-top:1px solid var(--border);flex-shrink:0;text-align:center">
       <button onclick="closeFamiliesHomeOverlay();switchShell('pay');goTab('families',document.getElementById('nb-families'))" style="background:none;border:none;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer;text-decoration:underline">⚙️ עוד הגדרות למנהל (מייל, גזבר, הודעה לכולם)</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fund detail — lightweight home-screen overlay (replaces the old "קופה" tab) -->
+<div id="fundDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFundDetail()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">💰 הקופות שלנו</span>
+      <button onclick="closeFundDetail()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+
+      <!-- Grand total summary card -->
+      <div id="grandTotalCard" style="background:var(--text);border-radius:var(--r);padding:20px 20px 16px;margin-bottom:14px">
+        <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:6px;text-align:center;letter-spacing:.5px">סך כל הקופות</div>
+        <div id="grandTotalAmt" style="font-size:38px;font-weight:800;color:#fff;letter-spacing:-1px;text-align:center;margin-bottom:12px">₪0</div>
+        <div id="grandTotalBreakdown" style="display:flex;justify-content:center;gap:16px;border-top:1px solid rgba(255,255,255,0.15);padding-top:10px"></div>
+      </div>
+
+      <!-- Main fund card with family balances inside -->
+      <div class="fund-section-title">💰 ארנק</div>
+      <div style="background:var(--bg);border-radius:var(--r);border:1px solid var(--border);padding:18px 16px 14px;margin-bottom:8px">
+        <div style="text-align:center;margin-bottom:4px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:2px">יתרה</div>
+          <div id="fundBalAmt" style="font-size:32px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪0</div>
+        </div>
+        <div id="fundFamSummary" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"></div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:8px;margin-bottom:18px;justify-content:flex-end" class="edit-only">
+        <button onclick="openDepositSheet('withdraw')" style="padding:7px 16px;border-radius:20px;border:1.5px solid var(--red-mid);background:transparent;color:var(--red-mid);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↑ משיכה</button>
+        <button onclick="openDepositSheet('deposit')" style="padding:7px 16px;border-radius:20px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">↓ הפקדה</button>
+      </div>
+
+      <!-- Event pots section -->
+      <div id="eventPotsSection" style="margin-bottom:18px"></div>
+
+      <!-- Savings pot section -->
+      <div id="savingsPotSection" style="margin-bottom:18px"></div>
+
+      <!-- Deposit/Withdraw modal -->
+      <div id="depositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1600;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeDepositSheet()">
+        <div id="depositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+          <div id="depositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופה</div>
+          <div id="depositFields"></div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmDeposit()">✓ אשר הפקדה</button>
+            <button onclick="closeDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Goal funds -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;margin-top:18px">
+        <div class="fund-section-title" style="margin-bottom:0">🎯 קופות למטרה</div>
+        <button class="fund-dep-btn edit-only" onclick="openGoalForm()">+ קופה חדשה</button>
+      </div>
+
+      <!-- New goal fund modal -->
+      <div id="goalFormOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1600;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalForm()">
+        <div id="goalFormSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px">קופה חדשה למטרה</div>
+          <input type="text" id="goalName" placeholder="שם הקופה (לדוגמה: מתנה לסבא)"
+            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
+          <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
+            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="addGoalFund()">✓ צור קופה</button>
+            <button onclick="closeGoalForm()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="goalFundsList" style="margin-bottom:14px"></div>
+
+      <!-- Goal deposit modal -->
+      <div id="goalDepositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1600;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalDepositSheet()">
+        <div id="goalDepositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+          <div id="goalDepositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
+          <div id="goalDepositFields"></div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
+            <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <button onclick="toggleFundTx()" id="fundTxToggle" style="width:100%;padding:11px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;text-align:right;display:flex;align-items:center;justify-content:space-between">
+          <span>📋 היסטוריית תנועות</span><span id="fundTxArrow">▼</span>
+        </button>
+        <div id="fundTxList" style="display:none"></div>
+      </div>
+
     </div>
   </div>
 </div>
