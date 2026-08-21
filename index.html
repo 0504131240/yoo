@@ -73,9 +73,12 @@
       </div>
       <div class="fh-cal-grid" id="calGrid"></div>
       <div class="fh-cal-evlist" id="calEvList"></div>
-      <div style="padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="openCalModal()" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
-        <button onclick="openYahrzeitModal()" class="edit-only" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #6b7280;background:transparent;color:#6b7280;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🕯 הוסף יארצייט</button>
+      <div style="padding:0 14px 14px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <button onclick="openCalModal()" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #667eea;background:transparent;color:#667eea;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ אירוע</button>
+          <button onclick="openYahrzeitModal()" class="edit-only" style="flex:1;min-width:90px;padding:9px;border-radius:var(--r2);border:1.5px dashed #6b7280;background:transparent;color:#6b7280;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🕯 הוסף יארצייט</button>
+        </div>
+        <button onclick="openNewPollModal()" class="edit-only" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed #7C3AED;background:transparent;color:#7C3AED;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;box-sizing:border-box">🗳 צור סקר</button>
       </div>
     </div>
   </div>
@@ -920,7 +923,7 @@
       <div style="font-size:15px;font-weight:700;margin-bottom:16px" id="personModalTitle">👶 הוסף ילד</div>
       <input type="text" id="personName" placeholder="שם פרטי"
         style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box">
-      <div id="personEmailWrap" style="display:none;margin-bottom:14px">
+      <div id="personEmailWrap" class="edit-only" style="display:none;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:6px">
           <input type="email" id="personEmail" placeholder="כתובת מייל"
             autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false"

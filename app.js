@@ -239,17 +239,17 @@ async function fbInit(){
 
 let _saving=false;
 
-// EmailJS settings
+// EmailJS settings — read/written via /api/settings/emailjs (Admin SDK,
+// bypasses Firestore rules) rather than the client SDK directly, so this
+// keeps working regardless of how the settings/* collection's Firestore
+// rules are configured.
 async function loadEjsSettings(){
   try{
-    const fb=await fbInit();
-    const snap=await fb.getDoc(fb.doc(fb.db,'settings','emailjs'));
-    if(snap.exists()){
-      const d=snap.data();
-      if(d.publicKey)  localStorage.setItem('ejsPublicKey', d.publicKey);
-      if(d.serviceId)  localStorage.setItem('ejsServiceId', d.serviceId);
-      if(d.templateId) localStorage.setItem('ejsTemplateId', d.templateId);
-    }
+    const r=await fetch('/api/settings/emailjs');
+    const d=await r.json();
+    if(d.publicKey)  localStorage.setItem('ejsPublicKey', d.publicKey);
+    if(d.serviceId)  localStorage.setItem('ejsServiceId', d.serviceId);
+    if(d.templateId) localStorage.setItem('ejsTemplateId', d.templateId);
   }catch(e){}
   const keyEl=document.getElementById('ejsPublicKey');
   const svcEl=document.getElementById('ejsServiceId');
@@ -268,12 +268,14 @@ async function saveEjsSettings(){
   localStorage.setItem('ejsServiceId',svc);
   localStorage.setItem('ejsTemplateId',tpl);
   if(key&&typeof emailjs!=='undefined') emailjs.init(key);
-  try{
-    const fb=await fbInit();
-    await fb.setDoc(fb.doc(fb.db,'settings','emailjs'),{publicKey:key,serviceId:svc,templateId:tpl});
-  }catch(e){}
   const st=document.getElementById('ejsStatus');
-  if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
+  try{
+    const r=await fetch('/api/settings/emailjs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,publicKey:key,serviceId:svc,templateId:tpl})});
+    if(!r.ok)throw new Error('save failed');
+    if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
+  }catch(e){
+    if(st){st.textContent='⚠ שמירה נכשלה';st.style.color='var(--red)';}
+  }
 }
 function openBroadcastModal(){
   const subjEl=document.getElementById('broadcastSubject');if(subjEl)subjEl.value='';
@@ -310,18 +312,19 @@ function getPaymentSettings(){
     bit:localStorage.getItem('payBitLink')||''
   };
 }
+// Read/written via /api/settings/payment (Admin SDK, bypasses Firestore
+// rules) rather than the client SDK directly, so this keeps working
+// regardless of how the settings/* collection's Firestore rules are
+// configured.
 async function loadPaymentSettings(){
   try{
-    const fb=await fbInit();
-    const snap=await fb.getDoc(fb.doc(fb.db,'settings','payment'));
-    if(snap.exists()){
-      const d=snap.data();
-      if(d.name)    localStorage.setItem('payTreasurerName',d.name);
-      if(d.bank)    localStorage.setItem('payBankName',d.bank);
-      if(d.branch)  localStorage.setItem('payBranch',d.branch);
-      if(d.account) localStorage.setItem('payAccount',d.account);
-      if(d.bit)     localStorage.setItem('payBitLink',d.bit);
-    }
+    const r=await fetch('/api/settings/payment');
+    const d=await r.json();
+    if(d.name)    localStorage.setItem('payTreasurerName',d.name);
+    if(d.bank)    localStorage.setItem('payBankName',d.bank);
+    if(d.branch)  localStorage.setItem('payBranch',d.branch);
+    if(d.account) localStorage.setItem('payAccount',d.account);
+    if(d.bit)     localStorage.setItem('payBitLink',d.bit);
   }catch(e){}
   const ids=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
   const keys=['payTreasurerName','payBankName','payBranch','payAccount','payBitLink'];
@@ -340,12 +343,14 @@ async function savePaymentSettings(){
   localStorage.setItem('payBranch',p.branch);
   localStorage.setItem('payAccount',p.account);
   localStorage.setItem('payBitLink',p.bit);
-  try{
-    const fb=await fbInit();
-    await fb.setDoc(fb.doc(fb.db,'settings','payment'),p);
-  }catch(e){}
   const st=document.getElementById('payStatus');
-  if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
+  try{
+    const r=await fetch('/api/settings/payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,...p})});
+    if(!r.ok)throw new Error('save failed');
+    if(st){st.textContent='✓ נשמר';st.style.color='var(--green)';setTimeout(()=>{if(st)st.textContent='';},2500);}
+  }catch(e){
+    if(st){st.textContent='⚠ שמירה נכשלה';st.style.color='var(--red)';}
+  }
 }
 function _paymentBlock(owe,evName,evId,famId){
   const p=getPaymentSettings();
@@ -3005,7 +3010,10 @@ function deletePerson(){
   if(_personMode==='p1'||_personMode==='p2'){
     if(!confirm('למחוק את פרטי ההורה?'))return;
     const isP1=_personMode==='p1';
-    if(isP1){f.email='';f.emailName='';delete f.parent1Bday;}else{f.email2='';f.emailName2='';delete f.parent2Bday;}
+    // Email is admin-managed (see personEmailWrap's edit-only gate) — a family
+    // member deleting their own name/birthday here must not silently wipe out
+    // the notification email the admin set up for them.
+    if(isP1){if(editMode)f.email='';f.emailName='';delete f.parent1Bday;}else{if(editMode)f.email2='';f.emailName2='';delete f.parent2Bday;}
   }else{
     if(_personKidId==null)return;
     if(!confirm('למחוק ילד זה?'))return;
