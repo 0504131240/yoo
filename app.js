@@ -1463,7 +1463,7 @@ function renderCalEvList(hebDays,bdayByDate,yahrByDate,annivByDate){
       :d.toLocaleDateString('he-IL',{day:'numeric',month:'long'});
     if(type==='bday'){
       const age=item.hebYear?(hebYNum-item.hebYear):null;
-      const balloon=(age!=null&&age>0)?`<span class="bday-balloon">${esc(item.gender==='boy'?'בן '+age:item.gender==='girl'?'בת '+age:String(age))}</span>`:'';
+      const balloon=(age!=null&&age>0&&age<=18)?`<span class="bday-balloon">${esc(item.gender==='boy'?'בן '+age:item.gender==='girl'?'בת '+age:String(age))}</span>`:'';
       return`<div class="fh-cal-ev">
         <div class="fh-cal-ev-dot" style="background:#c0392b"></div>
         <div class="fh-cal-ev-info">
@@ -2772,7 +2772,7 @@ function openFamDetail(famId){
         if(k.hebDay&&k.hebMonth){
           dateTxt=HEB_DAY_NUM[k.hebDay]+' ב'+k.hebMonth+(k.hebYear?' '+toHebrewYear(k.hebYear):'');
           const age=kidAge(k);
-          if(age!=null){
+          if(age!=null&&age<=18){
             const txt=k.gender==='boy'?'בן '+age:k.gender==='girl'?'בת '+age:String(age);
             ageBadge=`<span class="bday-balloon">${esc(txt)}</span>`;
           }
