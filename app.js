@@ -2244,7 +2244,15 @@ function releasePot(evId){
   const creditors=ev.participants.filter(fid=>(baseBal[fid]||0)>0.5)
     .map(fid=>({name:getFam(fid).name.replace('משפחת','').trim(),fid,amt:baseBal[fid]}));
   if(!creditors.length){
-    pots.forEach(p=>{ ev.expenses[p.famId]=(ev.expenses[p.famId]||0)+p.amt; });
+    // No one to route the pot money to, so it counts toward each depositor's own
+    // share — but it's a deposit, not something they bought. Track it separately
+    // so displays (e.g. the closing-email family table) can tell the two apart
+    // instead of silently showing it as a regular item expense.
+    if(!ev.potFoldedExpenses)ev.potFoldedExpenses={};
+    pots.forEach(p=>{
+      ev.expenses[p.famId]=(ev.expenses[p.famId]||0)+p.amt;
+      ev.potFoldedExpenses[p.famId]=(ev.potFoldedExpenses[p.famId]||0)+p.amt;
+    });
   } else {
     if(!ev.settled)ev.settled=[];
     calcPotTransfers(ev).forEach(t=>{
@@ -3660,7 +3668,9 @@ function _sendCloseEvEmailOne(ev,fid){
       const pf=getFam(fid2);if(!pf)return'';
       const pname=_esc(pf.name.replace('משפחת','').trim());
       const isMine=fid2===fid;
-      return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:7px 10px${isMine?';font-weight:700':''}">${pname}</td><td style="padding:7px 10px;font-weight:700;text-align:left${isMine?';color:#D97706':''}">₪${amt.toLocaleString()}</td></tr>`;
+      const potFolded=Math.round((ev.potFoldedExpenses||{})[fid2]||0);
+      const potNote=potFolded>0?`<div style="font-size:9px;font-weight:400;color:#94a3b8">מתוכם ₪${potFolded.toLocaleString()} מהפקדה לקופה</div>`:'';
+      return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:7px 10px${isMine?';font-weight:700':''}">${pname}</td><td style="padding:7px 10px;font-weight:700;text-align:left${isMine?';color:#D97706':''}">₪${amt.toLocaleString()}${potNote}</td></tr>`;
     }).join('');
     if(_famExpRows)bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 הוצאות לפי משפחה:</p><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">משפחה</th><th style="padding:8px 10px;text-align:left;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">הוצאה</th></tr>${_famExpRows}</table>`;
   } else if(!ev.cumulative){
@@ -3680,7 +3690,9 @@ function _sendCloseEvEmailOne(ev,fid){
       const pf=getFam(fid2);if(!pf)return'';
       const pname=_esc(pf.name.replace('משפחת','').trim());
       const isMine=fid2===fid;
-      return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:7px 10px${isMine?';font-weight:700':''}">${pname}</td><td style="padding:7px 10px;font-weight:700;text-align:left${isMine?';color:#D97706':''}">₪${amt.toLocaleString()}</td></tr>`;
+      const potFolded=Math.round((ev.potFoldedExpenses||{})[fid2]||0);
+      const potNote=potFolded>0?`<div style="font-size:9px;font-weight:400;color:#94a3b8">מתוכם ₪${potFolded.toLocaleString()} מהפקדה לקופה</div>`:'';
+      return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:7px 10px${isMine?';font-weight:700':''}">${pname}</td><td style="padding:7px 10px;font-weight:700;text-align:left${isMine?';color:#D97706':''}">₪${amt.toLocaleString()}${potNote}</td></tr>`;
     }).join('');
     if(_famExpRows)bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 הוצאות לפי משפחה:</p><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">משפחה</th><th style="padding:8px 10px;text-align:left;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">הוצאה</th></tr>${_famExpRows}</table>`;
   } else if(!_isPerFam&&(allItems.length||(ev.potExpItems||[]).length)){
