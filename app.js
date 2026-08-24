@@ -3670,17 +3670,19 @@ function _sendCloseEvEmailOne(ev,fid){
   const allItems=ev.expenseItems||[];
   if(ev.cumulative){
     // Cumulative events itemize expenses one-by-one during the event, but the closing
-    // summary is clearer grouped by family — how much of the total each family owes —
-    // same shape as the per-family table above, using each family's computed fair share
-    // (which already folds in every item's own split method and pot expenses).
-    const _famShareRows=ev.participants.map(fid2=>{
-      const amt=Math.round(shares[fid2]||0);if(!amt)return'';
+    // summary is clearer grouped by family — how much each family actually paid out
+    // (ev.expenses, kept in sync by itemPayers as items are added), same shape as the
+    // per-family table above. Each family's fair SHARE of the total is a different
+    // number (shown separately in the top card as "החלק שלך") and doesn't belong under
+    // an "expense" heading.
+    const _famExpRows=ev.participants.map(fid2=>{
+      const amt=Math.round((ev.expenses||{})[fid2]||0);if(!amt)return'';
       const pf=getFam(fid2);if(!pf)return'';
       const pname=_esc(pf.name.replace('משפחת','').trim());
       const isMine=fid2===fid;
       return`<tr style="border-bottom:1px solid #f0f0f6${isMine?';background:#FEFCE8':''}"><td style="padding:7px 10px${isMine?';font-weight:700':''}">${pname}</td><td style="padding:7px 10px;font-weight:700;text-align:left${isMine?';color:#D97706':''}">₪${amt.toLocaleString()}</td></tr>`;
     }).join('');
-    if(_famShareRows)bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 הוצאות לפי משפחה:</p><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">משפחה</th><th style="padding:8px 10px;text-align:left;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">הוצאה</th></tr>${_famShareRows}</table>`;
+    if(_famExpRows)bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 הוצאות לפי משפחה:</p><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><tr style="background:#E0F2FE"><th style="padding:8px 10px;text-align:right;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">משפחה</th><th style="padding:8px 10px;text-align:left;color:#555;font-weight:700;border-bottom:2px solid #7DD3FC">הוצאה</th></tr>${_famExpRows}</table>`;
   } else if(!_isPerFam&&(allItems.length||(ev.potExpItems||[]).length)){
     bodyHtml+=`<p style="font-weight:700;margin:0 0 8px;color:#333">💳 פירוט כל ההוצאות:</p>`;
     const _itemShare=(it,rfid)=>Math.round(itemShareFor(ev,it,rfid));
