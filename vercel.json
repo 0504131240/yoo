@@ -21,7 +21,6 @@
     }
   ],
   "crons": [
-    { "path": "/api/cron/daily-backup", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/weekly-debt-reminder", "schedule": "0 7 * * 0" }
+    { "path": "/api/cron/daily-backup", "schedule": "0 1 * * *" }
   ]
 }

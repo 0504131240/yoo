@@ -1,6 +1,9 @@
-// GET /api/cron/weekly-debt-reminder — runs on Vercel's schedule (see
-// vercel.json). Same CRON_SECRET protection as daily-backup.
-const { getDb, getMessaging } = require('../_lib/firebaseAdmin');
+// Weekly debt reminder logic, called from daily-backup.js (see the comment
+// there for why: Vercel's Hobby plan only ever actually registered ONE of
+// this project's two cron entries — this file was never invoked on its own
+// schedule, so the reminder silently never went out. Kept as a standalone
+// module, exporting the sendable logic instead of its own HTTP handler.
+const { getMessaging } = require('../_lib/firebaseAdmin');
 const { evAdjBalance } = require('../_lib/debtCalc');
 
 function _escHtml(s) {
@@ -49,26 +52,14 @@ function debtEmailContent(famName, debts, totalDebt) {
   return { message, html };
 }
 
-module.exports = async (req, res) => {
-  const auth = req.headers['authorization'];
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    res.status(401).json({ error: 'unauthorized' });
-    return;
-  }
-
-  const db = getDb();
-  const [dataSnap, ejsSnap] = await Promise.all([
-    db.doc('appData/familyPayments').get(),
-    db.doc('settings/emailjs').get(),
-  ]);
-  if (!dataSnap.exists) { res.status(200).json({ ok: true, skipped: true }); return; }
+async function sendWeeklyDebtReminders(db, data) {
+  const ejsSnap = await db.doc('settings/emailjs').get();
   const { publicKey, serviceId, templateId } = ejsSnap.exists ? ejsSnap.data() : {};
-  if (!publicKey || !serviceId || !templateId) { res.status(200).json({ ok: true, skipped: 'no emailjs settings' }); return; }
+  if (!publicKey || !serviceId || !templateId) return { skipped: 'no emailjs settings' };
 
-  const data = dataSnap.data();
   const families = data.families || [];
   const openEvents = (data.events || []).filter(e => e.open);
-  if (!openEvents.length) { res.status(200).json({ ok: true, skipped: 'no open events' }); return; }
+  if (!openEvents.length) return { skipped: 'no open events' };
 
   const debtsByFam = {};
   openEvents.forEach(ev => {
@@ -126,5 +117,7 @@ module.exports = async (req, res) => {
     }
   }
 
-  res.status(200).json({ ok: true, emailsSent, pushesSent });
-};
+  return { emailsSent, pushesSent };
+}
+
+module.exports = { sendWeeklyDebtReminders };

@@ -3,14 +3,20 @@
 // the CRON_SECRET env var; set CRON_SECRET in Vercel Project Settings so
 // nobody else can trigger this by just guessing the URL.
 //
-// Also sends the daily birthday/anniversary/yahrzeit reminder push here
-// (bundled into the same once-a-day cron rather than a separate one — the
-// Vercel Hobby plan caps a project at 2 cron jobs, and this project already
-// has 2). This replaces the old client-side checkBirthdayNotifs(), which
-// only ran when someone happened to open the app that day — if nobody did,
-// the reminder silently never went out even on the exact day.
+// Also sends the daily birthday/anniversary/yahrzeit reminder push, AND
+// (Sundays only) the weekly debt reminder email/push — both bundled into
+// this same once-a-day cron rather than their own separate entries.
+// vercel.json lists three cron paths, but empirically Vercel's Hobby plan
+// only ever actually registers ONE of a project's cron entries (confirmed
+// via the dashboard's Cron Jobs tab, which listed just this one) — the
+// other two were silently never invoked, which is why the weekly debt email
+// never went out and the old client-side birthday check (which only ran if
+// someone happened to open the app that day) was the sole source of that
+// reminder. Doing all three here, gated by day-of-week where relevant, is
+// the only way that's actually reliable on this plan.
 const { getDb, getMessaging } = require('../_lib/firebaseAdmin');
 const { allOccasions } = require('../_lib/birthdayCalc');
+const { sendWeeklyDebtReminders } = require('./weekly-debt-reminder');
 
 const BACKUP_RETENTION_DAYS = 30;
 
@@ -102,5 +108,14 @@ module.exports = async (req, res) => {
     console.error('dailyBackup: birthday reminder step failed', e);
   }
 
-  res.status(200).json({ ok: true, date: today, deletedOld: old.docs.length, reminders });
+  let debtReminders = { skipped: 'not sunday' };
+  if (new Date().getUTCDay() === 0) {
+    try {
+      debtReminders = await sendWeeklyDebtReminders(db, data);
+    } catch (e) {
+      console.error('dailyBackup: weekly debt reminder step failed', e);
+    }
+  }
+
+  res.status(200).json({ ok: true, date: today, deletedOld: old.docs.length, reminders, debtReminders });
 };
