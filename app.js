@@ -1126,7 +1126,7 @@ async function checkBirthdayNotifs(){
   const dayFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'});
   const monthFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'});
   const {db,doc,getDoc,setDoc}=await fbInit();
-  for(let i=0;i<=7;i++){
+  for(let i=0;i<=1;i++){
     const d=new Date(today);d.setDate(d.getDate()+i);
     const hd=parseInt(dayFmt.format(d)),hm=monthFmt.format(d);
     for(const b of all.filter(b=>b.hebDay===hd&&b.hebMonth===hm)){
