@@ -839,6 +839,8 @@
             style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
           <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
             style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+          <div style="font-size:12px;font-weight:700;color:var(--text2);margin:12px 0 6px">מי לא יראה את הקופה הזו? (אופציונלי — לדוגמה מתנה בהפתעה)</div>
+          <div class="chips" id="goalHideChips"></div>
           <div style="display:flex;gap:8px;margin-top:14px">
             <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="addGoalFund()">✓ צור קופה</button>
             <button onclick="closeGoalForm()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>

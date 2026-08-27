@@ -1520,6 +1520,15 @@ function _myFamId(){
   const id=localStorage.getItem('deviceFamId3');
   return id?parseInt(id):null;
 }
+// A goal fund created with families picked to keep it a surprise (e.g. a
+// gift) — those specific families see nothing about it anywhere, including
+// in aggregate totals, while everyone else (and always the admin) sees it
+// normally.
+const _visibleGoalFunds=list=>{
+  if(editMode)return list;
+  const myId=_myFamId();
+  return list.filter(g=>!(g.hiddenFrom||[]).includes(myId));
+};
 function _fundTxForDisplay(){
   if(_isAdminPage())return fund.transactions;
   const fid=_myFamId();
@@ -1637,7 +1646,7 @@ function renderHome(){
 
   // ── Banner ──
   const mainBal=fundTotal();
-  const goalBal=goalFunds.filter(g=>!g.archived).reduce((s,g)=>s+goalTotal(g),0);
+  const goalBal=_visibleGoalFunds(goalFunds.filter(g=>!g.archived)).reduce((s,g)=>s+goalTotal(g),0);
   const evPotsBal=open.reduce((s,ev)=>s+evNetPotBal(ev),0);
   const savBal=savingsPotBal();
   const allBal=mainBal+goalBal+evPotsBal+savBal;
@@ -1724,7 +1733,7 @@ function renderHome(){
       </div>`;
     }).join(''):`<div class="empty"><span class="empty-ico">📅</span>אין אירועים פעילים</div>`}`;
 
-  const openGoals=goalFunds.filter(g=>!g.closed&&!g.archived);
+  const openGoals=_visibleGoalFunds(goalFunds.filter(g=>!g.closed&&!g.archived));
   const goalSection=document.getElementById('homeGoalSection');
   goalSection.style.display=openGoals.length?'block':'none';
   document.getElementById('homeGoalList').innerHTML=openGoals.map(g=>{
@@ -2331,7 +2340,7 @@ function releasePotToSavings(evId,amt){
 function renderArchiveGoals(){
   const el=document.getElementById('archGoalList');
   if(!el)return;
-  const archived=goalFunds.filter(g=>g.archived);
+  const archived=_visibleGoalFunds(goalFunds.filter(g=>g.archived));
   if(!archived.length){el.innerHTML='';return;}
   el.innerHTML=`<div class="sec-ttl" style="margin-top:18px">קופות מטרה בארכיון</div>`+archived.map(g=>{
     const total=goalTotal(g);
@@ -2733,7 +2742,7 @@ function openFamDetail(famId){
   const name=f.name.replace('משפחת','').trim();
   const openEvs=events.filter(e=>e.open&&e.participants.includes(famId));
   const mainBal=Math.round(famFundBal(famId));
-  const myGoals=goalFunds.filter(g=>!g.archived&&(g.contributions[famId]||0)>0);
+  const myGoals=_visibleGoalFunds(goalFunds.filter(g=>!g.archived&&(g.contributions[famId]||0)>0));
 
   let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
     ${famAva(f,52)}
@@ -4256,7 +4265,7 @@ function renderSavingsPot(){
 }
 function renderFund(){
   const mainTotal=fundTotal();
-  const goalTotal2=goalFunds.filter(g=>!g.archived&&!g.closed).reduce((s,g)=>s+goalTotal(g),0);
+  const goalTotal2=_visibleGoalFunds(goalFunds.filter(g=>!g.archived&&!g.closed)).reduce((s,g)=>s+goalTotal(g),0);
   const evPotsTotal=events.filter(e=>e.open).reduce((s,ev)=>s+evNetPotBal(ev),0);
   const savTotal=savingsPotBal();
   const grandTotal=mainTotal+goalTotal2+evPotsTotal+savTotal;
@@ -4376,8 +4385,21 @@ function toggleFundTx(){
   }
 }
 
+let _goalHideFamIds=new Set();
 function openGoalForm(){
+  _goalHideFamIds=new Set();
+  renderGoalHideChips();
   document.getElementById('goalFormOverlay').style.display='flex';
+}
+function renderGoalHideChips(){
+  const el=document.getElementById('goalHideChips');if(!el)return;
+  el.innerHTML=families.map(f=>
+    `<button type="button" class="chip ${_goalHideFamIds.has(f.id)?'on':''}" onclick="toggleGoalHideFam(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
+  ).join('');
+}
+function toggleGoalHideFam(fid){
+  if(_goalHideFamIds.has(fid))_goalHideFamIds.delete(fid);else _goalHideFamIds.add(fid);
+  renderGoalHideChips();
 }
 function closeGoalForm(){
   document.getElementById('goalFormOverlay').style.display='none';
@@ -4388,7 +4410,7 @@ function addGoalFund(){
   const name=document.getElementById('goalName').value.trim();
   if(!name){ alert('נא להזין שם לקופה'); return; }
   const target=Math.max(0,parseFloat(document.getElementById('goalTarget').value)||0);
-  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false});
+  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds]});
   closeGoalForm();
   save();render();
 }
@@ -4473,7 +4495,7 @@ function toggleArchGoalExp(goalId){
 function renderGoalFunds(){
   const el=document.getElementById('goalFundsList');
   if(!el)return;
-  const activeGoals=goalFunds.filter(g=>!g.archived);
+  const activeGoals=_visibleGoalFunds(goalFunds.filter(g=>!g.archived));
   if(!activeGoals.length){
     el.innerHTML=`<div class="empty" style="padding:30px 20px"><span class="empty-ico">🎯</span>אין קופות למטרה<br><span style="font-size:12px">לדוגמה: קופה למתנה לסבא</span></div>`;
     return;
