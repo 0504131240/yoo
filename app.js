@@ -5891,7 +5891,7 @@ async function _updateCustomTotal(){
 }
 
 applyEditMode();
-load().then(async()=>{await autoUnlockAdmin();if(window.location.hash)handleHash();startRealtimeSync();startFormImportSync();renderNotifBtn();if(_notifOk()){registerFCMToken().catch(e=>alert('שגיאת רישום להתראות: '+e.message));}});
+load().then(async()=>{await autoUnlockAdmin();if(window.location.hash)handleHash();startRealtimeSync();startFormImportSync();renderNotifBtn();if(_notifOk()){registerFCMToken();}});
 loadEjsSettings();
 loadPaymentSettings();
 window.addEventListener('hashchange',handleHash);
