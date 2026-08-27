@@ -10,7 +10,7 @@ const { getDb, getMessaging, checkAdminPass } = require('./_lib/firebaseAdmin');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-  const { adminPass, title, body, target } = req.body || {};
+  const { adminPass, title, body, target, excludeFamIds } = req.body || {};
   if (!title || !body) { res.status(400).json({ error: 'title and body required' }); return; }
 
   const db = getDb();
@@ -30,13 +30,18 @@ module.exports = async (req, res) => {
   // target:'admin' restricts delivery to admin-registered devices only —
   // used for events that matter to the admin (money movement, family
   // self-edits) but would just be noise on every other family member's
-  // phone. Anything else (the default) reaches everyone.
+  // phone. Anything else (the default) reaches everyone. excludeFamIds
+  // additionally drops specific families' own devices regardless of target
+  // — e.g. a surprise-gift goal fund announced to everyone except the
+  // family it's for (admin-registered devices have no famId, so they're
+  // never affected by this).
   const groups = { admin: [], index: [] };
   tokSnap.docs.forEach(d => {
     const data = d.data();
     if (!data.token) return;
     const page = data.page === 'admin' ? 'admin' : 'index';
     if (target === 'admin' && page !== 'admin') return;
+    if (Array.isArray(excludeFamIds) && excludeFamIds.includes(data.famId)) return;
     groups[page].push(d);
   });
 
