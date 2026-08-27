@@ -1118,7 +1118,11 @@ function allBirthdays(){
   return [...kidBdays,...parentBdays];
 }
 async function checkBirthdayNotifs(){
-  const all=allBirthdays();
+  const all=[
+    ...allBirthdays().map(b=>({...b,kind:'birthday'})),
+    ...allAnniversaries().map(a=>({...a,kind:'anniversary'})),
+    ...allYahrzeits().filter(y=>y.hebDay&&y.hebMonth).map(y=>({...y,kind:'yahrzeit'}))
+  ];
   if(!_notifOk()||!all.length)return;
   const today=new Date(),todayStr=today.toDateString();
   if(localStorage.getItem('bdayNotifDate')===todayStr)return;
@@ -1130,14 +1134,16 @@ async function checkBirthdayNotifs(){
     const d=new Date(today);d.setDate(d.getDate()+i);
     const hd=parseInt(dayFmt.format(d)),hm=monthFmt.format(d);
     for(const b of all.filter(b=>b.hebDay===hd&&b.hebMonth===hm)){
-      const title=i===0?'🎂 יום הולדת היום!':'🎂 יום הולדת בעוד '+i+' ימים';
-      const body=i===0?'יום הולדת שמח ל'+b.name+'!':'של '+b.name;
+      const isAnniv=b.kind==='anniversary';
+      const isYahrzeit=b.kind==='yahrzeit';
+      const title=isYahrzeit?(i===0?'🕯️ יארצייט היום':'🕯️ יארצייט מחר'):isAnniv?(i===0?'💍 יום נישואין היום!':'💍 יום נישואין מחר'):(i===0?'🎂 יום הולדת היום!':'🎂 יום הולדת מחר');
+      const body=isYahrzeit?(i===0?'היום היארצייט של '+b.name:'מחר היארצייט של '+b.name):isAnniv?(i===0?'מזל טוב למשפחת '+b.name+'!':'מחר יום הנישואין של משפחת '+b.name):(i===0?'יום הולדת שמח ל'+b.name+'!':'מחר יום ההולדת של '+b.name);
       // Every device with notifications on runs this same check
-      // independently each day. Claim the (date, offset, person) combo in
-      // Firestore first — only the device that wins the claim actually
-      // pushes, so the same birthday doesn't get broadcast to everyone
-      // once per open device.
-      const claimId=(todayStr+'_'+i+'_'+b.name).replace(/[^a-zA-Z0-9א-ת]+/g,'_').slice(0,300);
+      // independently each day. Claim the (date, offset, kind, person) combo
+      // in Firestore first — only the device that wins the claim actually
+      // pushes, so the same occasion doesn't get broadcast to everyone once
+      // per open device.
+      const claimId=(todayStr+'_'+i+'_'+b.kind+'_'+b.name).replace(/[^a-zA-Z0-9א-ת]+/g,'_').slice(0,300);
       try{
         const ref=doc(db,'bdayNotifClaims',claimId);
         if((await getDoc(ref)).exists())continue;
