@@ -1762,11 +1762,7 @@ function goToEvent(evId){
   },50);
 }
 function goToGoalFund(goalId){
-  openFundDetail();
-  setTimeout(()=>{
-    const el=document.getElementById('gfund-'+goalId);
-    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
-  },100);
+  openGoalPayModal(goalId);
 }
 function stepChild(id,delta){
   const inp=document.getElementById(id);
@@ -4514,6 +4510,8 @@ function renderGoalFunds(){
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
+    const eligibleCount=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id)).length;
+    const perFamily=g.target>0&&eligibleCount?Math.ceil(g.target/eligibleCount):0;
     const contributors=families.filter(f=>(g.contributions[f.id]||0)>0);
     const contribHtml=contributors.length?`
       <div style="border-top:1px solid rgba(255,255,255,0.15);padding-top:9px;margin-top:10px">
@@ -4527,7 +4525,7 @@ function renderGoalFunds(){
           </div>`;
         }).join('')}
       </div>`:'';
-    return`<div class="fund-settle-card" id="gfund-${g.id}" style="margin-bottom:14px;${g.closed?'opacity:.6':''}">
+    return`<div class="fund-settle-card" id="gfund-${g.id}" onclick="openGoalPayModal(${g.id})" style="margin-bottom:14px;cursor:pointer;${g.closed?'opacity:.6':''}">
       <div style="background:var(--text);border-radius:var(--r) var(--r) 0 0;padding:16px 16px 13px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
           <div style="font-size:15px;font-weight:800;color:#fff">🎯 ${esc(g.name)}</div>
@@ -4537,10 +4535,11 @@ function renderGoalFunds(){
         <div style="font-size:30px;font-weight:800;color:#fff;letter-spacing:-0.5px">${total>0?'₪'+total.toLocaleString():'₪0'}</div>
         ${g.target>0?`
           <div class="pbar" style="margin:8px 0 3px;background:rgba(255,255,255,0.2)"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.55)">מתוך ₪${g.target.toLocaleString()} · ${pct}%</div>`:''}
+          <div style="font-size:11px;color:rgba(255,255,255,0.55)">מתוך ₪${g.target.toLocaleString()} · ${pct}%</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:4px">💳 כל משפחה: ₪${perFamily.toLocaleString()} (חלוקה שווה בין ${eligibleCount} משפחות)</div>`:''}
         ${contribHtml}
       </div>
-      <div style="padding:10px 12px">
+      <div style="padding:10px 12px" onclick="event.stopPropagation()">
         ${!g.closed?`<button class="edit-only" onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:''}
         <div class="card-actions edit-only" style="margin:0">
           <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
@@ -4550,6 +4549,64 @@ function renderGoalFunds(){
       </div>
     </div>`;
   }).join('');
+}
+
+// Quick "who paid" checklist for a goal fund — clicking a family toggles
+// their contribution between 0 and their equal share (perFamily), instead
+// of typing an amount every time. The manual "↓ הפקדה" sheet still exists
+// for custom/partial amounts; this is the fast path for the common case.
+let _goalPayGoalId=null;
+function openGoalPayModal(goalId){
+  _goalPayGoalId=goalId;
+  renderGoalPayModal();
+  document.getElementById('goalPayModal').style.display='flex';
+}
+function closeGoalPayModal(){
+  document.getElementById('goalPayModal').style.display='none';
+  _goalPayGoalId=null;
+}
+function renderGoalPayModal(){
+  const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g)return;
+  const titleEl=document.getElementById('goalPayTitle');
+  if(titleEl)titleEl.textContent='🎯 מי שילם? — '+g.name;
+  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
+  const total=goalTotal(g);
+  const progEl=document.getElementById('goalPayProgress');
+  if(progEl){
+    const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
+    progEl.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:3px">נאסף עד כה</div>
+      <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪${total.toLocaleString()}${g.target>0?` <span style="font-size:13px;font-weight:600;color:var(--text2)">מתוך ₪${g.target.toLocaleString()}</span>`:''}</div>
+      ${g.target>0?`<div class="pbar" style="margin:8px 0 2px"><div class="pfill ${pct>=100?'full':'part'}" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text2)">${pct}%</div>`:''}`;
+  }
+  const noteEl=document.getElementById('goalPayNote');
+  if(noteEl)noteEl.textContent=perFamily>0?'חלוקה שווה: ₪'+perFamily.toLocaleString()+' למשפחה':'לא הוגדר סכום מטרה לקופה הזו — אין לפי מה לחשב חלק שווה';
+  document.getElementById('goalPayList').innerHTML=eligible.map(f=>{
+    const paid=perFamily>0&&(g.contributions[f.id]||0)>=perFamily;
+    return`<div class="edit-only" onclick="toggleGoalPaid(${f.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${paid?'var(--green-mid)':'var(--border)'};margin-bottom:6px;cursor:pointer;box-sizing:border-box;background:${paid?'var(--green-bg)':'transparent'}">
+      <span style="font-size:18px;flex-shrink:0">${paid?'✅':'⬜'}</span>
+      ${famAva(f, 32, 'flex-shrink:0')}
+      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div></div>
+      <div style="font-size:13px;font-weight:700;color:${paid?'var(--green-mid)':'var(--text2)'}">₪${perFamily.toLocaleString()}</div>
+    </div>
+    <div class="view-only" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${paid?'var(--green-mid)':'var(--border)'};margin-bottom:6px;box-sizing:border-box;background:${paid?'var(--green-bg)':'transparent'}">
+      <span style="font-size:18px;flex-shrink:0">${paid?'✅':'⬜'}</span>
+      ${famAva(f, 32, 'flex-shrink:0')}
+      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div></div>
+      <div style="font-size:13px;font-weight:700;color:${paid?'var(--green-mid)':'var(--text2)'}">₪${perFamily.toLocaleString()}</div>
+    </div>`;
+  }).join('');
+}
+function toggleGoalPaid(famId){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g)return;
+  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
+  if(perFamily<=0)return;
+  const paid=(g.contributions[famId]||0)>=perFamily;
+  g.contributions[famId]=paid?0:perFamily;
+  save();render();
+  renderGoalPayModal();
 }
 
 let _depositFamId=null;

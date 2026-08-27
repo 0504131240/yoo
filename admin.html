@@ -862,6 +862,21 @@
         </div>
       </div>
 
+      <!-- Goal fund "who paid" checklist -->
+      <div id="goalPayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalPayModal()">
+        <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:380px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+            <span id="goalPayTitle" style="font-size:15px;font-weight:800;color:var(--text)">🎯 מי שילם?</span>
+            <button onclick="closeGoalPayModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+          </div>
+          <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+            <div id="goalPayProgress" style="margin-bottom:12px"></div>
+            <div id="goalPayNote" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
+            <div id="goalPayList"></div>
+          </div>
+        </div>
+      </div>
+
       <div style="margin-top:14px">
         <button onclick="toggleFundTx()" id="fundTxToggle" style="width:100%;padding:11px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;text-align:right;display:flex;align-items:center;justify-content:space-between">
           <span>📋 היסטוריית תנועות</span><span id="fundTxArrow">▼</span>
