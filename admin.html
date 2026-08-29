@@ -622,10 +622,18 @@
 </div>
 
 
-<!-- Settle transfers modal -->
+<!-- Settle transfers modal (savings-pot only) -->
 <div id="settleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeSettleModal()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
     <div id="settleModalContent"></div>
+  </div>
+</div>
+
+<!-- Global "העברות איזון" modal — direct family-to-family settle-up, netted
+     across all open events, as an optional alternative to paying the treasurer -->
+<div id="globalSettleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGlobalSettleModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div id="globalSettleModalContent"></div>
   </div>
 </div>
 
@@ -790,6 +798,12 @@
         <div id="grandTotalAmt" style="font-size:38px;font-weight:800;color:#fff;letter-spacing:-1px;text-align:center;margin-bottom:12px">₪0</div>
         <div id="grandTotalBreakdown" style="display:flex;justify-content:center;gap:16px;border-top:1px solid rgba(255,255,255,0.15);padding-top:10px"></div>
       </div>
+
+      <!-- Direct family-to-family settle-up, netted across all open events —
+           optional alternative to paying the treasurer. -->
+      <button onclick="openGlobalSettleModal()" style="width:100%;padding:12px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;text-align:right;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span>⚖️ העברות איזון בין משפחות</span><span style="font-size:11px;color:var(--text2);font-weight:600">חלופה לתשלום לגזבר ›</span>
+      </button>
 
       <!-- Main fund card with family balances inside -->
       <div class="fund-section-title">💰 ארנק</div>

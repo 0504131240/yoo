@@ -18,6 +18,11 @@ let messages=[];
 let calItems=[];
 let birthdays=[];
 let paymentClaims=[];
+// Direct family-to-family settle-up transfers, computed across ALL open
+// events combined (not tied to any one event) — the optional alternative to
+// just paying the treasurer. Recorded here rather than in any single event's
+// own `settled` array since the payment isn't "for" one specific event.
+let globalSettled=[];
 let visits=[];
 let notifications=[];
 let polls=[];
@@ -567,6 +572,7 @@ function saveLocal(){
     localStorage.setItem('calItems',JSON.stringify(calItems));
     localStorage.setItem('birthdays',JSON.stringify(birthdays));
     localStorage.setItem('paymentClaims',JSON.stringify(paymentClaims));
+    localStorage.setItem('globalSettled',JSON.stringify(globalSettled));
     localStorage.setItem('visits',JSON.stringify(visits));
     localStorage.setItem('notifications',JSON.stringify(notifications));
     localStorage.setItem('polls',JSON.stringify(polls));
@@ -586,7 +592,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,visits,notifications,polls,countdowns,yahrzeits});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,globalSettled,visits,notifications,polls,countdowns,yahrzeits});
     localStorage.removeItem('pendingSave');
     localStorage.removeItem('pendingSaveAt');
     showSyncStatus('✓ נשמר',2000);
@@ -619,6 +625,7 @@ async function load(){
     calItems=d.calItems||[];
     birthdays=d.birthdays||[];
     paymentClaims=d.paymentClaims||[];
+    globalSettled=d.globalSettled||[];
     visits=d.visits||[];
     notifications=d.notifications||[];
     polls=d.polls||[];
@@ -675,6 +682,7 @@ async function load(){
       const cals=localStorage.getItem('calItems');if(cals)calItems=JSON.parse(cals);
       const bds=localStorage.getItem('birthdays');if(bds)birthdays=JSON.parse(bds);
       const pcs=localStorage.getItem('paymentClaims');if(pcs)paymentClaims=JSON.parse(pcs);
+      const gst=localStorage.getItem('globalSettled');if(gst)globalSettled=JSON.parse(gst);
       const vst=localStorage.getItem('visits');if(vst)visits=JSON.parse(vst);
       const nts=localStorage.getItem('notifications');if(nts)notifications=JSON.parse(nts);
       const pls=localStorage.getItem('polls');if(pls)polls=JSON.parse(pls);
@@ -1704,15 +1712,16 @@ function renderHome(){
     ${open.length?open.map(ev=>{
       const cl=col(ev.id);
       const cost=evCost(ev);
-      const pending=calcTransfers(ev).filter(t=>!t.coveredByPot);
+      const pendingSavings=calcTransfers(ev).filter(t=>t.toFid==='__savings__'&&!t.coveredByPot);
       const adjBals=evAdjBalance(ev);
       const settledFams=ev.participants.filter(fid=>Math.abs(adjBals[fid]||0)<=0.5).length;
       const total=ev.participants.length;
       const pct=total?Math.round(settledFams/total*100):100;
       const hasPot=evPotTotal(ev)>0;
-      const balanced=!pending.length;
+      const balanced=settledFams===total;
       const tags=[
-        !balanced?`<span class="badge badge-amber">↔ ${pending.length} העברות</span>`:`<span class="badge badge-green">✅ מאוזן</span>`,
+        !balanced?`<span class="badge badge-amber">⏳ פעיל</span>`:`<span class="badge badge-green">✅ מאוזן</span>`,
+        pendingSavings.length?`<span class="badge" style="background:var(--green-bg);color:var(--green-mid)">💎 ${pendingSavings.length}</span>`:'',
         hasPot?`<span class="badge" style="background:var(--amber-bg);color:var(--amber)">💰 ₪${evNetPotBal(ev).toLocaleString()}</span>`:''
       ].filter(Boolean).join('');
       const meta=[ev.date&&ev.date!=='לא צוין'?esc(ev.date):'',ev.participants.length+' משפחות',splitShort[ev.splitMethod||'equal']].filter(Boolean).join(' · ');
@@ -1815,22 +1824,86 @@ function calcTransfers(ev){
   if(_savCoveredByPot) transfers.forEach(t=>{if(t.toFid==='__savings__')t.coveredByPot=true;});
   return transfers;
 }
+// A family's total net balance across every currently-open event combined.
+// Positive = owed money overall, negative = owes money overall. Feeds the
+// standalone "העברות איזון" (balance transfers) tool — the optional direct
+// alternative to everyone just paying the treasurer. Savings-pot obligations
+// are deliberately excluded — they're owed to that specific event's own
+// savings goal, not to another family.
+function famGlobalBalances(){
+  const net={};
+  events.filter(e=>e.open).forEach(ev=>{
+    const bal={...evAdjBalance(ev)};
+    // Pre-apply pot releases to creditors so the net position only reflects
+    // the remaining gap — money already sitting in the event's own pot gets
+    // released to them separately, not via a family-to-family transfer.
+    if((ev.potPayments||[]).length>0){
+      calcPotTransfers(ev).forEach(t=>{ bal[t.toFid]=(bal[t.toFid]||0)-t.amt; });
+      const excess=calcPotExcessByFamily(ev);
+      Object.entries(excess).forEach(([fid,exc])=>{
+        const fidNum=parseInt(fid);const adj=bal[fidNum]||0;
+        if(adj>0.5) bal[fidNum]=Math.max(0,adj-exc);
+      });
+    }
+    ev.participants.forEach(fid=>{ net[fid]=(net[fid]||0)+(bal[fid]||0); });
+  });
+  (globalSettled||[]).forEach(s=>{
+    net[s.fromFid]=(net[s.fromFid]||0)+s.amt;
+    net[s.toFid]=(net[s.toFid]||0)-s.amt;
+  });
+  return net;
+}
+// Minimal set of family-to-family transfers to settle every open event at
+// once, computed from each family's combined net position — so a debt in one
+// event that's already covered by a credit in another doesn't need a
+// (redundant) payment, and money routes directly between the two families
+// that actually end up owing each other instead of via a third family who
+// happens to link the two events.
+function calcGlobalTransfers(){
+  const net=famGlobalBalances();
+  const pos=[],neg=[];
+  Object.keys(net).forEach(fidStr=>{
+    const fid=parseInt(fidStr);
+    const f=getFam(fid);if(!f)return;
+    const name=f.name.replace('משפחת','').trim();
+    const amt=net[fid];
+    if(amt>0.5) pos.push({name,fid,amt});
+    else if(amt<-0.5) neg.push({name,fid,amt:-amt});
+  });
+  const transfers=[];
+  const pCopy=pos.sort((a,b)=>b.amt-a.amt);
+  const nCopy=neg.sort((a,b)=>b.amt-a.amt);
+  let pi=0,ni=0;
+  while(pi<pCopy.length&&ni<nCopy.length){
+    const give=Math.min(pCopy[pi].amt,nCopy[ni].amt);
+    if(give>0.5) transfers.push({from:nCopy[ni].name,fromFid:nCopy[ni].fid,to:pCopy[pi].name,toFid:pCopy[pi].fid,amt:Math.round(give)});
+    pCopy[pi].amt-=give; nCopy[ni].amt-=give;
+    if(pCopy[pi].amt<=0.5)pi++;
+    if(nCopy[ni].amt<=0.5)ni++;
+  }
+  return transfers;
+}
 function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
-  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  const ev=evId!=null?events.find(e=>e.id===evId):null;
+  if(evId!=null&&!ev)return;
   const key=String(fromFid);
   const bal=fund.famBalances[key]||0;
   if(bal<amt){ alert('אין מספיק יתרה בקופה עבור '+from+' (יתרה: ₪'+bal.toLocaleString()+')'); return; }
-  if(!ev.settled)ev.settled=[];
-  ev.settled.push({from,fromFid,to,toFid,amt,method:'fund'});
+  if(ev){
+    if(!ev.settled)ev.settled=[];
+    ev.settled.push({from,fromFid,to,toFid,amt,method:'fund'});
+  } else {
+    globalSettled.push({from,fromFid,to,toFid,amt,method:'fund',date:new Date().toLocaleDateString('he-IL')});
+  }
   fund.famBalances[key]=bal-amt;
   fund.transactions.push({id:nxtTx++,type:'payout',famId:fromFid,amount:amt,
-    desc:'תשלום של '+from+' ל'+to+' · '+ev.name,
+    desc:'תשלום של '+from+' ל'+to+(ev?' · '+ev.name:''),
     date:new Date().toLocaleDateString('he-IL')});
   // credit the creditor's fund balance
   const toKey2=String(toFid);
   fund.famBalances[toKey2]=(fund.famBalances[toKey2]||0)+amt;
   fund.transactions.push({id:nxtTx++,type:'deposit',famId:toFid,amount:amt,
-    desc:'קיבלת מ'+from+' עבור "'+ev.name+'" (מהארנק)',
+    desc:'קיבלת מ'+from+(ev?' עבור "'+ev.name+'"':'')+' (מהארנק)',
     date:new Date().toLocaleDateString('he-IL')});
   save();render();
 }
@@ -1881,6 +1954,29 @@ function confirmPartPay(){
   if(paid>_ppMax+0.5){alert('הסכום גבוה מהנדרש');return;}
   if(_ppPot) payToPot(_ppEvId,_ppFromFid,paid);
   else if(_ppFund) markTransferFromFund(_ppEvId,_ppFrom,_ppFromFid,_ppTo,_ppToFid,paid);
+  else if(_ppEvId==null){
+    // Global settle-up transfer (the "העברות איזון" tool) — not tied to any
+    // single event's ledger.
+    const key=String(_ppFromFid);
+    const fundBal=fund.famBalances[key]||0;
+    const fromFund=Math.min(paid,fundBal);
+    const fromDirect=paid-fromFund;
+    if(fromFund>0){
+      globalSettled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromFund,method:'fund',date:new Date().toLocaleDateString('he-IL')});
+      fund.famBalances[key]=fundBal-fromFund;
+      fund.transactions.push({id:nxtTx++,type:'payout',famId:_ppFromFid,amount:fromFund,
+        desc:'תשלום של '+_ppFrom+' ל'+_ppTo+' (מהארנק)',
+        date:new Date().toLocaleDateString('he-IL')});
+      const toKey=String(_ppToFid);
+      fund.famBalances[toKey]=(fund.famBalances[toKey]||0)+fromFund;
+      fund.transactions.push({id:nxtTx++,type:'deposit',famId:_ppToFid,amount:fromFund,
+        desc:'קיבלת מ'+_ppFrom+' (מהארנק)',
+        date:new Date().toLocaleDateString('he-IL')});
+    }
+    if(fromDirect>0) globalSettled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromDirect,method:'direct',date:new Date().toLocaleDateString('he-IL')});
+    addNotif('✓',_ppFrom+' העביר ל'+_ppTo+' ₪'+paid.toLocaleString(),'admin');
+    save();render();
+  }
   else {
     const ev=events.find(e=>e.id===_ppEvId);if(!ev)return;
     const key=String(_ppFromFid);
@@ -1910,7 +2006,10 @@ function confirmPartPay(){
       if((adjAfter[_ppToFid]||0)<=0.5)_sendCloseEvEmailOne(ev,_ppToFid);
     }
   }
-  if(_ppSettle){const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
+  if(_ppSettle){
+    if(_ppEvId==null) renderGlobalSettleModal();
+    else{const ev=events.find(e=>e.id===_ppEvId);if(ev)renderSettleModal(ev);}
+  }
   closePartPayModal();
 }
 function openPotPayModal(evId,famId){
@@ -1933,8 +2032,12 @@ function evCard(ev){
   const cost=evCost(ev);
   const excl=families.filter(f=>ev.excluded.includes(f.id));
   const adjBal=evAdjBalance(ev);
-  const _allTransfers=calcTransfers(ev);
-  const transfers=_allTransfers.filter(t=>!t.coveredByPot);
+  // Family-to-family "who pays whom" suggestions were removed from the event
+  // window — everyone pays the treasurer directly instead (see
+  // openGlobalSettleModal for the optional direct-transfer alternative).
+  // Only the event's own savings-pot transfers still show here.
+  const transfers=calcTransfers(ev).filter(t=>t.toFid==='__savings__'&&!t.coveredByPot);
+  const hasSavingsInfo=transfers.length>0||(ev.savingsPaid||[]).length>0||(ev.savingsTotal||0)>0;
   const potPayments=ev.potPayments||[];
   const potOrigByFam=evPotOrigByFam(ev);
   const potTransByFam=evPotTransByFam(ev);
@@ -2049,9 +2152,9 @@ function evCard(ev){
   const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
   const settleLines=transfers.map(t=>{
     return`<div class="settle-row" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 0">
-      <span style="font-size:12px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> &nbsp;₪${t.amt.toLocaleString()}</span>
+      <span style="font-size:12px">💎 <b>${esc(t.from)}</b> מעביר לקופת חיסכון &nbsp;₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="openPartPayModal(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},false,false)">✓ שולם</button>
+        <button style="padding:5px 10px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap" onclick="confirmSavingsTransfer(${ev.id},${t.fromFid},${t.amt})">💎 שולם</button>
       </div>
     </div>`;
   }).join('');
@@ -2137,7 +2240,7 @@ function evCard(ev){
     ${exclLine}
     <div class="card-actions">
       <button class="action-btn edit-only" onclick="editEv(${ev.id})">✏️ ערוך</button>
-      ${cost>0?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--blue-bg);border-color:var(--blue-mid);color:var(--blue)':''}">📊 ${transfers.length?`<b>(${transfers.length})</b> `:''} העברות</button>`:''}
+      ${hasSavingsInfo?`<button class="action-btn" onclick="openSettleModal(${ev.id})" style="${transfers.length?'background:var(--green-bg);border-color:var(--green-mid);color:var(--green-mid)':''}">💎 ${transfers.length?`<b>(${transfers.length})</b> `:''} קופת חיסכון</button>`:''}
       ${hasPotHistory?(hasPot?`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">💰 ₪${(potTotal-potExpTotalCard).toLocaleString()}${potExpTotalCard>0?` <span style="font-size:10px;opacity:.7">(הוצאות ₪${potExpTotalCard.toLocaleString()})</span>`:''}</button>`:`<button class="action-btn" onclick="openPotModal(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">💰 קופת האירוע (₪0)</button>`):''}
       ${ev.cumulative&&cost>0?ev.closed?`<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:6px;background:var(--surface2);border:1.5px solid var(--border);font-size:12px;color:var(--text2);font-weight:600">🏁 הסתיים</span>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}` :`<button class="action-btn blue edit-only" onclick="openCloseEvModal(${ev.id})">🏁 סיים אירוע</button>${balanced?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}`:balanced&&cost>0?`<button class="action-btn edit-only" onclick="archiveEv(${ev.id})" style="background:var(--surface2);border-color:var(--border);color:var(--text2)">🗂 לארכיון</button>`:''}
       ${cost>0?`<button class="action-btn edit-only" onclick="openEmailModal(${ev.id})" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">📧 מיילים</button>`:''}
@@ -4165,7 +4268,7 @@ function openClaimsModal(){
   if(!paymentClaims.length){closeClaimsModal();return;}
   const rows=[...paymentClaims].sort((a,b)=>b.ts-a.ts).map(c=>{
     const ev=events.find(e=>e.id===c.evId);const f=getFam(c.famId);
-    const evName=ev?esc(ev.name):'אירוע שנמחק';
+    const evName=ev?esc(ev.name):(c.kind==='transfer'&&c.evId==null?'העברות איזון':'אירוע שנמחק');
     const famName=f?esc(f.name.replace('משפחת','').trim()):'משפחה שנמחקה';
     if(c.kind==='transfer'){
       const tf=getFam(c.toFid);
@@ -4177,7 +4280,7 @@ function openClaimsModal(){
           <div style="font-size:14px;font-weight:700;color:var(--green-mid)">₪${c.amt.toLocaleString()}</div>
         </div>
         <div style="display:flex;gap:6px">
-          ${ev&&f&&tf?`<button onclick="goToClaimTransfer(${c.id})" style="flex:1;padding:7px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">✓ אשר</button>`:''}
+          ${(ev||c.evId==null)&&f&&tf?`<button onclick="goToClaimTransfer(${c.id})" style="flex:1;padding:7px;border-radius:8px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">✓ אשר</button>`:''}
           <button onclick="dismissClaim(${c.id})" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">✗ בטל</button>
         </div>
       </div>`;
@@ -4214,16 +4317,23 @@ function claimTransfer(evId,fromFid,toFid,amt){
   _sendPush('💸 אישור תשלום חדש','₪'+amt.toLocaleString()+' · לבדיקה באפליקציה','admin');
   save();
   renderClaimsBanner();
-  const ev=events.find(e=>e.id===evId);
-  if(settleModalEvId===evId&&ev)renderSettleModal(ev);
+  // Real (family-to-family) transfer claims are global now (evId==null) —
+  // refresh the standalone "העברות איזון" modal if it's open.
+  if(evId==null){
+    const modal=document.getElementById('globalSettleModal');
+    if(modal&&modal.style.display==='flex')renderGlobalSettleModal();
+  } else {
+    const ev=events.find(e=>e.id===evId);
+    if(settleModalEvId===evId&&ev)renderSettleModal(ev);
+  }
 }
 function goToClaimTransfer(claimId){
   const c=paymentClaims.find(x=>x.id===claimId);if(!c)return;
   const ev=events.find(e=>e.id===c.evId);const f=getFam(c.famId);const tf=getFam(c.toFid);
-  if(!ev||!f||!tf){dismissClaim(claimId);return;}
+  if((!ev&&c.evId!=null)||!f||!tf){dismissClaim(claimId);return;}
   paymentClaims=paymentClaims.filter(x=>x.id!==claimId);
   save();renderClaimsBanner();closeClaimsModal();
-  openPartPayModal(ev.id,f.name.replace('משפחת','').trim(),c.famId,tf.name.replace('משפחת','').trim(),c.toFid,c.amt,false,false);
+  openPartPayModal(ev?ev.id:null,f.name.replace('משפחת','').trim(),c.famId,tf.name.replace('משפחת','').trim(),c.toFid,c.amt,false,false);
 }
 
 function renderSavingsPot(){
@@ -5029,59 +5139,90 @@ function closeSettleModal(){
   document.getElementById('settleModal').style.display='none';
   settleModalEvId=null;
 }
+// This modal is now savings-pot only — family-to-family "who pays whom"
+// suggestions were removed from the per-event window (everyone just pays the
+// treasurer directly instead); see openGlobalSettleModal for the standalone
+// direct-transfer alternative that nets across all open events at once.
 function renderSettleModal(ev){
   const el=document.getElementById('settleModalContent');if(!el)return;
   const _allTransfers=calcTransfers(ev);
-  const transfers=_allTransfers.filter(t=>!t.coveredByPot);
-  const _potCoveredTransfers=_allTransfers.filter(t=>t.coveredByPot);
+  const transfers=_allTransfers.filter(t=>t.toFid==='__savings__'&&!t.coveredByPot);
+  const _potCoveredTransfers=_allTransfers.filter(t=>t.toFid==='__savings__'&&t.coveredByPot);
   const settledList=ev.settled||[];
-  const _myFid=_myFamId();
-  const _hasTransferClaim=(fromFid,toFid)=>paymentClaims.some(c=>c.kind==='transfer'&&c.evId===ev.id&&c.famId===fromFid&&c.toFid===toFid);
-  const settleLines=transfers.map(t=>{
-    if(t.toFid==='__savings__'){
-      return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
-        <span style="font-size:13px">💎 <b>${esc(t.from)}</b> מעביר לקופת חיסכון ₪${t.amt.toLocaleString()}</span>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="confirmSavingsTransfer(${ev.id},${t.fromFid},${t.amt})">💎 שולם</button>
-        </div>
-      </div>`;
-    }
-    const _claimBtn=t.fromFid===_myFid?(_hasTransferClaim(t.fromFid,t.toFid)?
-      `<span style="padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700;color:var(--text2)">⏳ ממתין לאישור</span>`:
-      `<button style="padding:6px 12px;border-radius:6px;border:1.5px solid var(--green-mid);background:var(--green-bg);color:var(--green-mid);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="claimTransfer(${ev.id},${t.fromFid},${t.toFid},${t.amt})">✓ העברתי</button>`):'';
-    return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
-      <span style="font-size:13px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</span>
+  const settleLines=transfers.map(t=>
+    `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">💎 <b>${esc(t.from)}</b> מעביר לקופת חיסכון ₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${_claimBtn}
-        <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="openPartPayModal(${ev.id},'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},false,true)">✓ שולם</button>
+        <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--green-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="confirmSavingsTransfer(${ev.id},${t.fromFid},${t.amt})">💎 שולם</button>
       </div>
-    </div>`;
-  }).join('');
-  const _potByTo={};const _nonPot=[];
-  settledList.forEach(s=>{if(s.method==='pot'){const k=s.toFid!=null?String(s.toFid):s.to;if(!_potByTo[k])_potByTo[k]={to:s.to,amt:0};_potByTo[k].amt+=s.amt;}else _nonPot.push(s);});
+    </div>`
+  ).join('');
   const _rowHtml=(icon,badge,from,to,amt)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(from)}</b> העביר ל<b style="color:var(--text)">${esc(to)}</b> ₪${Math.round(amt).toLocaleString()}</span>${badge}</div>`;
-  const _potBadge='<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">קופת אירוע</span>';
-  const _potRows=Object.values(_potByTo).map(p=>_rowHtml('💰',_potBadge,'קופת האירוע',p.to,p.amt));
-  const _nonPotRows=_nonPot.map(s=>{const icon=s.method==='fund'?'🏦':'✓';const badge=s.method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';return _rowHtml(icon,badge,s.from,s.to,s.amt);});
   const _savBadge='<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">חיסכון</span>';
   const _savPaidRows=(ev.savingsPaid||[]).map(p=>{const f=getFam(p.famId);if(!f)return'';return _rowHtml('💎',_savBadge,f.name.replace('משפחת','').trim(),'קופת חיסכון',p.amt);}).join('');
   const _potCovBadge='<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">הוסדר ע"י הקופה</span>';
   const _potCovRows=_potCoveredTransfers.map(t=>_rowHtml('💰',_potCovBadge,t.from,'קופת חיסכון',t.amt));
-  const _hasDone=settledList.length||(ev.savingsPaid||[]).length||_potCoveredTransfers.length;
+  const _hasDone=(ev.savingsPaid||[]).length||_potCoveredTransfers.length;
   const doneRows=_hasDone?
     `<div style="padding:12px 16px 4px;border-top:2px solid var(--border);margin-top:${transfers.length?'8':'0'}px">
       <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">✅ בוצעו</div>
-      ${[..._nonPotRows,..._potRows,..._potCovRows].join('')}${_savPaidRows}
+      ${_potCovRows.join('')}${_savPaidRows}
     </div>`:'';
   el.innerHTML=`
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-      <div><div style="font-size:14px;font-weight:700">📊 העברות לאיזון</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${shareLabel(ev)} · ${esc(ev.name)}</div></div>
+      <div><div style="font-size:14px;font-weight:700">💎 קופת חיסכון</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${esc(ev.name)}</div></div>
       <button onclick="closeSettleModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
     </div>
     ${transfers.length?`<div style="padding:4px 0 4px">${settleLines}</div>`:`<div style="padding:20px;text-align:center;font-size:15px;color:var(--green)">✅ כולם מסודרים!</div>`}
     ${doneRows}
     <div style="padding:10px 16px">
       <button onclick="closeSettleModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+    </div>`;
+}
+// Standalone "העברות איזון" tool — direct family-to-family settle-up,
+// netted across every open event at once. Optional alternative to the
+// default flow of everyone paying the treasurer.
+function openGlobalSettleModal(){
+  renderGlobalSettleModal();
+  document.getElementById('globalSettleModal').style.display='flex';
+}
+function closeGlobalSettleModal(){
+  document.getElementById('globalSettleModal').style.display='none';
+}
+function renderGlobalSettleModal(){
+  const el=document.getElementById('globalSettleModalContent');if(!el)return;
+  const transfers=calcGlobalTransfers();
+  const _myFid=_myFamId();
+  const _hasTransferClaim=(fromFid,toFid)=>paymentClaims.some(c=>c.kind==='transfer'&&c.evId==null&&c.famId===fromFid&&c.toFid===toFid);
+  const settleLines=transfers.map(t=>{
+    const _claimBtn=t.fromFid===_myFid?(_hasTransferClaim(t.fromFid,t.toFid)?
+      `<span style="padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700;color:var(--text2)">⏳ ממתין לאישור</span>`:
+      `<button style="padding:6px 12px;border-radius:6px;border:1.5px solid var(--green-mid);background:var(--green-bg);color:var(--green-mid);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="claimTransfer(null,${t.fromFid},${t.toFid},${t.amt})">✓ העברתי</button>`):'';
+    return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</span>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${_claimBtn}
+        <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="openPartPayModal(null,'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},false,true)">✓ שולם</button>
+      </div>
+    </div>`;
+  }).join('');
+  const _rowHtml=(icon,badge,from,to,amt)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(from)}</b> העביר ל<b style="color:var(--text)">${esc(to)}</b> ₪${Math.round(amt).toLocaleString()}</span>${badge}</div>`;
+  const _nonPotBadge=method=>method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';
+  const doneRowsList=(globalSettled||[]).map(s=>_rowHtml(s.method==='fund'?'🏦':'✓',_nonPotBadge(s.method),s.from,s.to,s.amt));
+  const doneRows=doneRowsList.length?
+    `<div style="padding:12px 16px 4px;border-top:2px solid var(--border);margin-top:${transfers.length?'8':'0'}px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">✅ בוצעו</div>
+      ${doneRowsList.join('')}
+    </div>`:'';
+  el.innerHTML=`
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-size:14px;font-weight:700">⚖️ העברות איזון</div><div style="font-size:11px;color:var(--text2);margin-top:2px">חלופה ישירה לתשלום דרך הגזבר — מחושב על כל האירועים הפתוחים יחד</div></div>
+      <button onclick="closeGlobalSettleModal()" style="border:none;background:none;font-size:20px;color:var(--text2);cursor:pointer;font-family:var(--font);padding:0">✕</button>
+    </div>
+    ${transfers.length?`<div style="padding:4px 0 4px">${settleLines}</div>`:`<div style="padding:20px;text-align:center;font-size:15px;color:var(--green)">✅ כולם מסודרים!</div>`}
+    ${doneRows}
+    <div style="padding:10px 16px">
+      <button onclick="closeGlobalSettleModal()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>`;
 }
 // Human-readable "how was it settled" lines for one family in an event —
@@ -5152,7 +5293,9 @@ function evCoverLines(ev,fid){
 }
 // Family-to-family transfers for one family in an event: both the moves that
 // already happened (from ev.settled, direct or wallet) and the ones still
-// pending (from calcTransfers). Used to show "who paid whom" on each card.
+// already happened (from ev.settled). Family-to-family "pending" suggestions
+// were removed — everyone pays the treasurer directly now (see
+// openGlobalSettleModal for the optional direct-transfer alternative).
 function evFamTransfers(ev,famId){
   const out=[];
   const _sfByName=n=>families.find(x=>x.name===n||x.name.replace(/^משפחת\s*/,'')===n);
@@ -5163,10 +5306,6 @@ function evFamTransfers(ev,famId){
     const isTo=s.toFid!=null?Number(s.toFid)===Number(famId):(_sfByName(s.to)||{}).id===famId;
     if(isFrom) out.push({dir:'out',pending:false,amt:Math.round(s.amt),other:nm(s.toFid,s.to)});
     else if(isTo) out.push({dir:'in',pending:false,amt:Math.round(s.amt),other:nm(s.fromFid,s.from)});
-  });
-  calcTransfers(ev).filter(t=>!t.coveredByPot&&t.toFid!=='__savings__').forEach(t=>{
-    if(Number(t.fromFid)===Number(famId)) out.push({dir:'out',pending:true,amt:Math.round(t.amt),other:nm(t.toFid,t.to)});
-    else if(Number(t.toFid)===Number(famId)) out.push({dir:'in',pending:true,amt:Math.round(t.amt),other:nm(t.fromFid,t.from)});
   });
   return out;
 }
@@ -5447,13 +5586,14 @@ function renderEventDash(ev){
     :`<div style="text-align:center;color:var(--text3);font-size:12.5px;padding:6px 0">אין פריטי הוצאה — העלות מחולקת לפי משפחות בלבד.</div>`;
   const typeSection=_dashSection('📊 פירוט לפי סוג הוצאה',typeInner);
 
-  // ── Balancing transfers (read-only summary) ──
-  const transfers=calcTransfers(ev).filter(t=>!t.coveredByPot);
-  const trInner=transfers.length?transfers.map(t=>{
-    if(t.toFid==='__savings__')return`<div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)">💎 <b>${esc(t.from)}</b> משלמים לקופת חיסכון · <b style="color:var(--blue)">₪${t.amt.toLocaleString()}</b></div>`;
-    return`<div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)">👈 <b>${esc(t.from)}</b> משלמים ל<b>${esc(t.to)}</b> · <b style="color:var(--blue)">₪${t.amt.toLocaleString()}</b></div>`;
-  }).join(''):`<div style="text-align:center;color:var(--green);font-size:13px;padding:6px 0;font-weight:700">✅ כולם מסודרים!</div>`;
-  const trSection=_dashSection('🔄 העברות לאיזון',trInner);
+  // ── Savings-pot transfers (read-only summary) — family-to-family "who
+  // pays whom" suggestions were removed; everyone pays the treasurer
+  // directly now (see openGlobalSettleModal for the direct alternative). ──
+  const savingsTransfers=calcTransfers(ev).filter(t=>t.toFid==='__savings__'&&!t.coveredByPot);
+  const hasSavingsGoal=savingsTransfers.length>0||(ev.savingsPaid||[]).length>0||(ev.savingsTotal||0)>0;
+  const trSection=hasSavingsGoal?_dashSection('💎 קופת חיסכון',savingsTransfers.length?savingsTransfers.map(t=>
+    `<div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)">💎 <b>${esc(t.from)}</b> משלמים לקופת חיסכון · <b style="color:var(--blue)">₪${t.amt.toLocaleString()}</b></div>`
+  ).join(''):`<div style="text-align:center;color:var(--green);font-size:13px;padding:6px 0;font-weight:700">✅ כולם מסודרים!</div>`):'';
 
   // ── Pot (conditional) ──
   let potSection='';
