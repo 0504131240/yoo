@@ -62,10 +62,13 @@ async function sendWeeklyDebtReminders(db, data) {
   if (!openEvents.length) return { skipped: 'no open events' };
 
   const debtsByFam = {};
+  const netByFam = {};
   openEvents.forEach(ev => {
     const adjBal = evAdjBalance(ev, families);
     ev.participants.forEach(fid => {
-      const owe = Math.round(-(adjBal[fid] || 0));
+      const bal = adjBal[fid] || 0;
+      netByFam[fid] = (netByFam[fid] || 0) + bal;
+      const owe = Math.round(-bal);
       if (owe > 0.5) {
         if (!debtsByFam[fid]) debtsByFam[fid] = [];
         debtsByFam[fid].push({ name: ev.name, owe });
@@ -76,6 +79,9 @@ async function sendWeeklyDebtReminders(db, data) {
   let emailsSent = 0, pushesSent = 0;
   for (const [fidStr, debts] of Object.entries(debtsByFam)) {
     const fid = parseInt(fidStr);
+    // A credit balance in another open event that fully covers this debt
+    // means the family isn't actually in the red overall — skip the nag.
+    if ((netByFam[fid] || 0) >= -0.5) continue;
     const fam = families.find(f => f.id === fid);
     if (!fam) continue;
     const famName = fam.name.replace('משפחת', '').trim();
