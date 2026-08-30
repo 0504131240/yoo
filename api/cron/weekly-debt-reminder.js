@@ -11,15 +11,22 @@ function _escHtml(s) {
 }
 
 async function sendViaEmailJS(publicKey, serviceId, templateId, toEmail, toName, subject, message, messageHtml) {
+  // EmailJS's "Allow API for non-browser applications" account setting also
+  // requires the account's Private Key (EmailJS dashboard → Account →
+  // General → API Keys) sent as accessToken — set via the EMAILJS_PRIVATE_KEY
+  // env var in Vercel, never stored in Firestore or served to the browser
+  // (unlike the public key, which /api/settings/emailjs.js does expose).
+  const body = {
+    service_id: serviceId,
+    template_id: templateId,
+    user_id: publicKey,
+    template_params: { to_email: toEmail, to_name: toName, subject, message, message_html: messageHtml },
+  };
+  if (process.env.EMAILJS_PRIVATE_KEY) body.accessToken = process.env.EMAILJS_PRIVATE_KEY;
   const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      service_id: serviceId,
-      template_id: templateId,
-      user_id: publicKey,
-      template_params: { to_email: toEmail, to_name: toName, subject, message, message_html: messageHtml },
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`EmailJS ${res.status}: ${await res.text()}`);
 }
