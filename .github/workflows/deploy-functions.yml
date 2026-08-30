@@ -27,5 +27,12 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy to Firebase
-        run: npx firebase-tools deploy --only functions:sendPushOnUpdate,functions:dailyBackup,functions:weeklyDebtReminder,functions:listBackups,functions:restoreFromBackup --project yossi20361 --non-interactive --force
+      # These 5 functions are fully superseded by api/ (Vercel): sendPushOnUpdate by
+      # api/notify.js (which also respects target/excludeFamIds, unlike this broadcast-
+      # to-everyone trigger), dailyBackup + weeklyDebtReminder by api/cron/daily-backup.js,
+      # listBackups/restoreFromBackup by api/backups/*.js. Nobody deleted the old Firebase
+      # deployment when the migration happened, so it kept running in parallel — every
+      # write fired two pushes, one correctly scoped, one not. Deleting them here instead
+      # of just deploying nothing, since a --only deploy never removes what's already live.
+      - name: Delete superseded Firebase Functions
+        run: npx firebase-tools functions:delete sendPushOnUpdate dailyBackup weeklyDebtReminder listBackups restoreFromBackup --project yossi20361 --force
