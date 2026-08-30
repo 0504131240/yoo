@@ -40,12 +40,17 @@ async function sendBirthdayReminders(db, data) {
   const dayFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', { day: 'numeric' });
   const monthFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { month: 'long' });
   const today = new Date();
+  // Intl renders Adar as plain "אדר" in a regular year but "אדר א׳"/"אדר ב׳" in a
+  // leap year — an occasion saved in one kind of year never string-equals today's
+  // month name in the other, silently skipping it for years at a time. Treat any
+  // Adar variant as interchangeable (same fix as app.js's calendar matching).
+  const hebMonthEq = (a, b) => a === b || (!!a && !!b && a.startsWith('אדר') && b.startsWith('אדר'));
 
   let sent = 0, occasions = 0;
   for (let i = 0; i <= 1; i++) {
     const d = new Date(today); d.setDate(d.getDate() + i);
     const hd = parseInt(dayFmt.format(d)), hm = monthFmt.format(d);
-    for (const b of all.filter(x => x.hebDay === hd && x.hebMonth === hm)) {
+    for (const b of all.filter(x => x.hebDay === hd && hebMonthEq(x.hebMonth, hm))) {
       occasions++;
       const isAnniv = b.kind === 'anniversary';
       const isYahrzeit = b.kind === 'yahrzeit';
@@ -83,8 +88,12 @@ async function sendBirthdayReminders(db, data) {
 }
 
 module.exports = async (req, res) => {
+  // Fail closed, not open: if CRON_SECRET is ever missing from Vercel's env
+  // (unset, wrong environment scope), this used to let the request through
+  // for anyone who found the URL, silently triggering full data backups,
+  // birthday pushes, and (Sundays) debt-reminder emails on demand.
   const auth = req.headers['authorization'];
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     res.status(401).json({ error: 'unauthorized' });
     return;
   }
