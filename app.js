@@ -201,8 +201,12 @@ function evEffectivePotPayments(ev){
 function evAdjBalance(ev){
   const adjBal=evBalance(ev);
   (ev.settled||[]).forEach(s=>{
-    const fromFid=ev.participants.find(fid=>{ const f=getFam(fid); return f&&f.name.replace('משפחת','').trim()===s.from; });
-    const toFid=ev.participants.find(fid=>{ const f=getFam(fid); return f&&f.name.replace('משפחת','').trim()===s.to; });
+    // Prefer the fromFid/toFid every settled entry already carries (matching
+    // every other reader of ev.settled in the app) over matching by name —
+    // name-only matching breaks silently the moment a family is renamed,
+    // making an already-settled debt reappear as owed.
+    const fromFid=s.fromFid!=null?s.fromFid:ev.participants.find(fid=>{ const f=getFam(fid); return f&&f.name.replace('משפחת','').trim()===s.from; });
+    const toFid=s.toFid!=null?s.toFid:ev.participants.find(fid=>{ const f=getFam(fid); return f&&f.name.replace('משפחת','').trim()===s.to; });
     if(fromFid!=null) adjBal[fromFid]=(adjBal[fromFid]||0)+s.amt;
     if(toFid!=null) adjBal[toFid]=(adjBal[toFid]||0)-s.amt;
   });
@@ -1286,6 +1290,13 @@ function toHebrewYear(hy){
   else{if(t)s+=TENS[t];if(o)s+=ONES[o];}
   return s.length===1?s+'׳':s.slice(0,-1)+'״'+s.slice(-1);
 }
+// Intl renders Adar as plain "אדר" in a regular year but "אדר א׳"/"אדר ב׳" in a
+// leap year (which has two Adars) — a birthday/anniversary/yahrzeit saved in one
+// kind of year never string-equals today's month name in the other kind, so it
+// silently never matches that year. Treat any Adar variant as interchangeable:
+// occasionally matching twice in a leap year is a far better failure mode than
+// silently skipping the occasion for years at a time.
+const _hebMonthEq=(a,b)=>a===b||(!!a&&!!b&&a.startsWith('אדר')&&b.startsWith('אדר'));
 function hebrewToGregorian(hebYear,hebMonthName,hebDay){
   if(!hebYear||!hebMonthName||!hebDay)return null;
   const dayFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{day:'numeric'});
@@ -1353,9 +1364,9 @@ function renderCalendar(){
       const isToday=ds===todayStr;
       const isSel=calSelDay===ds&&!isToday;
       const evOnDay=calItems.filter(c=>c.date===ds);
-      const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
-      const yahrOnDay=_allYahr.filter(y=>y.hebDay===hebDayNumInt&&y.hebMonth===hebMonthName);
-      const annivOnDay=_allAnniv.filter(a=>a.hebDay===hebDayNumInt&&a.hebMonth===hebMonthName);
+      const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&_hebMonthEq(b.hebMonth,hebMonthName));
+      const yahrOnDay=_allYahr.filter(y=>y.hebDay===hebDayNumInt&&_hebMonthEq(y.hebMonth,hebMonthName));
+      const annivOnDay=_allAnniv.filter(a=>a.hebDay===hebDayNumInt&&_hebMonthEq(a.hebMonth,hebMonthName));
       if(bdayOnDay.length)bdayByDate[ds]=bdayOnDay;
       if(yahrOnDay.length)yahrByDate[ds]=yahrOnDay;
       if(annivOnDay.length)annivByDate[ds]=annivOnDay;
@@ -1383,9 +1394,9 @@ function renderCalendar(){
       const isToday=ds===todayStr;
       const isSel=calSelDay===ds&&!isToday;
       const evOnDay=calItems.filter(c=>c.date===ds);
-      const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&b.hebMonth===hebMonthName);
-      const yahrOnDay=_allYahr.filter(y=>y.hebDay===hebDayNumInt&&y.hebMonth===hebMonthName);
-      const annivOnDay=_allAnniv.filter(a=>a.hebDay===hebDayNumInt&&a.hebMonth===hebMonthName);
+      const bdayOnDay=_allBdays.filter(b=>b.hebDay===hebDayNumInt&&_hebMonthEq(b.hebMonth,hebMonthName));
+      const yahrOnDay=_allYahr.filter(y=>y.hebDay===hebDayNumInt&&_hebMonthEq(y.hebMonth,hebMonthName));
+      const annivOnDay=_allAnniv.filter(a=>a.hebDay===hebDayNumInt&&_hebMonthEq(a.hebMonth,hebMonthName));
       if(bdayOnDay.length)bdayByDate[ds]=bdayOnDay;
       if(yahrOnDay.length)yahrByDate[ds]=yahrOnDay;
       if(annivOnDay.length)annivByDate[ds]=annivOnDay;
@@ -1883,6 +1894,32 @@ function calcGlobalTransfers(){
   }
   return transfers;
 }
+// A global (cross-event) settle-up payment — from the "העברות איזון" tool —
+// is computed from a family's NET position across every open event, so it
+// doesn't correspond to any single event's own ledger. Recording it only in
+// the standalone globalSettled array (as this used to do) meant every other
+// consumer of a family's balance — the event card's own settled/active
+// badge, the close-summary email, the debtor-reminder email — kept using the
+// per-event evAdjBalance(ev), which never saw this payment and kept showing
+// the family as still owing. Waterfall the payment into the real events it
+// actually covers instead, so evAdjBalance reflects it everywhere. Any
+// leftover (shouldn't normally happen, since callers derive amt from the same
+// net calc) falls back to the old event-less record so nothing is lost.
+function _distributeGlobalSettle(fromFid,toFid,from,to,amt,method){
+  let remaining=amt;
+  events.filter(e=>e.open&&e.participants.includes(fromFid)).forEach(ev=>{
+    if(remaining<=0.5)return;
+    const owe=Math.round(Math.max(0,-(evAdjBalance(ev)[fromFid]||0)));
+    if(owe<=0.5)return;
+    const portion=Math.min(owe,remaining);
+    if(!ev.settled)ev.settled=[];
+    ev.settled.push({from,fromFid,to,toFid,amt:portion,method,global:true});
+    remaining-=portion;
+  });
+  if(remaining>0.5){
+    globalSettled.push({from,fromFid,to,toFid,amt:remaining,method,date:new Date().toLocaleDateString('he-IL')});
+  }
+}
 function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
   const ev=evId!=null?events.find(e=>e.id===evId):null;
   if(evId!=null&&!ev)return;
@@ -1893,7 +1930,7 @@ function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
     if(!ev.settled)ev.settled=[];
     ev.settled.push({from,fromFid,to,toFid,amt,method:'fund'});
   } else {
-    globalSettled.push({from,fromFid,to,toFid,amt,method:'fund',date:new Date().toLocaleDateString('he-IL')});
+    _distributeGlobalSettle(fromFid,toFid,from,to,amt,'fund');
   }
   fund.famBalances[key]=bal-amt;
   fund.transactions.push({id:nxtTx++,type:'payout',famId:fromFid,amount:amt,
@@ -1962,7 +1999,7 @@ function confirmPartPay(){
     const fromFund=Math.min(paid,fundBal);
     const fromDirect=paid-fromFund;
     if(fromFund>0){
-      globalSettled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromFund,method:'fund',date:new Date().toLocaleDateString('he-IL')});
+      _distributeGlobalSettle(_ppFromFid,_ppToFid,_ppFrom,_ppTo,fromFund,'fund');
       fund.famBalances[key]=fundBal-fromFund;
       fund.transactions.push({id:nxtTx++,type:'payout',famId:_ppFromFid,amount:fromFund,
         desc:'תשלום של '+_ppFrom+' ל'+_ppTo+' (מהארנק)',
@@ -1973,7 +2010,7 @@ function confirmPartPay(){
         desc:'קיבלת מ'+_ppFrom+' (מהארנק)',
         date:new Date().toLocaleDateString('he-IL')});
     }
-    if(fromDirect>0) globalSettled.push({from:_ppFrom,fromFid:_ppFromFid,to:_ppTo,toFid:_ppToFid,amt:fromDirect,method:'direct',date:new Date().toLocaleDateString('he-IL')});
+    if(fromDirect>0) _distributeGlobalSettle(_ppFromFid,_ppToFid,_ppFrom,_ppTo,fromDirect,'direct');
     addNotif('✓',_ppFrom+' העביר ל'+_ppTo+' ₪'+paid.toLocaleString(),'admin');
     save();render();
   }
@@ -3569,7 +3606,12 @@ async function doCreate(){
       if(!ev.cumulative){
         ev.totalCost=totalCost;
         if(expMode==='custom'){
-          const preserved=(ev.expenseItems||[]).filter(it=>it.customSplit||(it.sharedWith&&it.sharedWith.length<participants.length));
+          // A partial item (sharedWith a subset) whose entire subset was removed from
+          // the event has nobody left to charge — itemShareFor() would silently assign
+          // its cost to no one while the payer's expense entry (added back below) still
+          // counted it as paid, leaking that amount out of the balance sheet. Drop it
+          // along with its cost together instead, so the sheet stays consistent.
+          const preserved=(ev.expenseItems||[]).filter(it=>it.customSplit||(it.sharedWith&&it.sharedWith.length<participants.length&&it.sharedWith.some(fid=>participants.includes(fid))));
           const finalExpenses={...expenses};
           preserved.forEach(it=>{ finalExpenses[it.famId]=(finalExpenses[it.famId]||0)+it.amt; });
           let seq=Math.max(0,...preserved.map(it=>it.id||0))+1;
@@ -5208,7 +5250,11 @@ function renderGlobalSettleModal(){
   }).join('');
   const _rowHtml=(icon,badge,from,to,amt)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(from)}</b> העביר ל<b style="color:var(--text)">${esc(to)}</b> ₪${Math.round(amt).toLocaleString()}</span>${badge}</div>`;
   const _nonPotBadge=method=>method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';
-  const doneRowsList=(globalSettled||[]).map(s=>_rowHtml(s.method==='fund'?'🏦':'✓',_nonPotBadge(s.method),s.from,s.to,s.amt));
+  // Combine legacy event-less records with the per-event entries new global
+  // settlements are now written into (tagged `global:true` by
+  // _distributeGlobalSettle) so this history list still shows them all.
+  const _globalDoneEntries=[...(globalSettled||[]),...events.flatMap(ev=>(ev.settled||[]).filter(s=>s.global))];
+  const doneRowsList=_globalDoneEntries.map(s=>_rowHtml(s.method==='fund'?'🏦':'✓',_nonPotBadge(s.method),s.from,s.to,s.amt));
   const doneRows=doneRowsList.length?
     `<div style="padding:12px 16px 4px;border-top:2px solid var(--border);margin-top:${transfers.length?'8':'0'}px">
       <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">✅ בוצעו</div>
@@ -5813,7 +5859,19 @@ function deletePotDeposit(evId,famId,localIdx){
     return false;
   });
   if(gi<0)return;
+  const removed=ev.potPayments[gi];
   ev.potPayments.splice(gi,1);
+  // A deposit made "from wallet" (useFundForCumPot) already debited fund.famBalances
+  // and logged a payout — undo both here, or the money just disappears (not in the
+  // event pot anymore, never credited back to the wallet either).
+  if(removed.fromFund){
+    const key=String(famId);
+    fund.famBalances[key]=(fund.famBalances[key]||0)+removed.amt;
+    const famName=(getFam(famId)||{}).name?.replace('משפחת','').trim()||'';
+    fund.transactions.push({id:nxtTx++,type:'deposit',famId,amount:removed.amt,evId:ev.id,
+      desc:'ביטול הפקדה לקופת האירוע · '+ev.name+' → '+famName,
+      date:new Date().toLocaleDateString('he-IL')});
+  }
   save();render();
   // refresh pot modal if open
   const modal=document.getElementById('potModal');
@@ -5909,7 +5967,7 @@ function doDepositToCumPot(){
       desc:'העברה לקופת האירוע · '+ev.name+' → '+_cumPotFamName,
       date:new Date().toLocaleDateString('he-IL')});
   }
-  ev.potPayments.push({famId:savedFamId,amt:roundAmt});
+  ev.potPayments.push({famId:savedFamId,amt:roundAmt,fromFund});
   closeCumPot();
   save();render();
   const _potF=getFam(savedFamId);
