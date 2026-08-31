@@ -1125,6 +1125,55 @@ function renderNotifBtn(){
       :requestNotifPerm;
 }
 
+// Admin-only list of every registered fcmTokens doc — mainly for spotting
+// stale/duplicate device registrations (see registerFCMToken's own
+// same-token cleanup, which only self-heals the next time that specific
+// device re-registers).
+async function openNotifDevicesModal(){
+  document.getElementById('notifDevicesModal').style.display='flex';
+  document.getElementById('notifDevicesModalContent').innerHTML='<div style="text-align:center;padding:20px;color:var(--text2)">טוען...</div>';
+  await renderNotifDevicesModal();
+}
+function closeNotifDevicesModal(){
+  document.getElementById('notifDevicesModal').style.display='none';
+}
+async function renderNotifDevicesModal(){
+  const el=document.getElementById('notifDevicesModalContent');if(!el)return;
+  try{
+    const {db,collection,getDocs}=await fbInit();
+    const snap=await getDocs(collection(db,'fcmTokens'));
+    const rows=[];
+    snap.forEach(d=>rows.push({id:d.id,...d.data()}));
+    if(!rows.length){el.innerHTML='<div class="empty" style="padding:20px 0"><span class="empty-ico">📱</span>אין מכשירים רשומים</div>';return;}
+    rows.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    // Two docs sharing the exact same push token are a genuine duplicate —
+    // the same device registered twice under different device ids.
+    const tokenCounts={};
+    rows.forEach(r=>{ if(r.token) tokenCounts[r.token]=(tokenCounts[r.token]||0)+1; });
+    el.innerHTML=rows.map(r=>{
+      const f=r.famId!=null?getFam(r.famId):null;
+      const who=r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע'));
+      const dateStr=r.ts?new Date(r.ts).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      const isDup=r.token&&tokenCounts[r.token]>1;
+      return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${esc(who)}${isDup?' <span style="font-size:10px;background:var(--red-bg);color:var(--red-mid);padding:1px 7px;border-radius:10px">כפול</span>':''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${r.page==='admin'?'עמוד ניהול':'עמוד משפחה'} · נרשם ${dateStr}</div>
+        </div>
+        <button onclick="deleteNotifDevice('${r.id}')" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0" title="מחק רישום">🗑</button>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--red-mid);font-size:13px">שגיאה בטעינה: '+esc(e.message||'')+'</div>';
+  }
+}
+async function deleteNotifDevice(id){
+  if(!confirm('למחוק את הרישום הזה? המכשיר יפסיק לקבל התראות עד שיירשם מחדש.'))return;
+  const {db,doc,deleteDoc}=await fbInit();
+  await deleteDoc(doc(db,'fcmTokens',id));
+  renderNotifDevicesModal();
+}
+
 function allBirthdays(){
   const kidBdays=families.flatMap(f=>(f.kids||[]).filter(k=>k.hebDay&&k.hebMonth).map(k=>({
     name:(k.name?k.name:'ילד/ה')+' ('+f.name.replace('משפחת','').trim()+')',

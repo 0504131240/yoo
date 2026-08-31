@@ -408,6 +408,11 @@
       <button onclick="savePaymentSettings()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור פרטי תשלום</button>
       <div id="payStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
     </div>
+    <div class="sec-ttl edit-only" style="margin-top:20px">📱 מכשירים רשומים להתראות</div>
+    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">רשימת כל המכשירים הרשומים לקבל התראות פוש — שימושי לאיתור רישומים כפולים או ישנים.</div>
+      <button onclick="openNotifDevicesModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📋 הצג רשימה</button>
+    </div>
     <div class="sec-ttl edit-only" style="margin-top:20px">📢 שליחת הודעה לכולם</div>
     <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">שולח מייל לכל המשפחות שיש להן כתובת מייל שמורה.</div>
@@ -682,6 +687,17 @@
       <button onclick="sendBroadcastEmail()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">📧 שלח לכולם</button>
       <button onclick="closeBroadcastModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
     </div>
+  </div>
+</div>
+
+<!-- Registered notification devices modal -->
+<div id="notifDevicesModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeNotifDevicesModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">📱 מכשירים רשומים להתראות</span>
+      <button onclick="closeNotifDevicesModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0" id="notifDevicesModalContent"></div>
   </div>
 </div>
 
