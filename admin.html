@@ -378,36 +378,14 @@
     </div>
     <div id="famList"></div>
     <div class="sec-ttl edit-only" style="margin-top:20px">⚙️ הגדרות התראות מייל</div>
-    <div class="edit-only" id="emailjsSettings" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
-        כדי לשלוח מיילים: צור חשבון ב-<b>emailjs.com</b> → צור שירות + תבנית עם משתנים <b>to_email, to_name, subject, message_html</b> (בגוף המייל השתמש ב-<b>{{{message_html}}}</b>) → הדבק כאן את הפרטים.
-      </div>
-      <input type="text" id="ejsPublicKey" placeholder="Public Key" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
-      <input type="text" id="ejsServiceId" placeholder="Service ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
-      <input type="text" id="ejsTemplateId" placeholder="Template ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
-      <div style="display:flex;gap:8px">
-        <button onclick="saveEjsSettings()" style="flex:1;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור הגדרות</button>
-        <button onclick="testEjsEmail()" style="padding:9px 12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📧 בדוק</button>
-      </div>
-      <div id="ejsStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
+    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">חיבור שירות המייל (EmailJS) לשליחת תזכורות והודעות.</div>
+      <button onclick="openEjsSettingsModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">⚙️ ערוך הגדרות</button>
     </div>
     <div class="sec-ttl edit-only" style="margin-top:20px">💳 פרטי תשלום לגזבר</div>
     <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">פרטים אלו יופיעו בכל מייל תזכורת חוב כדי שהמשפחות ידעו לאן להעביר את הכסף.</div>
-      <input type="text" id="payTreasurerName" placeholder="שם הגזבר (לדוגמה: יוסי ינקלביץ)"
-        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px">
-      <div style="display:flex;gap:6px;margin-bottom:6px">
-        <input type="text" id="payBankName" placeholder="שם בנק (לדוגמה: הפועלים)"
-          style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
-        <input type="text" id="payBranch" placeholder="סניף" inputmode="numeric"
-          style="width:80px;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:center">
-      </div>
-      <input type="text" id="payAccount" placeholder="מספר חשבון" inputmode="numeric"
-        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr;text-align:right">
-      <input type="url" id="payBitLink" placeholder="קישור ביט לתשלום (https://www.bitpay.co.il/app/me/...)"
-        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;direction:ltr;text-align:right">
-      <button onclick="savePaymentSettings()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור פרטי תשלום</button>
-      <div id="payStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">פרטי התשלום שיופיעו בכל מייל תזכורת חוב.</div>
+      <button onclick="openPaymentSettingsModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💳 ערוך פרטי תשלום</button>
     </div>
     <div class="sec-ttl edit-only" style="margin-top:20px">📱 מכשירים רשומים להתראות</div>
     <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
@@ -699,6 +677,56 @@
       <button onclick="closeNotifDevicesModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
     </div>
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0" id="notifDevicesModalContent"></div>
+  </div>
+</div>
+
+<!-- EmailJS settings modal -->
+<div id="ejsSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeEjsSettingsModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">⚙️ הגדרות התראות מייל</span>
+      <button onclick="closeEjsSettingsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
+        כדי לשלוח מיילים: צור חשבון ב-<b>emailjs.com</b> → צור שירות + תבנית עם משתנים <b>to_email, to_name, subject, message_html</b> (בגוף המייל השתמש ב-<b>{{{message_html}}}</b>) → הדבק כאן את הפרטים.
+      </div>
+      <input type="text" id="ejsPublicKey" placeholder="Public Key" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
+      <input type="text" id="ejsServiceId" placeholder="Service ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
+      <input type="text" id="ejsTemplateId" placeholder="Template ID" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr">
+      <div style="display:flex;gap:8px">
+        <button onclick="saveEjsSettings()" style="flex:1;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור הגדרות</button>
+        <button onclick="testEjsEmail()" style="padding:9px 12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📧 בדוק</button>
+      </div>
+      <div id="ejsStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Treasurer payment settings modal -->
+<div id="paymentSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closePaymentSettingsModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">💳 פרטי תשלום לגזבר</span>
+      <button onclick="closePaymentSettingsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">פרטים אלו יופיעו בכל מייל תזכורת חוב כדי שהמשפחות ידעו לאן להעביר את הכסף.</div>
+      <input type="text" id="payTreasurerName" placeholder="שם הגזבר (לדוגמה: יוסי ינקלביץ)"
+        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px">
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input type="text" id="payBankName" placeholder="שם בנק (לדוגמה: הפועלים)"
+          style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+        <input type="text" id="payBranch" placeholder="סניף" inputmode="numeric"
+          style="width:80px;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;direction:ltr;text-align:center">
+      </div>
+      <input type="text" id="payAccount" placeholder="מספר חשבון" inputmode="numeric"
+        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px;direction:ltr;text-align:right">
+      <input type="url" id="payBitLink" placeholder="קישור ביט לתשלום (https://www.bitpay.co.il/app/me/...)"
+        style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;direction:ltr;text-align:right">
+      <button onclick="savePaymentSettings()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור פרטי תשלום</button>
+      <div id="payStatus" style="font-size:12px;margin-top:8px;text-align:center"></div>
+    </div>
   </div>
 </div>
 
