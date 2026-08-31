@@ -6,7 +6,7 @@
 // Gated by the app's own admin password (same trust boundary as the rest of
 // the app's shared-family data) so random internet traffic can't spam pushes
 // to the family.
-const { getDb, getMessaging, checkAdminPass } = require('./_lib/firebaseAdmin');
+const { getDb, getMessaging, checkAdminPass, dedupeTokenDocs } = require('./_lib/firebaseAdmin');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
@@ -19,6 +19,7 @@ module.exports = async (req, res) => {
   const tokSnap = await db.collection('fcmTokens').get();
   console.log(`notify: ${tokSnap.size} registered token(s) found`);
   if (tokSnap.empty) { res.status(200).json({ sent: 0, registered: 0 }); return; }
+  const tokenDocs = await dedupeTokenDocs(tokSnap.docs);
 
   // Devices registered from admin.html should land back on admin.html when
   // the notification is tapped, not on the public family page (and vice
@@ -36,9 +37,8 @@ module.exports = async (req, res) => {
   // family it's for (admin-registered devices have no famId, so they're
   // never affected by this).
   const groups = { admin: [], index: [] };
-  tokSnap.docs.forEach(d => {
+  tokenDocs.forEach(d => {
     const data = d.data();
-    if (!data.token) return;
     const page = data.page === 'admin' ? 'admin' : 'index';
     if (target === 'admin' && page !== 'admin') return;
     if (Array.isArray(excludeFamIds) && excludeFamIds.includes(data.famId)) return;

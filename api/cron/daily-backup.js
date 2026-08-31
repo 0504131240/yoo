@@ -14,7 +14,7 @@
 // someone happened to open the app that day) was the sole source of that
 // reminder. Doing all three here, gated by day-of-week where relevant, is
 // the only way that's actually reliable on this plan.
-const { getDb, getMessaging } = require('../_lib/firebaseAdmin');
+const { getDb, getMessaging, dedupeTokenDocs } = require('../_lib/firebaseAdmin');
 const { allOccasions } = require('../_lib/birthdayCalc');
 const { sendWeeklyDebtReminders } = require('./weekly-debt-reminder');
 
@@ -26,14 +26,14 @@ async function sendBirthdayReminders(db, data) {
 
   const tokSnap = await db.collection('fcmTokens').get();
   if (tokSnap.empty) return { occasions: 0, sent: 0 };
+  const tokenDocs = await dedupeTokenDocs(tokSnap.docs);
   const LINKS = {
     admin: 'https://yankeleviz.vercel.app/admin.html',
     index: 'https://yankeleviz.vercel.app/',
   };
   const groups = { admin: [], index: [] };
-  tokSnap.docs.forEach(d => {
+  tokenDocs.forEach(d => {
     const t = d.data();
-    if (!t.token) return;
     groups[t.page === 'admin' ? 'admin' : 'index'].push(d);
   });
 

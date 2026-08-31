@@ -3,7 +3,7 @@
 // this project's two cron entries — this file was never invoked on its own
 // schedule, so the reminder silently never went out. Kept as a standalone
 // module, exporting the sendable logic instead of its own HTTP handler.
-const { getMessaging } = require('../_lib/firebaseAdmin');
+const { getMessaging, dedupeTokenDocs } = require('../_lib/firebaseAdmin');
 const { evAdjBalance } = require('../_lib/debtCalc');
 
 function _escHtml(s) {
@@ -118,7 +118,7 @@ async function sendWeeklyDebtReminders(db, data) {
     // broadcast to everyone, since the debt is specific to them.
     try {
       const tokSnap = await db.collection('fcmTokens').where('famId', '==', fid).get();
-      const tokenDocs = tokSnap.docs.filter(d => d.data().token);
+      const tokenDocs = await dedupeTokenDocs(tokSnap.docs);
       if (tokenDocs.length) {
         const resp = await getMessaging().sendEachForMulticast({
           tokens: tokenDocs.map(d => d.data().token),

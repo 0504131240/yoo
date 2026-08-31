@@ -61,4 +61,33 @@ async function checkAdminPass(db, supplied) {
   return !!real && !!supplied && supplied === real;
 }
 
-module.exports = { getDb, getMessaging, checkAdminPass };
+// Collapse duplicate fcmTokens docs that share the exact same push token —
+// e.g. the client's localStorage device id was reset (site data cleared,
+// PWA reinstalled...) so a new doc got created, but the browser's
+// underlying push subscription — and therefore the token itself — stayed
+// the same, leaving both the old and new doc valid and delivering every
+// push twice to the same device. Keeps whichever doc was registered most
+// recently and deletes the rest, so this self-heals the next time any push
+// fires — no separate cleanup job needed.
+// Note: this only catches two docs with an identical token value. Two
+// genuinely different push subscriptions on the same physical phone (e.g.
+// an installed PWA and a regular browser tab, which each get their own
+// token) look like two different devices and can't be merged from the data
+// alone.
+async function dedupeTokenDocs(docs) {
+  const byToken = new Map();
+  docs.forEach(d => {
+    const data = d.data();
+    if (!data.token) return;
+    const existing = byToken.get(data.token);
+    if (!existing || (data.ts || 0) > (existing.data().ts || 0)) byToken.set(data.token, d);
+  });
+  const keep = new Set([...byToken.values()].map(d => d.id));
+  const stale = docs.filter(d => d.data().token && !keep.has(d.id));
+  if (stale.length) {
+    await Promise.all(stale.map(d => d.ref.delete().catch(() => {})));
+  }
+  return [...byToken.values()];
+}
+
+module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs };

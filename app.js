@@ -242,7 +242,8 @@ async function fbInit(){
   const fsMod=await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js");
   _fbApp=appMod.initializeApp(firebaseConfig);
   const db=fsMod.getFirestore(_fbApp);
-  _fb={db,doc:fsMod.doc,getDoc:fsMod.getDoc,setDoc:fsMod.setDoc,onSnapshot:fsMod.onSnapshot,collection:fsMod.collection};
+  _fb={db,doc:fsMod.doc,getDoc:fsMod.getDoc,setDoc:fsMod.setDoc,onSnapshot:fsMod.onSnapshot,collection:fsMod.collection,
+    getDocs:fsMod.getDocs,query:fsMod.query,where:fsMod.where,deleteDoc:fsMod.deleteDoc};
   return _fb;
 }
 
@@ -1065,10 +1066,20 @@ async function registerFCMToken(){
   const swReg=await navigator.serviceWorker.ready;
   const token=await msgMod.getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:swReg});
   if(!token) throw new Error('getToken החזיר ריק — בדוק הגדרות דפדפן');
-  const {db,doc,setDoc}=await fbInit();
+  const {db,doc,setDoc,collection,query,where,getDocs,deleteDoc}=await fbInit();
   let did=localStorage.getItem('fcmDeviceId');
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
   await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId()});
+  // If this exact push token is already registered under a different device
+  // id (e.g. site data was cleared so a new fcmDeviceId got generated, but
+  // the browser's underlying push subscription — and therefore the token —
+  // stayed the same), that old doc is a genuine duplicate that would
+  // receive every push twice. Clean it up.
+  try{
+    const dupSnap=await getDocs(query(collection(db,'fcmTokens'),where('token','==',token)));
+    const stale=dupSnap.docs.filter(d=>d.id!==did);
+    await Promise.all(stale.map(d=>deleteDoc(d.ref)));
+  }catch(e){console.warn('fcmTokens dedup failed:',e);}
   console.log('FCM token saved OK');
   // Background pushes (tab closed/hidden) are shown automatically by
   // sw.js's onBackgroundMessage. But by design, Chrome does NOT auto-show
