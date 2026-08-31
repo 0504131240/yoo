@@ -1020,6 +1020,22 @@ function _myChatName(){
   const surname=fam.name.replace('משפחת','').trim();
   return firstName?`${firstName} ${surname}`:surname;
 }
+// Like _myChatName(), but for the family devices list (openNotifDevicesModal):
+// falls back to the email's own local-part when the family never filled in
+// the parent-name field, so a registration is still traceable to a person
+// and not just the family/surname.
+function _fcmRegistrantName(){
+  if(_isAdminPage())return(localStorage.getItem('chatName')||'').trim()||null;
+  const famId=localStorage.getItem('deviceFamId3');if(!famId)return null;
+  const fam=getFam(parseInt(famId));if(!fam)return null;
+  const slot=parseInt(localStorage.getItem('deviceEmailSlot3')||'1');
+  const firstName=slot===2?fam.emailName2:fam.emailName;
+  const surname=fam.name.replace('משפחת','').trim();
+  if(firstName)return`${firstName} ${surname}`;
+  const email=slot===2?fam.email2:fam.email;
+  const localPart=email?_cleanEmail(email).split('@')[0]:'';
+  return localPart?`${localPart} (${surname})`:surname;
+}
 function renderChatInput(){
   const area=document.getElementById('chatInputArea');if(!area)return;
   const saved=_myChatName();
@@ -1084,7 +1100,7 @@ async function registerFCMToken(){
   const {db,doc,setDoc,collection,query,where,getDocs,deleteDoc}=await fbInit();
   let did=localStorage.getItem('fcmDeviceId');
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
-  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),name:_myChatName()||null});
+  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),name:_fcmRegistrantName()});
   // If this exact push token is already registered under a different device
   // id (e.g. site data was cleared so a new fcmDeviceId got generated, but
   // the browser's underlying push subscription — and therefore the token —
