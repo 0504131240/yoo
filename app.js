@@ -1020,6 +1020,19 @@ function _myChatName(){
   const surname=fam.name.replace('משפחת','').trim();
   return firstName?`${firstName} ${surname}`:surname;
 }
+// Shared by _fcmRegistrantName() (device-side, at registration time) and the
+// admin devices list (renderNotifDevicesModal, recomputed live off current
+// family data) so a filled-in parent name shows up immediately for everyone
+// viewing the list, not just after that specific device re-registers.
+function _regDisplayName(fam,slot){
+  if(!fam)return null;
+  const firstName=slot===2?fam.emailName2:fam.emailName;
+  const surname=fam.name.replace('משפחת','').trim();
+  if(firstName)return`${firstName} ${surname}`;
+  const email=slot===2?fam.email2:fam.email;
+  const localPart=email?_cleanEmail(email).split('@')[0]:'';
+  return localPart?`${localPart} (${surname})`:surname;
+}
 // Like _myChatName(), but for the family devices list (openNotifDevicesModal):
 // falls back to the email's own local-part when the family never filled in
 // the parent-name field, so a registration is still traceable to a person
@@ -1029,12 +1042,7 @@ function _fcmRegistrantName(){
   const famId=localStorage.getItem('deviceFamId3');if(!famId)return null;
   const fam=getFam(parseInt(famId));if(!fam)return null;
   const slot=parseInt(localStorage.getItem('deviceEmailSlot3')||'1');
-  const firstName=slot===2?fam.emailName2:fam.emailName;
-  const surname=fam.name.replace('משפחת','').trim();
-  if(firstName)return`${firstName} ${surname}`;
-  const email=slot===2?fam.email2:fam.email;
-  const localPart=email?_cleanEmail(email).split('@')[0]:'';
-  return localPart?`${localPart} (${surname})`:surname;
+  return _regDisplayName(fam,slot);
 }
 function renderChatInput(){
   const area=document.getElementById('chatInputArea');if(!area)return;
@@ -1100,7 +1108,7 @@ async function registerFCMToken(){
   const {db,doc,setDoc,collection,query,where,getDocs,deleteDoc}=await fbInit();
   let did=localStorage.getItem('fcmDeviceId');
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
-  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),name:_fcmRegistrantName()});
+  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),slot:_isAdminPage()?null:parseInt(localStorage.getItem('deviceEmailSlot3')||'1'),name:_fcmRegistrantName()});
   // If this exact push token is already registered under a different device
   // id (e.g. site data was cleared so a new fcmDeviceId got generated, but
   // the browser's underlying push subscription — and therefore the token —
@@ -1183,7 +1191,7 @@ async function renderNotifDevicesModal(){
     rows.forEach(r=>{ if(r.token) tokenCounts[r.token]=(tokenCounts[r.token]||0)+1; });
     el.innerHTML=rows.map(r=>{
       const f=r.famId!=null?getFam(r.famId):null;
-      const who=r.name||(r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע')));
+      const who=(f&&r.slot!=null)?_regDisplayName(f,r.slot):(r.name||(r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע'))));
       const dateStr=r.ts?new Date(r.ts).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
       const isDup=r.token&&tokenCounts[r.token]>1;
       return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
