@@ -1084,7 +1084,7 @@ async function registerFCMToken(){
   const {db,doc,setDoc,collection,query,where,getDocs,deleteDoc}=await fbInit();
   let did=localStorage.getItem('fcmDeviceId');
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
-  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId()});
+  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),name:_myChatName()||null});
   // If this exact push token is already registered under a different device
   // id (e.g. site data was cleared so a new fcmDeviceId got generated, but
   // the browser's underlying push subscription — and therefore the token —
@@ -1167,7 +1167,7 @@ async function renderNotifDevicesModal(){
     rows.forEach(r=>{ if(r.token) tokenCounts[r.token]=(tokenCounts[r.token]||0)+1; });
     el.innerHTML=rows.map(r=>{
       const f=r.famId!=null?getFam(r.famId):null;
-      const who=r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע'));
+      const who=r.name||(r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע')));
       const dateStr=r.ts?new Date(r.ts).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
       const isDup=r.token&&tokenCounts[r.token]>1;
       return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
