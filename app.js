@@ -1192,12 +1192,17 @@ async function renderNotifDevicesModal(){
     el.innerHTML=rows.map(r=>{
       const f=r.famId!=null?getFam(r.famId):null;
       const who=(f&&r.slot!=null)?_regDisplayName(f,r.slot):(r.name||(r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע'))));
+      // Surfacing which email this device logged in with makes it obvious,
+      // right in this list, whether a surname-only entry is missing a first
+      // name because that specific parent slot's name field is empty —
+      // instead of that being invisible and looking like a bug.
+      const regEmail=(f&&r.slot!=null)?(r.slot===2?f.email2:f.email):null;
       const dateStr=r.ts?new Date(r.ts).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
       const isDup=r.token&&tokenCounts[r.token]>1;
       return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700">${esc(who)}${isDup?' <span style="font-size:10px;background:var(--red-bg);color:var(--red-mid);padding:1px 7px;border-radius:10px">כפול</span>':''}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px">${r.page==='admin'?'עמוד ניהול':'עמוד משפחה'} · נרשם ${dateStr}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${r.page==='admin'?'עמוד ניהול':'עמוד משפחה'} · נרשם ${dateStr}${regEmail?' · '+esc(regEmail):''}</div>
         </div>
         <button onclick="deleteNotifDevice('${r.id}')" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0" title="מחק רישום">🗑</button>
       </div>`;
