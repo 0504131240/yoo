@@ -19,7 +19,11 @@
 
 <!-- FAMILY HOME SHELL -->
 <div id="shell-home">
-  <div class="fh-hero">
+  <div class="fh-hero" style="position:relative">
+    <div style="position:absolute;top:10px;left:10px;z-index:5;display:flex;gap:8px">
+      <button id="notifBtn" style="background:rgba(0,0,0,0.06);border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;opacity:.7;line-height:1;color:var(--text2)">🔕</button>
+      <button id="settingsHubBtn" class="edit-only" onclick="openSettingsHubModal()" style="background:rgba(0,0,0,0.06);border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;line-height:1;color:var(--text2)" title="הגדרות">⚙️</button>
+    </div>
     <img src="logo.jpg" class="fh-hero-logo" alt="ינקלביץ">
     <div class="fh-hero-content">
       <div class="fh-hero-sub" id="fhSub"></div>
@@ -377,26 +381,6 @@
       <button class="action-btn blue" onclick="addFam()">הוסף</button>
     </div>
     <div id="famList"></div>
-    <div class="sec-ttl edit-only" style="margin-top:20px">⚙️ הגדרות התראות מייל</div>
-    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">חיבור שירות המייל (EmailJS) לשליחת תזכורות והודעות.</div>
-      <button onclick="openEjsSettingsModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">⚙️ ערוך הגדרות</button>
-    </div>
-    <div class="sec-ttl edit-only" style="margin-top:20px">💳 פרטי תשלום לגזבר</div>
-    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">פרטי התשלום שיופיעו בכל מייל תזכורת חוב.</div>
-      <button onclick="openPaymentSettingsModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💳 ערוך פרטי תשלום</button>
-    </div>
-    <div class="sec-ttl edit-only" style="margin-top:20px">📱 מכשירים רשומים להתראות</div>
-    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">רשימת כל המכשירים הרשומים לקבל התראות פוש — שימושי לאיתור רישומים כפולים או ישנים.</div>
-      <button onclick="openNotifDevicesModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📋 הצג רשימה</button>
-    </div>
-    <div class="sec-ttl edit-only" style="margin-top:20px">📢 שליחת הודעה לכולם</div>
-    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">שולח מייל לכל המשפחות שיש להן כתובת מייל שמורה.</div>
-      <button onclick="openBroadcastModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✏️ נסח ושלח הודעה</button>
-    </div>
     <div id="visitLogSection"></div>
   </div>
 
@@ -442,7 +426,7 @@
     <div style="padding:14px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <button onclick="closeChatSheet()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
       <span style="font-size:15px;font-weight:800;color:var(--text)">💬 צ'אט משפחתי</span>
-      <button id="notifBtn" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 2px;opacity:.7;line-height:1;color:var(--text2)">🔕</button>
+      <span style="width:22px"></span>
     </div>
     <div class="msg-list" id="msgList" style="flex:1;overflow-y:auto;padding:10px 14px 6px;min-height:0"></div>
     <div id="chatInputArea" style="padding:8px 12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0"></div>
@@ -665,6 +649,38 @@
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onclick="sendBroadcastEmail()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">📧 שלח לכולם</button>
       <button onclick="closeBroadcastModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings hub modal -->
+<div id="settingsHubModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1650;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeSettingsHubModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">⚙️ הגדרות</span>
+      <button onclick="closeSettingsHubModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div class="sec-ttl" style="margin-top:0">📧 הגדרות התראות מייל</div>
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">חיבור שירות המייל (EmailJS) לשליחת תזכורות והודעות.</div>
+        <button onclick="closeSettingsHubModal();openEjsSettingsModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">⚙️ ערוך הגדרות</button>
+      </div>
+      <div class="sec-ttl">💳 פרטי תשלום לגזבר</div>
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">פרטי התשלום שיופיעו בכל מייל תזכורת חוב.</div>
+        <button onclick="closeSettingsHubModal();openPaymentSettingsModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💳 ערוך פרטי תשלום</button>
+      </div>
+      <div class="sec-ttl">📱 מכשירים רשומים להתראות</div>
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">רשימת כל המכשירים הרשומים לקבל התראות פוש — שימושי לאיתור רישומים כפולים או ישנים.</div>
+        <button onclick="closeSettingsHubModal();openNotifDevicesModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">📋 הצג רשימה</button>
+      </div>
+      <div class="sec-ttl">📢 שליחת הודעה לכולם</div>
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">שולח מייל לכל המשפחות שיש להן כתובת מייל שמורה.</div>
+        <button onclick="closeSettingsHubModal();openBroadcastModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✏️ נסח ושלח הודעה</button>
+      </div>
     </div>
   </div>
 </div>

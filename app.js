@@ -263,6 +263,12 @@ function openPaymentSettingsModal(){
 function closePaymentSettingsModal(){
   document.getElementById('paymentSettingsModal').style.display='none';
 }
+function openSettingsHubModal(){
+  document.getElementById('settingsHubModal').style.display='flex';
+}
+function closeSettingsHubModal(){
+  document.getElementById('settingsHubModal').style.display='none';
+}
 
 // EmailJS settings — read/written via /api/settings/emailjs (Admin SDK,
 // bypasses Firestore rules) rather than the client SDK directly, so this
