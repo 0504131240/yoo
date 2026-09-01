@@ -4262,10 +4262,17 @@ function _relTime(ts){
   if(days<30)return`לפני ${days} ימים`;
   return new Date(ts).toLocaleDateString('he-IL');
 }
+function openVisitLogModal(){
+  renderVisitLog();
+  document.getElementById('visitLogModal').style.display='flex';
+}
+function closeVisitLogModal(){
+  document.getElementById('visitLogModal').style.display='none';
+}
 function renderVisitLog(){
-  const el=document.getElementById('visitLogSection');if(!el)return;
-  if(!visits.length){el.innerHTML='';return;}
-  const rows=[...visits].sort((a,b)=>b.lastSeen-a.lastSeen).map(v=>{
+  const el=document.getElementById('visitLogModalContent');if(!el)return;
+  if(!visits.length){el.innerHTML='<div class="empty" style="padding:20px 0"><span class="empty-ico">👥</span>אין עדיין כניסות רשומות</div>';return;}
+  el.innerHTML=[...visits].sort((a,b)=>b.lastSeen-a.lastSeen).map(v=>{
     const f=getFam(v.famId);
     const famName=f?f.name.replace('משפחת','').trim():'משפחה שנמחקה';
     return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
@@ -4276,9 +4283,6 @@ function renderVisitLog(){
       <div style="font-size:12px;color:var(--text2)">${_relTime(v.lastSeen)}</div>
     </div>`;
   }).join('');
-  el.innerHTML=`
-    <div class="sec-ttl edit-only" style="margin-top:20px">👥 מי נכנס לאפליקציה</div>
-    <div class="edit-only" style="background:var(--surface2);border-radius:var(--r2);padding:10px 14px;margin-bottom:12px">${rows}</div>`;
 }
 // pushTarget: 'all' (default) reaches every registered device; 'admin'
 // reaches only devices registered from admin.html — for events that matter
