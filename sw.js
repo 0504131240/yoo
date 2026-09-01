@@ -11,15 +11,18 @@ firebase.initializeApp({
 });
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(payload => {
-  const title = payload.notification?.title || 'ינקלביץ';
-  const body  = payload.notification?.body  || '';
-  // The server picks admin.html vs index.html per-recipient (see
-  // api/notify.js) and sends it as fcmOptions.link — use that rather than
-  // guessing from this script's own location, which is always "/" and used
-  // to send admin-registered devices to the wrong page on click.
-  const url = payload.fcmOptions?.link || (self.location.origin + '/');
+  // Data-only payload (see api/notify.js) — if the server ever sent a
+  // top-level `notification` field instead, the browser's push service
+  // would auto-display it AND this handler would show it again, doubling
+  // every push. Read everything from payload.data instead.
+  const d = payload.data || {};
+  const title = d.title || 'ינקלביץ';
+  const body  = d.body  || '';
+  const icon  = d.icon  || '/icon.jpg';
+  const url   = d.link  || (self.location.origin + '/');
   self.registration.showNotification(title, {
-    body, icon:'/icon.jpg', dir:'rtl', lang:'he',
+    body, icon, dir:'rtl', lang:'he',
+    tag: title+'|'+body,
     data:{url}
   });
 });

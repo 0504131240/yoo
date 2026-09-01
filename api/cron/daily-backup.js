@@ -64,13 +64,12 @@ async function sendBirthdayReminders(db, data) {
       for (const [page, docs] of Object.entries(groups)) {
         if (!docs.length) continue;
         try {
+          // Data-only (no top-level `notification`) — see notify.js for why:
+          // a notification payload gets auto-displayed by the browser's push
+          // service AND by our own onBackgroundMessage handler, doubling it.
           const resp = await getMessaging().sendEachForMulticast({
             tokens: docs.map(d => d.data().token),
-            notification: { title, body },
-            webpush: {
-              notification: { icon: 'https://yankeleviz.vercel.app/icon.jpg', dir: 'rtl', lang: 'he' },
-              fcmOptions: { link: LINKS[page] },
-            },
+            data: { title, body, icon: 'https://yankeleviz.vercel.app/icon.jpg', link: LINKS[page] },
           });
           sent += resp.successCount;
           const dead = docs.filter((_, i) => !resp.responses[i]?.success);

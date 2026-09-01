@@ -1128,8 +1128,12 @@ async function registerFCMToken(){
   if(!_fcmForegroundBound){
     _fcmForegroundBound=true;
     msgMod.onMessage(messaging,payload=>{
-      const n=payload.notification||{};
-      showNotif(n.title||'ינקלביץ',n.body||'');
+      // Data-only payload (see api/notify.js) — reading payload.notification
+      // here would silently show nothing for these messages, since the
+      // server intentionally never sets that field (to avoid the browser
+      // auto-displaying it a second time on top of this).
+      const d=payload.data||{};
+      showNotif(d.title||'ינקלביץ',d.body||'',d.title+'|'+d.body);
     });
   }
 }
@@ -1145,9 +1149,9 @@ async function requestNotifPerm(){
   }
 }
 
-function showNotif(title,body){
+function showNotif(title,body,tag){
   if(!_notifOk())return;
-  try{new Notification(title,{body,icon:'./icon-192.png',dir:'rtl',lang:'he'});}catch(e){}
+  try{new Notification(title,{body,icon:'./icon-192.png',dir:'rtl',lang:'he',...(tag?{tag}:{})});}catch(e){}
 }
 
 function renderNotifBtn(){

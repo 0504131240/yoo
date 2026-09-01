@@ -120,12 +120,16 @@ async function sendWeeklyDebtReminders(db, data) {
       const tokSnap = await db.collection('fcmTokens').where('famId', '==', fid).get();
       const tokenDocs = await dedupeTokenDocs(tokSnap.docs);
       if (tokenDocs.length) {
+        // Data-only (no top-level `notification`) — see notify.js for why:
+        // a notification payload gets auto-displayed by the browser's push
+        // service AND by our own onBackgroundMessage handler, doubling it.
         const resp = await getMessaging().sendEachForMulticast({
           tokens: tokenDocs.map(d => d.data().token),
-          notification: { title: '⚠️ תזכורת שבועית: חוב פתוח', body: `סה"כ ₪${totalDebt.toLocaleString()}` },
-          webpush: {
-            notification: { icon: 'https://yankeleviz.vercel.app/icon.jpg', dir: 'rtl', lang: 'he' },
-            fcmOptions: { link: 'https://yankeleviz.vercel.app/' },
+          data: {
+            title: '⚠️ תזכורת שבועית: חוב פתוח',
+            body: `סה"כ ₪${totalDebt.toLocaleString()}`,
+            icon: 'https://yankeleviz.vercel.app/icon.jpg',
+            link: 'https://yankeleviz.vercel.app/',
           },
         });
         pushesSent += resp.successCount;

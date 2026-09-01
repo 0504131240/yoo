@@ -49,13 +49,15 @@ module.exports = async (req, res) => {
   for (const [page, docs] of Object.entries(groups)) {
     if (!docs.length) continue;
     registered += docs.length;
+    // Deliberately a data-only message (no top-level `notification` field):
+    // when FCM messages carry a notification payload, the browser's push
+    // service auto-displays it AND our own onBackgroundMessage handler in
+    // sw.js displays it again — a well-known FCM web-push double-notification
+    // gotcha. Data-only means only our own code ever calls showNotification,
+    // exactly once.
     const resp = await getMessaging().sendEachForMulticast({
       tokens: docs.map(d => d.data().token),
-      notification: { title, body },
-      webpush: {
-        notification: { icon: 'https://yankeleviz.vercel.app/icon.jpg', dir: 'rtl', lang: 'he' },
-        fcmOptions: { link: LINKS[page] },
-      },
+      data: { title, body, icon: 'https://yankeleviz.vercel.app/icon.jpg', link: LINKS[page] },
     });
     sent += resp.successCount;
     resp.responses.forEach((r, i) => {
