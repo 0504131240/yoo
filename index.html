@@ -58,6 +58,9 @@
       <button class="fh-pill-btn" id="pollBannerBtn" style="display:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:0 4px 22px rgba(124,58,237,0.35)" onclick="openPollSheet()">
         <span class="fh-pill-ico">🗳</span><span id="pollBannerLbl">סקר ממתין למילוי</span>
       </button>
+      <button class="fh-pill-btn" style="background:linear-gradient(135deg,#8FBC5A,#4E9A4E);box-shadow:0 4px 22px rgba(78,154,78,0.35)" onclick="openFamilyTreeOverlay()">
+        <span class="fh-pill-ico">🌳</span>אילן יוחסין
+      </button>
     </div>
     <!-- Family calendar card — below on mobile, right on desktop -->
     <div class="fh-card fh-cal-card" style="margin:0">
@@ -884,6 +887,52 @@
     </div>
   </div>
 </div>
+
+<!-- Family tree ("אילן יוחסין") — full-screen page -->
+<div id="familyTreeOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:1900;flex-direction:column">
+  <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface)">
+    <button onclick="closeFamilyTreeOverlay()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    <span style="font-size:16px;font-weight:800;color:var(--text)">🌳 אילן יוחסין</span>
+    <button onclick="addRootTreePerson()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:7px 12px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ הוסף אדם</button>
+  </div>
+  <div style="flex:1;overflow:auto;padding:24px">
+    <div id="treeCanvas" style="position:relative"></div>
+  </div>
+</div>
+
+<!-- Family tree: person action sheet -->
+<div id="treePersonModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreePersonModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:340px;box-sizing:border-box">
+    <input type="text" id="treePersonNameInp" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:15px;font-weight:700;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;text-align:center" onchange="saveTreePersonName()">
+    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:16px">
+      <button id="treeGenderNone" onclick="setTreePersonGender('')" style="padding:5px 10px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer">–</button>
+      <button id="treeGenderBoy" onclick="setTreePersonGender('boy')" style="padding:5px 10px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer">👦 זכר</button>
+      <button id="treeGenderGirl" onclick="setTreePersonGender('girl')" style="padding:5px 10px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer">👧 נקבה</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button id="treeAddParentBtn" onclick="openTreeAddModal('parent')" style="padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">⬆️ הוסף הורה</button>
+      <button onclick="openTreeAddModal('spouse')" style="padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">💍 הוסף בן/בת זוג</button>
+      <button onclick="openTreeAddModal('sibling')" style="padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">👫 הוסף אח/אחות</button>
+      <button onclick="openTreeAddModal('child')" style="padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">⬇️ הוסף ילד/ה</button>
+      <button id="treeResetPosBtn" onclick="resetTreePersonPosition()" style="display:none;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">↺ מיקום אוטומטי</button>
+      <button onclick="deleteTreePerson()" style="padding:10px;border-radius:var(--r2);border:1.5px solid #c33;background:transparent;color:#c33;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🗑 מחק אדם</button>
+      <button onclick="closeTreePersonModal()" style="padding:10px;border-radius:var(--r2);border:none;background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+    </div>
+  </div>
+</div>
+
+<!-- Family tree: add-relation name entry -->
+<div id="treeAddModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2100;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeAddModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:320px;box-sizing:border-box">
+    <div id="treeAddModalTitle" style="font-size:15px;font-weight:700;margin-bottom:12px;text-align:center;color:var(--text)"></div>
+    <input type="text" id="treeAddNameInp" placeholder="שם מלא" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:12px" onkeydown="if(event.key==='Enter')confirmTreeAdd()">
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmTreeAdd()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הוסף</button>
+      <button onclick="closeTreeAddModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- Fund detail — lightweight home-screen overlay (replaces the old "קופה" tab) -->
 <div id="fundDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFundDetail()">
