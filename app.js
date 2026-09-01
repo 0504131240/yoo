@@ -4124,8 +4124,8 @@ function toggleExp(evId){
   renderArchive();
 }
 function setYear(y){actYear=y;renderArchive();}
-function addFam(){
-  const inp=document.getElementById('famInput');
+function addFam(inputId){
+  const inp=document.getElementById(inputId||'famInput');
   let name=inp.value.trim();if(!name)return;
   if(!name.startsWith('משפחת'))name='משפחת '+name;
   families.push({id:nxtFam++,name,children:0});inp.value='';save();render();

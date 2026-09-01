@@ -849,10 +849,12 @@
       <button onclick="closeFamiliesHomeOverlay()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
     </div>
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div class="fam-add edit-only">
+        <input type="text" id="famInputHome" placeholder="שם משפחה חדשה...">
+        <button class="action-btn blue" onclick="addFam('famInputHome')">הוסף</button>
+      </div>
+      <button onclick="openAnnualReport()" class="edit-only" style="width:100%;margin-bottom:12px;padding:7px 12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">📊 דוח שנתי</button>
       <div id="famListHome"></div>
-    </div>
-    <div class="edit-only" style="padding:12px 18px;border-top:1px solid var(--border);flex-shrink:0;text-align:center">
-      <button onclick="closeFamiliesHomeOverlay();switchShell('pay');goTab('families',document.getElementById('nb-families'))" style="background:none;border:none;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer;text-decoration:underline">⚙️ עוד הגדרות למנהל (מייל, גזבר, הודעה לכולם)</button>
     </div>
   </div>
 </div>
