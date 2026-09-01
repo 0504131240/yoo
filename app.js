@@ -1186,9 +1186,18 @@ async function renderNotifDevicesModal(){
     if(!rows.length){el.innerHTML='<div class="empty" style="padding:20px 0"><span class="empty-ico">📱</span>אין מכשירים רשומים</div>';return;}
     rows.sort((a,b)=>(b.ts||0)-(a.ts||0));
     // Two docs sharing the exact same push token are a genuine duplicate —
-    // the same device registered twice under different device ids.
-    const tokenCounts={};
-    rows.forEach(r=>{ if(r.token) tokenCounts[r.token]=(tokenCounts[r.token]||0)+1; });
+    // the same device registered twice under different device ids. But a
+    // browser tab and an installed PWA on the same physical phone get two
+    // DIFFERENT tokens for the same underlying push permission — that can't
+    // be deduped by token value at all, since they're genuinely different
+    // subscriptions, yet it still double-fires every push. Catch that case
+    // too by flagging the same family member (famId+slot) registered more
+    // than once.
+    const tokenCounts={},personCounts={};
+    rows.forEach(r=>{
+      if(r.token) tokenCounts[r.token]=(tokenCounts[r.token]||0)+1;
+      if(r.famId!=null&&r.slot!=null){ const k=r.famId+':'+r.slot; personCounts[k]=(personCounts[k]||0)+1; }
+    });
     el.innerHTML=rows.map(r=>{
       const f=r.famId!=null?getFam(r.famId):null;
       const who=(f&&r.slot!=null)?_regDisplayName(f,r.slot):(r.name||(r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע'))));
@@ -1198,7 +1207,8 @@ async function renderNotifDevicesModal(){
       // instead of that being invisible and looking like a bug.
       const regEmail=(f&&r.slot!=null)?(r.slot===2?f.email2:f.email):null;
       const dateStr=r.ts?new Date(r.ts).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-      const isDup=r.token&&tokenCounts[r.token]>1;
+      const personKey=(r.famId!=null&&r.slot!=null)?r.famId+':'+r.slot:null;
+      const isDup=(r.token&&tokenCounts[r.token]>1)||(personKey&&personCounts[personKey]>1);
       return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700">${esc(who)}${isDup?' <span style="font-size:10px;background:var(--red-bg);color:var(--red-mid);padding:1px 7px;border-radius:10px">כפול</span>':''}</div>
