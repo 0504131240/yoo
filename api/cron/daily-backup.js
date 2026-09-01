@@ -14,7 +14,7 @@
 // someone happened to open the app that day) was the sole source of that
 // reminder. Doing all three here, gated by day-of-week where relevant, is
 // the only way that's actually reliable on this plan.
-const { getDb, getMessaging, dedupeTokenDocs } = require('../_lib/firebaseAdmin');
+const { getDb, getMessaging, dedupeTokenDocs, notifPrefAllows } = require('../_lib/firebaseAdmin');
 const { allOccasions } = require('../_lib/birthdayCalc');
 const { sendWeeklyDebtReminders } = require('./weekly-debt-reminder');
 
@@ -61,7 +61,15 @@ async function sendBirthdayReminders(db, data) {
         : isAnniv ? (i === 0 ? 'מזל טוב למשפחת ' + b.name + '!' : 'מחר יום הנישואין של משפחת ' + b.name)
         : (i === 0 ? 'יום הולדת שמח ל' + b.name + '!' : 'מחר יום ההולדת של ' + b.name);
 
-      for (const [page, docs] of Object.entries(groups)) {
+      for (const [page, allDocs] of Object.entries(groups)) {
+        // A family device's own notifPref ('important'/'mine'/'all') only
+        // ever filters family-page pushes — the admin device always gets
+        // everything. Birthdays/anniversaries/yahrzeits are always kind
+        // 'important'; b.famId (when set — yahrzeits have none) is who a
+        // 'mine'-tier device needs to match to still get it.
+        const docs = page === 'index'
+          ? allDocs.filter(d => notifPrefAllows(d.data().notifPref, 'important', b.famId != null ? [b.famId] : undefined, d.data().famId))
+          : allDocs;
         if (!docs.length) continue;
         try {
           // Data-only (no top-level `notification`) — see notify.js for why:
@@ -75,7 +83,7 @@ async function sendBirthdayReminders(db, data) {
           const dead = docs.filter((_, i) => !resp.responses[i]?.success);
           if (dead.length) {
             await Promise.all(dead.map(d => d.ref.delete()));
-            groups[page] = docs.filter((_, i) => resp.responses[i]?.success);
+            groups[page] = groups[page].filter(d => !dead.includes(d));
           }
         } catch (e) {
           console.error(`dailyBackup: birthday push failed [${page}]`, e);

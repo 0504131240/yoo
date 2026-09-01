@@ -6,11 +6,11 @@
 // Gated by the app's own admin password (same trust boundary as the rest of
 // the app's shared-family data) so random internet traffic can't spam pushes
 // to the family.
-const { getDb, getMessaging, checkAdminPass, dedupeTokenDocs } = require('./_lib/firebaseAdmin');
+const { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows } = require('./_lib/firebaseAdmin');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-  const { adminPass, title, body, target, excludeFamIds } = req.body || {};
+  const { adminPass, title, body, target, excludeFamIds, kind, relatedFamIds } = req.body || {};
   if (!title || !body) { res.status(400).json({ error: 'title and body required' }); return; }
 
   const db = getDb();
@@ -42,6 +42,9 @@ module.exports = async (req, res) => {
     const page = data.page === 'admin' ? 'admin' : 'index';
     if (target === 'admin' && page !== 'admin') return;
     if (Array.isArray(excludeFamIds) && excludeFamIds.includes(data.famId)) return;
+    // A family device's own notifPref only ever filters family-page pushes —
+    // the admin device always gets everything.
+    if (page === 'index' && !notifPrefAllows(data.notifPref, kind, relatedFamIds, data.famId)) return;
     groups[page].push(d);
   });
 

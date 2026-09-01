@@ -90,4 +90,19 @@ async function dedupeTokenDocs(docs) {
   return [...byToken.values()];
 }
 
-module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs };
+// A family device can choose (via the 🔔 button, see notifPrefModal in
+// app.js) how much it wants pushed to it: 'all' (default — every push,
+// unchanged), 'important' (skips chat/poll noise) or 'mine' (skips anything
+// not about this family's own events, per relatedFamIds). Only ever applied
+// to family-page ('index') devices — admin devices always get everything,
+// regardless of what's stored in their own notifPref field.
+function notifPrefAllows(pref, kind, relatedFamIds, famId) {
+  const p = pref || 'all';
+  if (p === 'all') return true;
+  if (kind === 'chat' || kind === 'poll') return false;
+  if (p === 'important') return true;
+  if (p === 'mine') return Array.isArray(relatedFamIds) && famId != null && relatedFamIds.includes(famId);
+  return true;
+}
+
+module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows };

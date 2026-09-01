@@ -1091,7 +1091,7 @@ function sendChatMsg(){
   const text=(textEl?.value||'').trim();
   if(!text||!author)return;
   messages.push({id:nxtMsg++,author,text,ts:Date.now()});
-  _sendPush('💬 הודעה חדשה',(author?author+': ':'')+text);
+  _sendPush('💬 הודעה חדשה',(author?author+': ':'')+text,'all',null,'chat');
   if(textEl){textEl.value='';textEl.focus();}
   save();renderMessages();
 }
@@ -1114,7 +1114,7 @@ async function registerFCMToken(){
   const {db,doc,setDoc,collection,query,where,getDocs,deleteDoc}=await fbInit();
   let did=localStorage.getItem('fcmDeviceId');
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
-  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),slot:_isAdminPage()?null:parseInt(localStorage.getItem('deviceEmailSlot3')||'1'),name:_fcmRegistrantName()});
+  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),slot:_isAdminPage()?null:parseInt(localStorage.getItem('deviceEmailSlot3')||'1'),name:_fcmRegistrantName(),notifPref:localStorage.getItem('notifPref')||'all'});
   // If this exact push token is already registered under a different device
   // id (e.g. site data was cleared so a new fcmDeviceId got generated, but
   // the browser's underlying push subscription — and therefore the token —
@@ -1170,8 +1170,46 @@ function renderNotifBtn(){
   btn.onclick=perm==='denied'
     ?()=>alert('הדפדפן חסם התראות. לאיפוס דרך הגדרות האתר בסרגל הכתובת.')
     :perm==='granted'
-      ?()=>alert('התראות פעילות. לביטול — הגדרות האתר בסרגל הכתובת.')
+      ?openNotifPrefModal
       :requestNotifPerm;
+}
+// Lets a family device choose which pushes it actually wants — 'all' (every
+// push, unchanged default), 'important' (skips chat/poll noise) or 'mine'
+// (skips anything not about this family's own events). Falls back to the
+// old plain alert when the picker markup isn't on this page (e.g. admin.html
+// intentionally never gained it — the admin device always gets everything).
+const NOTIF_PREFS=[
+  {id:'all',ico:'🔔',title:'כל מה שזז',desc:'עדכון על כל פעילות באפליקציה — הודעות בצ\'אט, סקרים, אירועים, הוצאות ועוד.'},
+  {id:'important',ico:'📌',title:'עדכונים חשובים',desc:'ימי הולדת, פתיחה/סגירה של אירוע, הוצאות חדשות וכדומה — בלי הודעות צ\'אט וסקרים.'},
+  {id:'mine',ico:'🎯',title:'רק מה שקשור אליי',desc:'רק התראות על אירועים שהמשפחה שלכם משתתפת בהם.'},
+];
+function openNotifPrefModal(){
+  const modal=document.getElementById('notifPrefModal');
+  if(!modal){alert('התראות פעילות. לביטול — הגדרות האתר בסרגל הכתובת.');return;}
+  renderNotifPrefModal();
+  modal.style.display='flex';
+}
+function closeNotifPrefModal(){
+  const modal=document.getElementById('notifPrefModal');if(modal)modal.style.display='none';
+}
+function renderNotifPrefModal(){
+  const el=document.getElementById('notifPrefModalContent');if(!el)return;
+  const cur=localStorage.getItem('notifPref')||'all';
+  el.innerHTML=NOTIF_PREFS.map(p=>`
+    <button onclick="saveNotifPref('${p.id}')" style="width:100%;text-align:right;display:block;padding:12px 14px;margin-bottom:10px;border-radius:var(--r2);border:1.5px solid ${p.id===cur?'var(--blue-mid)':'var(--border)'};background:var(--surface2);cursor:pointer;font-family:var(--font)">
+      <div style="font-size:14px;font-weight:700;color:var(--text)">${p.ico} ${p.title}${p.id===cur?' ✓':''}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">${esc(p.desc)}</div>
+    </button>`).join('');
+}
+async function saveNotifPref(pref){
+  localStorage.setItem('notifPref',pref);
+  try{
+    const {db,doc,setDoc}=await fbInit();
+    const did=localStorage.getItem('fcmDeviceId');
+    if(did) await setDoc(doc(db,'fcmTokens',did),{notifPref:pref},{merge:true});
+  }catch(e){console.warn('saveNotifPref failed:',e);}
+  renderNotifPrefModal();
+  showToast('✓ ההעדפה נשמרה',2000);
 }
 
 // Admin-only list of every registered fcmTokens doc — mainly for spotting
@@ -1311,7 +1349,7 @@ async function startFormImportSync(){
             _creditItemPayers(ev,item);
             added++;
           });
-          if(added){changed=true;addNotif('📋',`${sub.famName||'משפחה'} שלח/ה ${added} הוצאה${added===1?'':'ות'} דרך הטופס ל"${ev.name}"`);}
+          if(added){changed=true;addNotif('📋',`${sub.famName||'משפחה'} שלח/ה ${added} הוצאה${added===1?'':'ות'} דרך הטופס ל"${ev.name}"`,undefined,undefined,'important',ev.participants);}
           await setDoc(doc(db,'formExpenses',sub._id),{imported:true,importedAt:new Date().toISOString()},{merge:true});
         }
         if(changed){save();render();}
@@ -1723,7 +1761,7 @@ function saveNewPoll(){
   if(!q||opts.length<2){err.style.display='block';return;}
   err.style.display='none';
   polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false});
-  addNotif('🗳','נוצר סקר חדש: "'+q+'"');
+  addNotif('🗳','נוצר סקר חדש: "'+q+'"',undefined,undefined,'poll');
   save();closeNewPollModal();renderPollList();
 }
 function votePoll(pollId,optIdx){
@@ -2418,7 +2456,7 @@ function payToPot(evId,famId,amt){
   if(!ev.potPayments)ev.potPayments=[];
   ev.potPayments.push({famId,amt:payment});
   const _pf=getFam(famId);
-  addNotif('💰',(_pf?_pf.name.replace('משפחת','').trim():'')+' הפקיד/ה ₪'+payment.toLocaleString()+' לקופת "'+ev.name+'"');
+  addNotif('💰',(_pf?_pf.name.replace('משפחת','').trim():'')+' הפקיד/ה ₪'+payment.toLocaleString()+' לקופת "'+ev.name+'"',undefined,undefined,'important',ev.participants);
   save();render();
   if(ev.closed){const nb=evAdjBalance(ev)[famId]||0;if(nb>=-0.5)_sendCloseEvEmailOne(ev,famId);}
 }
@@ -3760,7 +3798,7 @@ async function doCreate(){
     }
     if(savingsTotal>0)newEv.savingsTotal=savingsTotal;
     events.unshift(newEv);
-    addNotif('📅','נוסף אירוע חדש: "'+newEv.name+'"');
+    addNotif('📅','נוסף אירוע חדש: "'+newEv.name+'"',undefined,undefined,'important',newEv.participants);
     // notify participants only for non-cumulative events (personalized per family)
     (()=>{
       if(newEv.cumulative) return;
@@ -3995,7 +4033,9 @@ function _sendCloseEvEmailOne(ev,fid){
 }
 function archiveEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
-  ev.open=false;ev.closedOn='היום';save();render();
+  ev.open=false;ev.closedOn='היום';
+  addNotif('🔒','האירוע "'+ev.name+'" נסגר',undefined,undefined,'important',ev.participants);
+  save();render();
   goTab('archive',null);
 }
 function sendEmailToFam(evId,fid){
@@ -4291,11 +4331,17 @@ function renderVisitLog(){
 // hiddenFromFamIds: families that shouldn't see this notification at all —
 // neither the in-app bell/list nor the device push — e.g. a surprise-gift
 // goal fund announced to everyone except the family it's for.
-function addNotif(icon,text,pushTarget,hiddenFromFamIds){
+// kind: 'chat'|'poll'|'important' (default) — lets each family device's own
+// notifPref (set via the 🔔 button, see notifPrefModal) filter what actually
+// pushes to it; the in-app notification center itself is never filtered by
+// this, only real device pushes are. relatedFamIds: which families this is
+// actually about, for the "רק מה שקשור אליי" pref tier — e.g. an event's
+// participants, or an expense's event's participants.
+function addNotif(icon,text,pushTarget,hiddenFromFamIds,kind,relatedFamIds){
   notifications.unshift({id:nxtNotif++,icon,text,ts:Date.now(),hiddenFrom:hiddenFromFamIds&&hiddenFromFamIds.length?hiddenFromFamIds:undefined});
   if(notifications.length>200)notifications.length=200;
   renderNotifCenterBadge();
-  _sendPush(icon+' ינקלביץ',text,pushTarget,hiddenFromFamIds);
+  _sendPush(icon+' ינקלביץ',text,pushTarget,hiddenFromFamIds,kind,relatedFamIds);
 }
 const _visibleNotifs=()=>{
   if(editMode)return notifications;
@@ -4306,8 +4352,8 @@ const _visibleNotifs=()=>{
 // every in-app notification-center event, so family members get it even
 // when the app is closed — not just the in-app bell. Best-effort: silently
 // ignored if it fails (e.g. offline, or the API route isn't deployed yet).
-function _sendPush(title,body,target,excludeFamIds){
-  fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,title,body,target:target||'all',excludeFamIds})}).catch(()=>{});
+function _sendPush(title,body,target,excludeFamIds,kind,relatedFamIds){
+  fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,title,body,target:target||'all',excludeFamIds,kind,relatedFamIds})}).catch(()=>{});
 }
 function _notifLastSeen(){return parseInt(localStorage.getItem('notifLastSeen')||'0');}
 function renderNotifCenterBadge(){
@@ -4696,7 +4742,7 @@ function addGoalFund(){
   if(!name){ alert('נא להזין שם לקופה'); return; }
   const target=Math.max(0,parseFloat(document.getElementById('goalTarget').value)||0);
   goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds]});
-  addNotif('🎯','נוצרה קופה חדשה: '+name,'all',[..._goalHideFamIds]);
+  addNotif('🎯','נוצרה קופה חדשה: '+name,'all',[..._goalHideFamIds],'important',families.filter(f=>!_goalHideFamIds.has(f.id)).map(f=>f.id));
   closeGoalForm();
   save();render();
 }
@@ -5167,7 +5213,7 @@ async function doAddExpItem(){
       ev.expenseItems.push(item);
       _creditItemPayers(ev,item);
       const _payNames=itemPayerNames(item).join(' + ');
-      addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+total.toLocaleString()+' ל"'+ev.name+'"');
+      addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+total.toLocaleString()+' ל"'+ev.name+'"',undefined,undefined,'important',ev.participants);
     }
     closeAddExpItem();save();render();
     return;
@@ -5206,7 +5252,7 @@ async function doAddExpItem(){
     ev.expenseItems.push(item);
     _creditItemPayers(ev,item);
     const _payNames=itemPayerNames(item).join(' + ');
-    addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+Math.round(amt).toLocaleString()+' ל"'+ev.name+'"');
+    addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+Math.round(amt).toLocaleString()+' ל"'+ev.name+'"',undefined,undefined,'important',ev.participants);
   }
   closeAddExpItem();
   save();render();

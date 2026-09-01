@@ -7,13 +7,13 @@
 function allBirthdays(families) {
   const kidBdays = families.flatMap(f => (f.kids || []).filter(k => k.hebDay && k.hebMonth).map(k => ({
     name: (k.name ? k.name : 'ילד/ה') + ' (' + f.name.replace('משפחת', '').trim() + ')',
-    hebDay: k.hebDay, hebMonth: k.hebMonth,
+    hebDay: k.hebDay, hebMonth: k.hebMonth, famId: f.id,
   })));
   const parentBdays = families.flatMap(f => {
     const fam = f.name.replace('משפחת', '').trim();
     const arr = [];
-    if (f.parent1Bday && f.parent1Bday.hebDay && f.parent1Bday.hebMonth) arr.push({ name: (f.emailName || 'הורה') + ' (' + fam + ')', hebDay: f.parent1Bday.hebDay, hebMonth: f.parent1Bday.hebMonth });
-    if (f.parent2Bday && f.parent2Bday.hebDay && f.parent2Bday.hebMonth) arr.push({ name: (f.emailName2 || 'הורה') + ' (' + fam + ')', hebDay: f.parent2Bday.hebDay, hebMonth: f.parent2Bday.hebMonth });
+    if (f.parent1Bday && f.parent1Bday.hebDay && f.parent1Bday.hebMonth) arr.push({ name: (f.emailName || 'הורה') + ' (' + fam + ')', hebDay: f.parent1Bday.hebDay, hebMonth: f.parent1Bday.hebMonth, famId: f.id });
+    if (f.parent2Bday && f.parent2Bday.hebDay && f.parent2Bday.hebMonth) arr.push({ name: (f.emailName2 || 'הורה') + ' (' + fam + ')', hebDay: f.parent2Bday.hebDay, hebMonth: f.parent2Bday.hebMonth, famId: f.id });
     return arr;
   });
   return [...kidBdays, ...parentBdays];
@@ -22,7 +22,7 @@ function allBirthdays(families) {
 function allAnniversaries(families) {
   return families.filter(f => f.anniversaryDay && f.anniversaryMonth).map(f => ({
     name: f.name.replace('משפחת', '').trim(),
-    hebDay: f.anniversaryDay, hebMonth: f.anniversaryMonth,
+    hebDay: f.anniversaryDay, hebMonth: f.anniversaryMonth, famId: f.id,
   }));
 }
 
