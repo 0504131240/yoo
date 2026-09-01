@@ -633,7 +633,10 @@
 <!-- Broadcast email modal -->
 <div id="broadcastModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeBroadcastModal()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
-    <div style="font-size:15px;font-weight:700;margin-bottom:12px">📢 הודעה לכל המשפחות</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:15px;font-weight:700">📢 הודעה לכל המשפחות</span>
+      <button onclick="closeBroadcastModal();openSettingsHubModal()" style="background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;color:var(--blue-mid);font-family:var(--font);padding:0">↩ הגדרות</button>
+    </div>
     <div id="broadcastHint" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
     <div class="field">
       <label class="field-lbl">נושא</label>
@@ -693,7 +696,10 @@
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:15px;font-weight:800;color:var(--text)">📱 מכשירים רשומים להתראות</span>
-      <button onclick="closeNotifDevicesModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onclick="closeNotifDevicesModal();openSettingsHubModal()" style="background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;color:var(--blue-mid);font-family:var(--font);padding:0">↩ הגדרות</button>
+        <button onclick="closeNotifDevicesModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      </div>
     </div>
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0" id="notifDevicesModalContent"></div>
   </div>
@@ -704,7 +710,10 @@
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:15px;font-weight:800;color:var(--text)">👥 מי נכנס לאפליקציה</span>
-      <button onclick="closeVisitLogModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onclick="closeVisitLogModal();openSettingsHubModal()" style="background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;color:var(--blue-mid);font-family:var(--font);padding:0">↩ הגדרות</button>
+        <button onclick="closeVisitLogModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      </div>
     </div>
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0" id="visitLogModalContent"></div>
   </div>
@@ -715,7 +724,10 @@
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:15px;font-weight:800;color:var(--text)">⚙️ הגדרות התראות מייל</span>
-      <button onclick="closeEjsSettingsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onclick="closeEjsSettingsModal();openSettingsHubModal()" style="background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;color:var(--blue-mid);font-family:var(--font);padding:0">↩ הגדרות</button>
+        <button onclick="closeEjsSettingsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      </div>
     </div>
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
@@ -738,7 +750,10 @@
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:15px;font-weight:800;color:var(--text)">💳 פרטי תשלום לגזבר</span>
-      <button onclick="closePaymentSettingsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onclick="closePaymentSettingsModal();openSettingsHubModal()" style="background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;color:var(--blue-mid);font-family:var(--font);padding:0">↩ הגדרות</button>
+        <button onclick="closePaymentSettingsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+      </div>
     </div>
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">פרטים אלו יופיעו בכל מייל תזכורת חוב כדי שהמשפחות ידעו לאן להעביר את הכסף.</div>
