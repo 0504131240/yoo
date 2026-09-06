@@ -3336,15 +3336,8 @@ function openFamEditSheet(fid){
   }
   if(clearBtn) clearBtn.style.display=f.photo?'inline-block':'none';
   _famAnniversaryPending=undefined;
-  updateFamAnniversaryBtn(f);
   renderFamPeopleGrid();
   document.getElementById('famEditOverlay').style.display='flex';
-}
-function updateFamAnniversaryBtn(f){
-  const btn=document.getElementById('famAnniversaryDateBtn');if(!btn)return;
-  if(f.anniversaryDay&&f.anniversaryMonth&&f.anniversaryYear)btn.textContent='📅 '+HEB_DAY_NUM[f.anniversaryDay]+' ב'+f.anniversaryMonth+' '+toHebrewYear(f.anniversaryYear);
-  else if(f.anniversaryDay&&f.anniversaryMonth)btn.textContent='📅 '+HEB_DAY_NUM[f.anniversaryDay]+' ב'+f.anniversaryMonth;
-  else btn.textContent='📅 בחר תאריך נישואין';
 }
 function openFamAnniversaryPicker(){
   const f=families.find(x=>x.id===_famEditId);if(!f)return;
@@ -3368,12 +3361,21 @@ function renderFamPeopleGrid(){
     ${circle(0,f.emailName||'הורה 1','👤',"openPersonModal('p1')")}
     ${circle(1,f.emailName2||'הורה 2','👤',"openPersonModal('p2')")}
   </div>`;
+  // _famAnniversaryPending (undefined = untouched this sheet-open, null =
+  // cleared, object = newly picked) reflects an in-progress edit that
+  // hasn't been saved to the family yet — see selectKidPickerDay/saveFamEdit.
+  const annivSrc=_famAnniversaryPending!==undefined?_famAnniversaryPending:{hebDay:f.anniversaryDay,hebMonth:f.anniversaryMonth};
+  const hasAnniv=!!(annivSrc&&annivSrc.hebDay&&annivSrc.hebMonth);
+  const annivLabel=hasAnniv?(HEB_DAY_NUM[annivSrc.hebDay]+' ב'+annivSrc.hebMonth):'הוסף יום נישואין';
+  const annivHtml=`<div style="display:flex;justify-content:center;margin-bottom:18px">
+    ${hasAnniv?circle(2,annivLabel,'💍','openFamAnniversaryPicker()'):circle(2,annivLabel,'+','openFamAnniversaryPicker()',true)}
+  </div>`;
   let kidsHtml=(f.kids||[]).map((k,i)=>{
     const icon=k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👶';
     return circle(i+2,k.name||'ילד/ה',icon,`openPersonModal('kid',${k.id})`);
   }).join('');
   kidsHtml+=circle(0,'הוסף ילד','+',"openPersonModal('kid')",true);
-  el.innerHTML=parentsHtml
+  el.innerHTML=parentsHtml+annivHtml
     +'<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">👶 ילדים</div>'
     +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px 8px">'+kidsHtml+'</div>';
 }
@@ -3495,7 +3497,7 @@ function updateKidDateBtn(){
 function clearKidDate(){
   _kidPickedDate=null;
   _kidLegacyDate=null;
-  if(_dateBtnTargetId==='famAnniversaryDateBtn')_famAnniversaryPending=null;
+  if(_dateBtnTargetId==='famAnniversaryDateBtn'){_famAnniversaryPending=null;renderFamPeopleGrid();}
   updateKidDateBtn();
 }
 function openKidDatePicker(){
@@ -3573,7 +3575,15 @@ function renderKidDatePicker(){
 function selectKidPickerDay(hebYear,hebMonth,hebDay){
   _kidPickedDate={hebYear,hebMonth,hebDay};
   _kidLegacyDate=null;
-  if(_dateBtnTargetId==='famAnniversaryDateBtn')_famAnniversaryPending={hebYear,hebMonth,hebDay};
+  if(_dateBtnTargetId==='famAnniversaryDateBtn'){
+    _famAnniversaryPending={hebYear,hebMonth,hebDay};
+    // The anniversary date button was replaced by a circle in the people
+    // grid (see renderFamPeopleGrid, which reads _famAnniversaryPending
+    // when set) — refresh it now so picking a date shows up immediately,
+    // same as Steinhart's circle does, without writing to the family
+    // object itself before the edit sheet is actually saved.
+    renderFamPeopleGrid();
+  }
   updateKidDateBtn();
   closeKidDatePicker();
 }
