@@ -6,12 +6,15 @@
 // Gated by the app's own admin password (same trust boundary as the rest of
 // the app's shared-family data) so random internet traffic can't spam pushes
 // to the family.
-const { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows } = require('./_lib/firebaseAdmin');
+const { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, isShabbatNow } = require('./_lib/firebaseAdmin');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
   const { adminPass, title, body, target, excludeFamIds, kind, relatedFamIds } = req.body || {};
   if (!title || !body) { res.status(400).json({ error: 'title and body required' }); return; }
+
+  // No pushes during Shabbat, regardless of who triggered this or why.
+  if (isShabbatNow()) { res.status(200).json({ sent: 0, registered: 0, skipped: 'shabbat' }); return; }
 
   const db = getDb();
   if (!(await checkAdminPass(db, adminPass))) { res.status(401).json({ error: 'unauthorized' }); return; }

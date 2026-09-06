@@ -105,4 +105,22 @@ function notifPrefAllows(pref, kind, relatedFamIds, famId) {
   return true;
 }
 
-module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows };
+// Rough, conservative Shabbat window in Israel local time: starts Friday
+// afternoon (well before the earliest winter candle-lighting, ~16:00) and
+// ends Saturday night (well after the latest summer havdalah, ~21:00).
+// Not astronomically precise (no location/zmanim lookup), but deliberately
+// errs on the side of staying quiet rather than risking a push or a cron
+// run landing during actual Shabbat.
+function isShabbatNow() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem', weekday: 'short', hour: 'numeric', hour12: false,
+  }).formatToParts(new Date());
+  const weekday = parts.find(p => p.type === 'weekday').value;
+  let hour = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  if (hour === 24) hour = 0; // some environments format midnight as "24"
+  if (weekday === 'Fri' && hour >= 16) return true;
+  if (weekday === 'Sat' && hour < 21) return true;
+  return false;
+}
+
+module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, isShabbatNow };
