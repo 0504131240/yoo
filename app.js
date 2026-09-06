@@ -3402,7 +3402,7 @@ function openFamDetail(famId){
         if(k.hebDay&&k.hebMonth){
           dateTxt=HEB_DAY_NUM[k.hebDay]+' ב'+k.hebMonth+(k.hebYear?' '+toHebrewYear(k.hebYear):'');
           const age=kidAge(k);
-          if(age!=null&&age<=18){
+          if(age!=null){
             const txt=k.gender==='boy'?'בן '+age:k.gender==='girl'?'בת '+age:String(age);
             ageBadge=`<span class="bday-balloon">${esc(txt)}</span>`;
           }
