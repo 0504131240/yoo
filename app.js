@@ -1801,8 +1801,15 @@ function hebrewToGregorian(hebYear,hebMonthName,hebDay){
   const yearFmt=new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'});
   const gregYearGuess=hebYear-3760;
   const cur=new Date(gregYearGuess,0,1);
-  cur.setDate(cur.getDate()-150);
-  for(let i=0;i<400;i++){
+  // A Hebrew year runs 353-385 days and 1 Tishrei can fall anywhere from
+  // early September to early October — a leap year (13 months, so a late
+  // month like Elul lands especially late) starting on the early side of
+  // that range pushes its last days past a narrower window. 200 back /
+  // 600 forward comfortably covers every real case (was 150/400, which
+  // silently missed some late-Elul dates in leap years — returning null
+  // and quietly hiding that kid's age badge).
+  cur.setDate(cur.getDate()-200);
+  for(let i=0;i<600;i++){
     if(parseInt(yearFmt.format(cur))===hebYear&&monthFmt.format(cur)===hebMonthName&&parseInt(dayFmt.format(cur))===hebDay)return new Date(cur);
     cur.setDate(cur.getDate()+1);
   }
