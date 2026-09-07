@@ -919,6 +919,7 @@
       </label>
       <input type="text" id="treePersonDeathYearInp" placeholder="שנת פטירה" inputmode="numeric" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;text-align:center;display:none" onchange="saveTreePersonName()">
     </div>
+    <button onclick="saveTreePersonChanges()" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:12px">💾 שמור</button>
     <div style="display:flex;gap:6px;justify-content:center;margin-bottom:16px">
       <button onclick="moveTreeSibling(1)" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-family:var(--font);cursor:pointer">⟶ ימינה</button>
       <button onclick="moveTreeSibling(-1)" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-family:var(--font);cursor:pointer">⟵ שמאלה</button>
@@ -942,7 +943,20 @@
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:320px;box-sizing:border-box">
     <div id="treeAddModalTitle" style="font-size:15px;font-weight:700;margin-bottom:12px;text-align:center;color:var(--text)"></div>
     <input type="text" id="treeAddNameInp" placeholder="שם פרטי" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px" onkeydown="if(event.key==='Enter')confirmTreeAdd()">
-    <input type="text" id="treeAddSurnameInp" placeholder="שם משפחה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:12px" onkeydown="if(event.key==='Enter')confirmTreeAdd()">
+    <input type="text" id="treeAddSurnameInp" placeholder="שם משפחה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px" onkeydown="if(event.key==='Enter')confirmTreeAdd()">
+    <input type="text" id="treeAddMaidenNameInp" placeholder="שם משפחה לפני הנישואין (לבית)" style="display:none;width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px">
+    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px">
+      <button id="treeAddGenderNone" onclick="setTreeAddGender('')" style="padding:5px 10px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer">–</button>
+      <button id="treeAddGenderBoy" onclick="setTreeAddGender('boy')" style="padding:5px 10px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer">👦 זכר</button>
+      <button id="treeAddGenderGirl" onclick="setTreeAddGender('girl')" style="padding:5px 10px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer">👧 נקבה</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px">
+      <input type="text" id="treeAddBirthYearInp" placeholder="שנת לידה" inputmode="numeric" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;text-align:center">
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);white-space:nowrap">
+        <input type="checkbox" id="treeAddDeceasedChk" onchange="toggleTreeAddDeceased()"> נפטר/ה
+      </label>
+      <input type="text" id="treeAddDeathYearInp" placeholder="שנת פטירה" inputmode="numeric" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;text-align:center;display:none">
+    </div>
     <div style="display:flex;gap:8px">
       <button onclick="confirmTreeAdd()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ הוסף</button>
       <button onclick="closeTreeAddModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>

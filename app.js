@@ -865,7 +865,7 @@ function closeFamiliesHomeOverlay(){
 // anyone (add parents/siblings/spouses/children, rename, delete) since a
 // genealogical tree outgrows what the payments app's family units model.
 const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
-let _treeActivePersonId=null,_treeAddRelation=null;
+let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
 
 // The families already in the app are treated as siblings of one another —
 // each one's own blood relative (see rootSurname below) is seeded as a
@@ -1231,7 +1231,11 @@ function renderFamilyTree(){
     if(!parentPoints.length)return;
     const dropX=parentPoints.reduce((s,pp)=>s+pp.cx,0)/parentPoints.length;
     const dropY=Math.max(...parentPoints.map(pp=>pp.bottom));
-    const busY=dropY+TREE_LEVEL_H/2;
+    // Halfway through the actual empty gap between a parent's bottom edge
+    // and the next row's top edge — NOT half of TREE_LEVEL_H (which already
+    // includes the card's own height), otherwise the bus lands exactly on
+    // the children's top edge with zero visible drop into their card.
+    const busY=dropY+(TREE_LEVEL_H-TREE_NODE_H)/2;
     // _treeLayout only credits a kid to the parent-unit that actually won
     // the race to position them (claimedBy) — a kid whose spouse also has
     // their own recorded parents can get positioned under THAT branch
@@ -1348,8 +1352,13 @@ function setTreePersonGender(g){
   p.gender=g;_renderTreeGenderButtons(g);
   const mn=document.getElementById('treePersonMaidenNameInp');
   if(mn)mn.style.display=g==='girl'?'block':'none';
-  save();renderFamilyTree();
+  renderFamilyTree();
 }
+// These edits only touch the in-memory familyTree array + re-render the
+// canvas — they do NOT persist to the server on every keystroke. The
+// person sheet has its own explicit "💾 שמור" button (saveTreePersonChanges)
+// for that, so a field can be edited/corrected several times without
+// triggering a save (and its sync-status flicker) each time.
 function saveTreePersonName(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   const v=(document.getElementById('treePersonNameInp').value||'').trim();
@@ -1358,13 +1367,17 @@ function saveTreePersonName(){
   p.maidenName=(document.getElementById('treePersonMaidenNameInp').value||'').trim();
   p.birthYear=(document.getElementById('treePersonBirthYearInp').value||'').trim();
   p.deathYear=(document.getElementById('treePersonDeathYearInp').value||'').trim();
-  save();renderFamilyTree();
+  renderFamilyTree();
 }
 function toggleTreePersonDeceased(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   p.deceased=document.getElementById('treePersonDeceasedChk').checked;
   document.getElementById('treePersonDeathYearInp').style.display=p.deceased?'block':'none';
-  save();renderFamilyTree();
+  renderFamilyTree();
+}
+function saveTreePersonChanges(){
+  save();
+  showToast('נשמר ✓');
 }
 // Swaps this person's position in `familyTree` with the sibling immediately
 // to their left/right (same parent set — see _treeLayout's stable-sort tie
@@ -1415,21 +1428,50 @@ function openTreeAddModal(relation){
   // adding from — prefill it so it's not typed again every time (still editable).
   const base=familyTree.find(x=>x.id===_treeActivePersonId);
   document.getElementById('treeAddSurnameInp').value=(relation==='sibling'||relation==='child')&&base?(base.surname||''):'';
+  document.getElementById('treeAddMaidenNameInp').value='';
+  document.getElementById('treeAddMaidenNameInp').style.display='none';
+  document.getElementById('treeAddBirthYearInp').value='';
+  document.getElementById('treeAddDeceasedChk').checked=false;
+  document.getElementById('treeAddDeathYearInp').value='';
+  document.getElementById('treeAddDeathYearInp').style.display='none';
+  setTreeAddGender('');
   document.getElementById('treeAddModal').style.display='flex';
   setTimeout(()=>document.getElementById('treeAddNameInp')?.focus(),50);
 }
 function closeTreeAddModal(){
   document.getElementById('treeAddModal').style.display='none';
 }
+function _renderTreeAddGenderButtons(g){
+  const map={'':'treeAddGenderNone',boy:'treeAddGenderBoy',girl:'treeAddGenderGirl'};
+  Object.keys(map).forEach(k=>{
+    const el=document.getElementById(map[k]);if(!el)return;
+    el.style.background=g===k?'var(--blue-mid)':'transparent';
+    el.style.color=g===k?'#fff':'var(--text2)';
+    el.style.borderColor=g===k?'var(--blue-mid)':'var(--border)';
+  });
+}
+function setTreeAddGender(g){
+  _treeAddGender=g;
+  _renderTreeAddGenderButtons(g);
+  const mn=document.getElementById('treeAddMaidenNameInp');
+  if(mn)mn.style.display=g==='girl'?'block':'none';
+}
+function toggleTreeAddDeceased(){
+  document.getElementById('treeAddDeathYearInp').style.display=document.getElementById('treeAddDeceasedChk').checked?'block':'none';
+}
 function confirmTreeAdd(){
   const name=(document.getElementById('treeAddNameInp').value||'').trim();
   if(!name)return;
   const surname=(document.getElementById('treeAddSurnameInp').value||'').trim();
+  const maidenName=(document.getElementById('treeAddMaidenNameInp').value||'').trim();
+  const birthYear=(document.getElementById('treeAddBirthYearInp').value||'').trim();
+  const deceased=document.getElementById('treeAddDeceasedChk').checked;
+  const deathYear=(document.getElementById('treeAddDeathYearInp').value||'').trim();
   const relation=_treeAddRelation;
   const base=familyTree.find(x=>x.id===_treeActivePersonId);
   // Firestore's setDoc throws on any `undefined` field value, so this must
   // never end up undefined (e.g. when base is the seeded root placeholder).
-  const newPerson={id:nxtTreePerson++,name,surname,gender:'',parentIds:[],spouseIds:[],sourceFamId:(base&&base.sourceFamId!=null)?base.sourceFamId:null,birthYear:'',deathYear:'',deceased:false,maidenName:''};
+  const newPerson={id:nxtTreePerson++,name,surname,gender:_treeAddGender,parentIds:[],spouseIds:[],sourceFamId:(base&&base.sourceFamId!=null)?base.sourceFamId:null,birthYear,deathYear,deceased,maidenName};
   if(relation==='parent'){
     if(!base)return;
     if(!base.parentIds)base.parentIds=[];
