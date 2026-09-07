@@ -5941,11 +5941,13 @@ function toggleGoalPaid(famId){
   save();render();
   renderGoalPayModal();
 }
-// Emails everyone who still owes toward this goal fund — skips families
-// hidden from it (g.hiddenFrom, e.g. a surprise-gift collection) and
-// anyone who's already paid their equal share, same eligibility/split
-// logic as the "who paid" checklist above.
-function sendGoalReminderEmails(goalId){
+// Opens a per-EMAIL-ADDRESS picker (not per-family — a family with two
+// saved addresses gets two separate rows) for everyone who still owes
+// toward this goal fund. Skips families hidden from it (g.hiddenFrom,
+// e.g. a surprise-gift collection) and anyone who's already paid their
+// equal share, same eligibility/split logic as the "who paid" checklist.
+let _goalReminderGoalId=null;
+function openGoalReminderModal(goalId){
   if(!editMode)return;
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
   const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
@@ -5953,18 +5955,65 @@ function sendGoalReminderEmails(goalId){
   if(perFamily<=0){alert('לא הוגדר סכום מטרה לקופה הזו — אין לפי מה לחשב חלק שווה ולשלוח תזכורת.');return;}
   const unpaid=eligible.filter(f=>(f.email||f.email2)&&(g.contributions[f.id]||0)<perFamily);
   if(!unpaid.length){alert('כל מי שיש לו כתובת מייל כבר שילם, או שאין למי לשלוח.');return;}
-  if(!confirm(`לשלוח תזכורת תשלום ל-${unpaid.length} משפחות שעדיין לא שילמו עבור "${g.name}"?`))return;
-  // sendEmailNotif staggers a single family's own email/email2 pair by
+  _goalReminderGoalId=goalId;
+  const titleEl=document.getElementById('goalReminderTitle');
+  if(titleEl)titleEl.textContent='📧 שלח תזכורת — '+g.name;
+  const rows=[];
+  unpaid.forEach(f=>{
+    const name=f.name.replace('משפחת','').trim();
+    if(_validEmail(f.email))rows.push({famId:f.id,email:f.email,name});
+    if(_validEmail(f.email2))rows.push({famId:f.id,email:f.email2,name});
+  });
+  document.getElementById('goalReminderList').innerHTML=rows.map(r=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;box-sizing:border-box">
+      <input type="checkbox" class="goalReminderChk" data-fam="${r.famId}" data-email="${esc(r.email)}" checked onchange="_updateGoalReminderCount()" style="width:18px;height:18px;flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">${esc(r.name)}</div>
+        <div style="font-size:11px;color:var(--text2);direction:ltr;text-align:right">${esc(r.email)}</div>
+      </div>
+    </label>`).join('');
+  _updateGoalReminderCount();
+  document.getElementById('goalReminderModal').style.display='flex';
+}
+function closeGoalReminderModal(){
+  document.getElementById('goalReminderModal').style.display='none';
+  _goalReminderGoalId=null;
+}
+function toggleAllGoalReminders(checked){
+  document.querySelectorAll('.goalReminderChk').forEach(cb=>cb.checked=checked);
+  _updateGoalReminderCount();
+}
+function _updateGoalReminderCount(){
+  const n=document.querySelectorAll('.goalReminderChk:checked').length;
+  const el=document.getElementById('goalReminderCount');
+  if(el)el.textContent=n+' נבחרו';
+}
+function sendSelectedGoalReminders(){
+  const g=goalFunds.find(x=>x.id===_goalReminderGoalId);if(!g)return;
+  const checked=[...document.querySelectorAll('.goalReminderChk:checked')];
+  if(!checked.length){alert('לא נבחרו נמענים.');return;}
+  const byFam=new Map();
+  checked.forEach(cb=>{
+    const fid=Number(cb.dataset.fam);
+    if(!byFam.has(fid))byFam.set(fid,[]);
+    byFam.get(fid).push(cb.dataset.email);
+  });
+  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
+  const famIds=[...byFam.keys()];
+  closeGoalReminderModal();
+  // sendEmailNotif staggers a single call's own email/email2 pair by
   // 600ms internally, but calling it back-to-back for every family here
-  // would still fire ALL families' first email at once (and all their
-  // second email 600ms later) — a burst EmailJS can silently throttle,
-  // which looked like "only the first email address per family got it".
+  // would still fire ALL families' first address at once (and all their
+  // second address 600ms later) — a burst EmailJS can silently throttle.
   // Space each family's own call out too, well past that internal 600ms,
   // so no two families' sends land in the same window.
-  unpaid.forEach((f,idx)=>{
+  famIds.forEach((fid,idx)=>{
     setTimeout(()=>{
+      const f=getFam(fid);if(!f)return;
+      const selectedEmails=byFam.get(fid);
       const name=f.name.replace('משפחת','').trim();
-      const paidSoFar=Math.round(g.contributions[f.id]||0);
+      const paidSoFar=Math.round(g.contributions[fid]||0);
       const owe=Math.round(perFamily-paidSoFar);
       const msg=`תזכורת תשלום: ${g.name}\n\nסכום המטרה הכולל: ₪${g.target.toLocaleString()}\nהחלק שלך: ₪${perFamily.toLocaleString()}${paidSoFar>0?`\nשילמת עד כה: ₪${paidSoFar.toLocaleString()}`:''}\n\n⚠️ יתרה לתשלום: ₪${owe.toLocaleString()}`;
       const cardRows=[['סכום המטרה הכולל',`₪${g.target.toLocaleString()}`],['החלק שלך',`₪${perFamily.toLocaleString()}`,true]];
@@ -5973,10 +6022,13 @@ function sendGoalReminderEmails(goalId){
       bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרה לתשלום ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
       bodyHtml+=_paymentBlock(owe,g.name,null,null);
       const html=_emailWrap(bodyHtml,g.name,'🎯','',name);
-      sendEmailNotif([{email:f.email,email2:f.email2,name}],`🎯 תזכורת תשלום: ${g.name} · ינקלביץ`,msg,html);
+      const recipient={name};
+      if(selectedEmails.includes(f.email))recipient.email=f.email;
+      if(selectedEmails.includes(f.email2))recipient.email2=f.email2;
+      sendEmailNotif([recipient],`🎯 תזכורת תשלום: ${g.name} · ינקלביץ`,msg,html);
     },idx*1500);
   });
-  showToast(`📧 שולח תזכורת ל-${unpaid.length} משפחות...`);
+  showToast(`📧 שולח תזכורת ל-${famIds.length} משפחות...`);
 }
 
 let _depositFamId=null;

@@ -1109,8 +1109,32 @@
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
       <div id="goalPayProgress" style="margin-bottom:12px"></div>
       <div id="goalPayNote" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
-      <button class="edit-only" onclick="sendGoalReminderEmails(_goalPayGoalId)" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:12px">📧 שלח תזכורת תשלום לכל מי שלא שילם</button>
+      <button class="edit-only" onclick="openGoalReminderModal(_goalPayGoalId)" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:12px">📧 שלח תזכורת תשלום לכל מי שלא שילם</button>
       <div id="goalPayList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Goal fund reminder — per-EMAIL-ADDRESS picker (a family with two
+     saved addresses gets two separate rows) opened from the button above. -->
+<div id="goalReminderModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1750;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalReminderModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:380px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span id="goalReminderTitle" style="font-size:15px;font-weight:800;color:var(--text)">📧 שלח תזכורת</span>
+      <button onclick="closeGoalReminderModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer">
+          <input type="checkbox" checked onchange="toggleAllGoalReminders(this.checked)" style="width:18px;height:18px">
+          בחר הכל
+        </label>
+        <span id="goalReminderCount" style="font-size:12px;color:var(--text2)"></span>
+      </div>
+      <div id="goalReminderList"></div>
+    </div>
+    <div style="padding:14px 18px;border-top:1px solid var(--border);flex-shrink:0">
+      <button onclick="sendSelectedGoalReminders()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">📧 שלח לנבחרים</button>
     </div>
   </div>
 </div>
