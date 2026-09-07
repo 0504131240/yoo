@@ -1277,6 +1277,62 @@ function _treeLayout(people){
     const u=makeUnit(byId.get(ids[0]));
     if(u)layoutUnit(u);
   });
+  // When a married couple's two sets of parents EACH exist in the tree
+  // solely to be that one spouse's parents (their only recorded child),
+  // the earlier pass leaves one side exactly centered on its kid and
+  // shoves the other one-sidedly out of the way to avoid overlapping it —
+  // legal, but lopsided. Re-space both sides outward from the couple's own
+  // midpoint instead, so they fan out symmetrically like a real genealogy
+  // chart, only when doing so doesn't collide with anything else already
+  // placed at that row (falls back to the original, already-safe
+  // positions otherwise).
+  const singleChildOf=new Map(); // parent-unit key -> id of their one-and-only child, if they have just one
+  childrenByKey.forEach((list,k)=>{ if(list.length===1)singleChildOf.set(k,list[0].id); });
+  const pairedCouples=new Set();
+  people.forEach(p=>{
+    (p.spouseIds||[]).forEach(sid=>{
+      if(!byId.has(sid))return;
+      const coupleKey=[p.id,sid].sort((a,b)=>a-b).join('-');
+      if(pairedCouples.has(coupleKey))return;
+      pairedCouples.add(coupleKey);
+      const a=p,b=byId.get(sid);
+      if(!a.parentIds||!a.parentIds.length||!b.parentIds||!b.parentIds.length)return;
+      const keyA=[...a.parentIds].sort((x,y)=>x-y).join(',');
+      const keyB=[...b.parentIds].sort((x,y)=>x-y).join(',');
+      if(keyA===keyB)return;
+      if(singleChildOf.get(keyA)!==a.id||singleChildOf.get(keyB)!==b.id)return;
+      if(!pos[a.id]||!pos[b.id])return;
+      if(a.parentIds.some(id=>!pos[id])||b.parentIds.some(id=>!pos[id]))return;
+      const lvl=level[a.parentIds[0]];
+      if(level[b.parentIds[0]]!==lvl)return; // shouldn't happen, but only touch same-row pairs
+      const aIsLeft=pos[a.id].x<pos[b.id].x;
+      const leftIds=aIsLeft?a.parentIds:b.parentIds;
+      const rightIds=aIsLeft?b.parentIds:a.parentIds;
+      const leftWidth=leftIds.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
+      const rightWidth=rightIds.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
+      const coupleMid=(pos[a.id].cx+pos[b.id].cx)/2;
+      const newLeftX=coupleMid-TREE_H_GAP/2-leftWidth;
+      const newRightX=coupleMid+TREE_H_GAP/2;
+      // Verify the new spot is actually clear of everything else at this
+      // row (excluding the two units being moved) before committing.
+      const movingIds=new Set([...leftIds,...rightIds]);
+      const others=[];
+      for(const pid in pos){
+        if(movingIds.has(Number(pid)))continue;
+        if(Math.round(pos[pid].y/TREE_LEVEL_H)===lvl)others.push({min:pos[pid].x,max:pos[pid].x+TREE_NODE_W});
+      }
+      const clear=(min,max)=>others.every(o=>max<=o.min||min>=o.max);
+      if(!clear(newLeftX,newLeftX+leftWidth)||!clear(newRightX,newRightX+rightWidth))return;
+      const shiftTo=(ids,newX)=>{
+        const oldX=Math.min(...ids.map(id=>pos[id].x));
+        const delta=newX-oldX;
+        if(delta===0)return;
+        ids.forEach(id=>{ pos[id].x+=delta;pos[id].cx+=delta; });
+      };
+      shiftTo(leftIds,newLeftX);
+      shiftTo(rightIds,newRightX);
+    });
+  });
   // A married-in ancestor unit anchored above someone near the tree's own
   // left edge (see the spans.length===0 branch above) can land at a
   // negative x if there was nothing else at that level to push it clear
