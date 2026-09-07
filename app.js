@@ -1382,6 +1382,7 @@ function saveTreePersonChanges(){
   save();
   renderFamilyTree();
   showToast('נשמר ✓');
+  closeTreePersonModal();
 }
 // Swaps this person's position in `familyTree` with the sibling immediately
 // to their left/right (same parent set — see _treeLayout's stable-sort tie
