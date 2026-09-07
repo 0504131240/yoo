@@ -757,7 +757,18 @@ async function load(){
     });
     const _bdaysCleared=birthdays.length>0;
     if(_bdaysCleared)birthdays=[];
-    if(_savAmtMigrated||_kidsMigrated||_bdaysCleared)save();
+    // Older tree data (or data cached before this fix) could carry an
+    // undefined sourceFamId — Firestore's setDoc throws on that, silently
+    // breaking every save from then on, so backfill it to null here.
+    let _treeMigrated=false;
+    familyTree.forEach(p=>{
+      if(p.sourceFamId===undefined){p.sourceFamId=null;_treeMigrated=true;}
+      if(p.birthYear===undefined){p.birthYear='';_treeMigrated=true;}
+      if(p.deathYear===undefined){p.deathYear='';_treeMigrated=true;}
+      if(p.deceased===undefined){p.deceased=false;_treeMigrated=true;}
+      if(p.surname===undefined){p.surname='';_treeMigrated=true;}
+    });
+    if(_savAmtMigrated||_kidsMigrated||_bdaysCleared||_treeMigrated)save();
     render();setTimeout(handleHash,100);
     if(!_isAdminPage()){
       const savedFamId=localStorage.getItem('deviceFamId3');
@@ -852,35 +863,73 @@ function closeFamiliesHomeOverlay(){
 // above) — seeded once from the current families/kids, then edited freely by
 // anyone (add parents/siblings/spouses/children, rename, delete) since a
 // genealogical tree outgrows what the payments app's family units model.
-const TREE_NODE_W=112,TREE_NODE_H=64,TREE_H_GAP=22,TREE_COUPLE_GAP=14,TREE_LEVEL_H=150;
+const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=22,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
 let _treeActivePersonId=null,_treeAddRelation=null;
 
+// The families already in the app are treated as siblings of one another —
+// each one's own blood relative (see rootSurname below) is seeded as a
+// child of one shared placeholder root couple, instead of each family
+// being its own disconnected root. Rename that placeholder pair to the
+// real grandparents once seeded (see resetFamilyTree() to redo this from
+// scratch on an already-seeded tree).
 function seedFamilyTreeIfEmpty(){
   if(familyTree.length||!families.length)return;
+  familyTree=_buildSeedFamilyTree();
+  save();
+}
+function _buildSeedFamilyTree(){
   const people=[];
+  const root1={id:nxtTreePerson++,name:'הורה 1',surname:'',gender:'',parentIds:[],spouseIds:[],sourceFamId:null};
+  const root2={id:nxtTreePerson++,name:'הורה 2',surname:'',gender:'',parentIds:[],spouseIds:[root1.id],sourceFamId:null};
+  root1.spouseIds.push(root2.id);
+  people.push(root1,root2);
+  const rootIds=[root1.id,root2.id];
+  // A family carrying the app's own surname kept it (a son); any other
+  // surname married in from outside (a daughter) — just a starting guess
+  // for each family's blood relative's gender, fully editable afterward.
+  const rootSurname='שטיינהרט';
   families.forEach(f=>{
     const surname=f.name.replace('משפחת','').trim();
-    const p1={id:nxtTreePerson++,name:(f.emailName||'הורה 1')+' '+surname,gender:'',parentIds:[],spouseIds:[]};
+    const bloodGender=surname===rootSurname?'boy':'girl';
+    // Tags every person seeded from this family with the same origin id, so
+    // the tree can color-code each branch (see col() in renderFamilyTree)
+    // and it's visually obvious who belongs to whom even in a wide tree.
+    const p1={id:nxtTreePerson++,name:f.emailName||'הורה 1',surname,gender:bloodGender,parentIds:[...rootIds],spouseIds:[],sourceFamId:f.id};
     people.push(p1);
     let parentIds=[p1.id];
     if(!f.parent2Removed){
-      const p2={id:nxtTreePerson++,name:(f.emailName2||'הורה 2')+' '+surname,gender:'',parentIds:[],spouseIds:[p1.id]};
+      const p2={id:nxtTreePerson++,name:f.emailName2||'הורה 2',surname,gender:bloodGender==='boy'?'girl':'boy',parentIds:[],spouseIds:[p1.id],sourceFamId:f.id};
       p1.spouseIds.push(p2.id);
       people.push(p2);
       parentIds=[p1.id,p2.id];
     }
     (f.kids||[]).forEach(k=>{
       if(!k.name)return;
-      people.push({id:nxtTreePerson++,name:k.name,gender:k.gender==='boy'||k.gender==='girl'?k.gender:'',parentIds:[...parentIds],spouseIds:[]});
+      people.push({id:nxtTreePerson++,name:k.name,surname,gender:k.gender==='boy'||k.gender==='girl'?k.gender:'',parentIds:[...parentIds],spouseIds:[],sourceFamId:f.id});
     });
   });
-  familyTree=people;
+  // Never leave these undefined (Firestore's setDoc throws on that).
+  people.forEach(p=>{p.birthYear='';p.deathYear='';p.deceased=false;});
+  return people;
+}
+// Rebuilds the tree from scratch using the current families/kids data —
+// discards any manual edits made in the tree itself (added people,
+// renames, extra relations). Offered as an explicit, confirmed action
+// rather than happening automatically, since it's destructive.
+function resetFamilyTree(){
+  if(!confirm('לבנות את העץ מחדש מהנתונים הקיימים? כל עריכה ידנית בעץ (שינויי שם, אנשים שהוספתם, קשרים נוספים) תימחק ותוחלף בעץ חדש.'))return;
+  familyTree=_buildSeedFamilyTree();
   save();
+  renderFamilyTree();
+  _fitTreeWhenReady();
 }
 function openFamilyTreeOverlay(){
   seedFamilyTreeIfEmpty();
   document.getElementById('familyTreeOverlay').style.display='flex';
+  const wrap0=document.getElementById('treeCanvasWrap');
+  if(wrap0){wrap0.scrollTop=0;wrap0.scrollLeft=0;} // known state immediately, before the fit even runs
   renderFamilyTree();
+  _fitTreeWhenReady(); // canvas needs a layout pass first for its size to be known
 }
 function closeFamilyTreeOverlay(){
   document.getElementById('familyTreeOverlay').style.display='none';
@@ -888,6 +937,49 @@ function closeFamilyTreeOverlay(){
 function renderFamilyTreeIfOpen(){
   const overlay=document.getElementById('familyTreeOverlay');
   if(overlay&&overlay.style.display==='flex')renderFamilyTree();
+}
+// Zoom is a CSS transform on #treeCanvas — offsetWidth/Height stay the
+// untransformed layout size regardless of scale, so "fit to screen" just
+// compares that natural size against the scrollable wrapper's viewport.
+let _treeZoom=1;
+function applyTreeZoom(){
+  const c=document.getElementById('treeCanvas');if(c)c.style.transform='scale('+_treeZoom+')';
+}
+function zoomTree(delta){
+  _treeZoom=Math.max(0.2,Math.min(2,Math.round((_treeZoom+delta)*100)/100));
+  applyTreeZoom();
+}
+function fitTreeToScreen(){
+  const c=document.getElementById('treeCanvas');if(!c)return;
+  // The page is RTL (<html dir="rtl">), where scrollLeft=0 shows the
+  // *right* edge of overflowing content in an RTL container — but the
+  // tree's own cards use physical left:Xpx starting at x=0. Rather than
+  // fight browser-inconsistent RTL scroll-sign conventions, the wrapper
+  // itself is forced dir="ltr" (see index.html/admin.html), so scrollLeft=0
+  // unambiguously means "leftmost" everywhere.
+  const wrap=document.getElementById('treeCanvasWrap')||c.parentElement;
+  if(!wrap||!c.offsetWidth||!c.offsetHeight)return;
+  const fit=Math.min((wrap.clientWidth-48)/c.offsetWidth,(wrap.clientHeight-48)/c.offsetHeight,1);
+  _treeZoom=Math.max(0.15,Math.round(fit*100)/100);
+  applyTreeZoom();
+  wrap.scrollTop=0;wrap.scrollLeft=0;
+}
+// Retries until the canvas has actually been laid out (offsetWidth/Height
+// read 0 right after a display:none→flex flip until the browser's next
+// layout pass) instead of a fixed delay that can silently miss on a
+// slower device, leaving the tree open scrolled to a stale/blank spot.
+// Once it succeeds, a couple of rAF follow-ups re-apply the same scroll
+// reset in case the browser re-anchors scroll position on a later paint
+// (seen on some mobile browsers right after a large layout change).
+function _fitTreeWhenReady(attempts){
+  attempts=attempts||0;
+  const c=document.getElementById('treeCanvas');
+  if(c&&c.offsetWidth&&c.offsetHeight){
+    fitTreeToScreen();
+    requestAnimationFrame(()=>{fitTreeToScreen();requestAnimationFrame(fitTreeToScreen);});
+    return;
+  }
+  if(attempts<20)setTimeout(()=>_fitTreeWhenReady(attempts+1),50);
 }
 // Assigns each person a generation level via BFS from roots (no parents),
 // then aligns spouses to the same (max) level so a married-in partner sits
@@ -925,52 +1017,170 @@ function _treeComputeLevels(people){
 // ordered by the average x of each unit's parents (a couple counts as one
 // unit so spouses stay adjacent) — a simple one-pass barycenter pass that
 // keeps most families visually under their parents without needing a full
-// graph-layout library. A person can be dragged (see _treeStartDrag) to an
-// explicit (x,y), which is honored outright here instead of being
-// auto-placed — only a couple where BOTH partners were dragged is treated
-// as a manually-placed unit; a couple with only one dragged partner still
-// auto-places both, to avoid a half-manual, half-auto unit.
+// graph-layout library. Fully automatic — nothing here is manually
+// draggable, so the layout is deterministic from the data alone.
+// Depth-first, bottom-up-centered layout: a parent unit (couple or single)
+// is positioned centered over the actual span of its own children's
+// subtrees, instead of children being positioned relative to wherever the
+// parent ended up. Left-to-right order is still exactly what
+// moveTreeSibling() controls (the current `familyTree` array order) — this
+// only changes X positions, not who ends up left/right of whom.
 function _treeLayout(people){
   const byId=new Map(people.map(p=>[p.id,p]));
   const level=_treeComputeLevels(people);
   const maxLevel=people.length?Math.max(...people.map(p=>level[p.id])):0;
   const pos={};
-  const isManual=p=>p.x!=null&&p.y!=null;
-  for(let li=0;li<=maxLevel;li++){
-    const levelPeople=people.filter(p=>level[p.id]===li);
-    const used=new Set(),units=[];
-    levelPeople.forEach(p=>{
-      if(used.has(p.id))return;
-      const spouseId=(p.spouseIds||[]).find(sid=>byId.has(sid)&&level[sid]===li&&!used.has(sid));
-      if(spouseId!=null){units.push({ids:[p.id,spouseId]});used.add(p.id);used.add(spouseId);}
-      else{units.push({ids:[p.id]});used.add(p.id);}
-    });
-    const manualUnits=units.filter(u=>u.ids.every(id=>isManual(byId.get(id))));
-    const autoUnits=units.filter(u=>!manualUnits.includes(u));
-    manualUnits.forEach(u=>{
-      u.ids.forEach(id=>{
-        const per=byId.get(id);
-        pos[id]={x:per.x,y:per.y,cx:per.x+TREE_NODE_W/2,cy:per.y+TREE_NODE_H/2,bottom:per.y+TREE_NODE_H};
-      });
-    });
-    if(li>0){
-      autoUnits.forEach(u=>{
-        const parentXs=[];
-        u.ids.forEach(id=>{ (byId.get(id).parentIds||[]).forEach(pid=>{ if(pos[pid])parentXs.push(pos[pid].cx); }); });
-        u._key=parentXs.length?parentXs.reduce((a,b)=>a+b,0)/parentXs.length:Infinity;
-      });
-      autoUnits.sort((a,b)=>a._key-b._key);
+  const usedInUnit=new Set();
+  // Which parent-unit (by its own combined-ids key) actually positioned a
+  // given kid — used by renderFamilyTree to tell a normal shared-bus child
+  // apart from one whose spouse's own parent unit lost the race to claim
+  // them (see the "married in from elsewhere" handling there).
+  const claimedBy={};
+  function makeUnit(p){
+    if(usedInUnit.has(p.id))return null;
+    const spouseId=(p.spouseIds||[]).find(sid=>byId.has(sid)&&level[sid]===level[p.id]&&!usedInUnit.has(sid));
+    let ids=spouseId!=null?[p.id,spouseId]:[p.id];
+    // Within a couple the male always renders on the right (higher x) —
+    // sort is stable so a same-gender/unset pair keeps its original order.
+    if(ids.length===2){
+      const male=id=>byId.get(id).gender==='boy'?1:0;
+      ids=ids.slice().sort((a,b)=>male(a)-male(b));
     }
-    let x=0;
-    autoUnits.forEach(u=>{
-      u.ids.forEach((id,i)=>{
-        const ix=x+i*(TREE_NODE_W+TREE_COUPLE_GAP);
-        pos[id]={x:ix,y:li*TREE_LEVEL_H,cx:ix+TREE_NODE_W/2,cy:li*TREE_LEVEL_H+TREE_NODE_H/2,bottom:li*TREE_LEVEL_H+TREE_NODE_H};
-      });
-      x+=(u.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W)+TREE_H_GAP;
-    });
+    ids.forEach(id=>usedInUnit.add(id));
+    return {ids,level:level[p.id]};
   }
-  return {pos,maxLevel};
+  // A person is a "child" of a unit when their parentIds, as a set, exactly
+  // match that unit's member ids.
+  const childrenByKey=new Map();
+  people.forEach(p=>{
+    if(!p.parentIds||!p.parentIds.length)return;
+    const key=[...p.parentIds].sort((a,b)=>a-b).join(',');
+    if(!childrenByKey.has(key))childrenByKey.set(key,[]);
+    childrenByKey.get(key).push(p);
+  });
+  const levelCursor={}; // next free x per level, so sibling subtrees never overlap
+  function layoutUnit(unit){
+    const key=[...unit.ids].sort((a,b)=>a-b).join(',');
+    const kids=childrenByKey.get(key)||[];
+    const width=unit.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
+    const minX=levelCursor[unit.level]||0;
+    let x=minX;
+    if(kids.length){
+      const seen=new Set(),kidUnits=[];
+      kids.forEach(k=>{
+        if(seen.has(k.id))return;
+        const ku=makeUnit(k);
+        if(!ku)return;
+        ku.ids.forEach(id=>seen.add(id));
+        kidUnits.push(ku);
+        claimedBy[k.id]=key;
+      });
+      const kidsSet=new Set(kids.map(k=>k.id));
+      const spans=kidUnits.map(ku=>{
+        const span=layoutUnit(ku);
+        const relevantIds=ku.ids.filter(id=>kidsSet.has(id));
+        if(relevantIds.length&&relevantIds.length<ku.ids.length){
+          // Only one member of this couple is actually our own kid — their
+          // spouse married in from a separately-tracked family with their
+          // own recorded parents. Center on just our own kid's slot, not
+          // the whole couple's width, so this parent unit doesn't visually
+          // land on top of the OTHER spouse's side (which would make it
+          // look like our kid's parents are actually the spouse's parents).
+          const xs=relevantIds.map(id=>pos[id].x);
+          const minRX=Math.min(...xs),maxRX=Math.max(...xs)+TREE_NODE_W;
+          return {x:minRX,width:maxRX-minRX};
+        }
+        return span;
+      });
+      // A kid claimed by a *different* parent unit's branch (their spouse
+      // also has their own recorded parents, and that branch won the race
+      // to position them) still belongs to this family — fold their actual
+      // position into the centering too, so this unit doesn't drift away
+      // from part of its own children just because it "lost" one of them.
+      const elsewhere=kids.filter(k=>claimedBy[k.id]!==key).map(k=>pos[k.id]).filter(Boolean);
+      const ranges=[
+        ...spans.map(s=>({min:s.x,max:s.x+s.width})),
+        ...elsewhere.map(pp=>({min:pp.x,max:pp.x+TREE_NODE_W}))
+      ];
+      if(ranges.length){
+        const minAll=Math.min(...ranges.map(r=>r.min)),maxAll=Math.max(...ranges.map(r=>r.max));
+        const center=(minAll+maxAll)/2;
+        x=Math.max(minX,center-width/2);
+      }
+    }
+    levelCursor[unit.level]=x+width+TREE_H_GAP;
+    unit.ids.forEach((id,i)=>{
+      const ix=x+i*(TREE_NODE_W+TREE_COUPLE_GAP);
+      pos[id]={x:ix,y:unit.level*TREE_LEVEL_H,cx:ix+TREE_NODE_W/2,cy:unit.level*TREE_LEVEL_H+TREE_NODE_H/2,bottom:unit.level*TREE_LEVEL_H+TREE_NODE_H};
+    });
+    return {x,width};
+  }
+  // Roots (no parents) are normally laid out left to right in familyTree
+  // array order. But when root A's only recorded child marries root B's
+  // only recorded child, that marriage bridges two separately-documented
+  // families — like a real genealogy chart, A and B should sit right next
+  // to each other (on the correct side of their kids' couple) regardless
+  // of where they happened to be in the array, otherwise one side's own
+  // parents can end up nowhere near where their child actually landed.
+  const rootPeople=people.filter(p=>level[p.id]===0);
+  const rootIdSet=new Set(rootPeople.map(p=>p.id));
+  const previewUsed=new Set();
+  const rootUnits=[];
+  rootPeople.forEach(p=>{
+    if(previewUsed.has(p.id))return;
+    const spouseId=(p.spouseIds||[]).find(sid=>rootIdSet.has(sid)&&!previewUsed.has(sid));
+    let ids=spouseId!=null?[p.id,spouseId]:[p.id];
+    if(ids.length===2){
+      const male=id=>byId.get(id).gender==='boy'?1:0;
+      ids=ids.slice().sort((a,b)=>male(a)-male(b));
+    }
+    ids.forEach(id=>previewUsed.add(id));
+    rootUnits.push(ids);
+  });
+  const unitKey=ids=>[...ids].sort((a,b)=>a-b).join(',');
+  const rootUnitByKey=new Map(rootUnits.map(u=>[unitKey(u),u]));
+  const linkPairs=new Map(); // unit key -> {leftKey,rightKey} for a bridging marriage
+  rootUnits.forEach(u=>{
+    const key=unitKey(u);
+    const kids=childrenByKey.get(key)||[];
+    // A root unit can have several kids (siblings) — any one of them
+    // marrying into another documented root family is enough to bridge
+    // the two, regardless of how many other (unmarried, or married-in-
+    // with-no-tracked-parents) siblings it also has.
+    kids.forEach(kid=>{
+    const spouseId=(kid.spouseIds||[]).find(sid=>byId.has(sid));
+    if(spouseId==null)return;
+    const spouse=byId.get(spouseId);
+    if(!spouse||!spouse.parentIds||!spouse.parentIds.length)return;
+    const spouseParentKey=[...spouse.parentIds].sort((a,b)=>a-b).join(',');
+    if(spouseParentKey===key||!rootUnitByKey.has(spouseParentKey))return;
+    const kidIsMale=kid.gender==='boy';
+    const leftKey=kidIsMale?spouseParentKey:key;
+    const rightKey=kidIsMale?key:spouseParentKey;
+    const pair={leftKey,rightKey};
+    linkPairs.set(leftKey,pair);
+    linkPairs.set(rightKey,pair);
+    });
+  });
+  const orderedRoots=[];
+  const placedRoot=new Set();
+  rootUnits.forEach(u=>{
+    const key=unitKey(u);
+    if(placedRoot.has(key))return;
+    const pair=linkPairs.get(key);
+    if(pair){
+      const leftUnit=rootUnitByKey.get(pair.leftKey),rightUnit=rootUnitByKey.get(pair.rightKey);
+      if(leftUnit&&!placedRoot.has(pair.leftKey)){orderedRoots.push(leftUnit);placedRoot.add(pair.leftKey);}
+      if(rightUnit&&!placedRoot.has(pair.rightKey)){orderedRoots.push(rightUnit);placedRoot.add(pair.rightKey);}
+    } else {
+      orderedRoots.push(u);placedRoot.add(key);
+    }
+  });
+  orderedRoots.forEach(ids=>{
+    const u=makeUnit(byId.get(ids[0]));
+    if(u)layoutUnit(u);
+  });
+  return {pos,maxLevel,claimedBy};
 }
 function renderFamilyTree(){
   const canvas=document.getElementById('treeCanvas');if(!canvas)return;
@@ -980,7 +1190,7 @@ function renderFamilyTree(){
     canvas.innerHTML='<div class="empty" style="padding:40px 0"><span class="empty-ico">🌳</span>אין עדיין אנשים בעץ. לחצו על "+ הוסף אדם" כדי להתחיל.</div>';
     return;
   }
-  const {pos,maxLevel}=_treeLayout(people);
+  const {pos,maxLevel,claimedBy}=_treeLayout(people);
   const maxX=Math.max(...Object.values(pos).map(p=>p.x+TREE_NODE_W))+20;
   const totalH=(maxLevel+1)*TREE_LEVEL_H+20;
   let svgLines='';
@@ -1003,76 +1213,86 @@ function renderFamilyTree(){
     if(!groups.has(key))groups.set(key,{parentIds:p.parentIds,kids:[]});
     groups.get(key).kids.push(p.id);
   });
-  groups.forEach(g=>{
+  const farConnections=[]; // collected first so overlapping ones can be staggered below
+  groups.forEach((g,key)=>{
     const parentPoints=g.parentIds.map(pid=>pos[pid]).filter(Boolean);
-    const kidXs=g.kids.map(kid=>pos[kid]?pos[kid].cx:null).filter(x=>x!=null);
-    if(!parentPoints.length||!kidXs.length)return;
+    if(!parentPoints.length)return;
     const dropX=parentPoints.reduce((s,pp)=>s+pp.cx,0)/parentPoints.length;
     const dropY=Math.max(...parentPoints.map(pp=>pp.bottom));
     const busY=dropY+TREE_LEVEL_H/2;
-    svgLines+=`<line x1="${dropX}" y1="${dropY}" x2="${dropX}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
-    const minX=Math.min(dropX,...kidXs),maxXk=Math.max(dropX,...kidXs);
-    svgLines+=`<line x1="${minX}" y1="${busY}" x2="${maxXk}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
-    g.kids.forEach(kid=>{
-      const kp=pos[kid];if(!kp)return;
-      svgLines+=`<line x1="${kp.cx}" y1="${busY}" x2="${kp.cx}" y2="${kp.y}" stroke="var(--border)" stroke-width="2"/>`;
+    // _treeLayout only credits a kid to the parent-unit that actually won
+    // the race to position them (claimedBy) — a kid whose spouse also has
+    // their own recorded parents can get positioned under THAT branch
+    // instead (see _treeLayout's makeUnit/claimedBy), so this group's own
+    // line to them has to reach across rather than join the normal bus.
+    const localKids=g.kids.filter(kid=>pos[kid]&&claimedBy[kid]===key);
+    const farKids=g.kids.filter(kid=>pos[kid]&&claimedBy[kid]!==key);
+    if(localKids.length){
+      const kidXs=localKids.map(kid=>pos[kid].cx);
+      svgLines+=`<line x1="${dropX}" y1="${dropY}" x2="${dropX}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
+      const minX=Math.min(dropX,...kidXs),maxXk=Math.max(dropX,...kidXs);
+      svgLines+=`<line x1="${minX}" y1="${busY}" x2="${maxXk}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
+      localKids.forEach(kid=>{
+        const kp=pos[kid];
+        svgLines+=`<line x1="${kp.cx}" y1="${busY}" x2="${kp.cx}" y2="${kp.y}" stroke="var(--border)" stroke-width="2"/>`;
+      });
+    }
+    farKids.forEach(kid=>{
+      const kp=pos[kid];
+      farConnections.push({dropX,dropY,kx:kp.cx,ky:kp.y});
+    });
+  });
+  // Draw each "married in from a separately-tracked family" connector as a
+  // normal right-angle drop (matching the rest of the tree) instead of a
+  // diagonal — but stagger the horizontal segment's height per connection
+  // sharing the same source level, so two of these reaching across the
+  // tree never sit at the exact same height and read as one merged bus.
+  const farByLevel=new Map();
+  farConnections.forEach(c=>{
+    if(!farByLevel.has(c.dropY))farByLevel.set(c.dropY,[]);
+    farByLevel.get(c.dropY).push(c);
+  });
+  farByLevel.forEach(list=>{
+    list.forEach((c,i)=>{
+      const frac=Math.min(0.3+i*0.3,0.85);
+      const busY=c.dropY+(c.ky-c.dropY)*frac;
+      svgLines+=`<line x1="${c.dropX}" y1="${c.dropY}" x2="${c.dropX}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
+      svgLines+=`<line x1="${c.dropX}" y1="${busY}" x2="${c.kx}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
+      svgLines+=`<line x1="${c.kx}" y1="${busY}" x2="${c.kx}" y2="${c.ky}" stroke="var(--border)" stroke-width="2"/>`;
     });
   });
   const cards=people.map(p=>{
     const pp=pos[p.id];if(!pp)return'';
-    const ico=p.gender==='boy'?'👦':p.gender==='girl'?'👧':'👤';
-    return`<div onpointerdown="_treeStartDrag(event,${p.id})" style="position:absolute;left:${pp.x}px;top:${pp.y}px;width:${TREE_NODE_W}px;height:${TREE_NODE_H}px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:4px;box-sizing:border-box;text-align:center;gap:2px;touch-action:none;user-select:none">
-      <span style="font-size:18px;line-height:1">${ico}</span>
+    // Gender-coded border (teal/rose), matching the standard genealogy-site
+    // convention — a small bottom accent still shows the original seeded
+    // family branch (sourceFamId) when known, without competing with it.
+    const genderColor=p.gender==='boy'?'#2a9d8f':p.gender==='girl'?'#e56399':'var(--border)';
+    const branchColor=p.sourceFamId!=null?col(p.sourceFamId).c:null;
+    const borderStyle=`border:1.5px solid ${genderColor}`+(branchColor?`;border-bottom:3px solid ${branchColor}`:'');
+    const avatarBg=p.gender==='boy'?'#e8f4f3':p.gender==='girl'?'#fbe9f0':'var(--surface2)';
+    const avatarFg=p.gender==='boy'?'#2a9d8f':p.gender==='girl'?'#e56399':'var(--text2)';
+    const deceased=p.deceased?`<span style="position:absolute;top:2px;left:2px;font-size:9px">🕯️</span>`:'';
+    const years=(p.birthYear||p.deathYear)?`<span style="font-size:8px;color:var(--text2)">${esc(p.birthYear||'')}${p.deceased||p.deathYear?'–'+esc(p.deathYear||''):''}</span>`:'';
+    // A small "+" below the card is a quick, always-visible shortcut straight
+    // into this person's add-relation options — the same destination as
+    // tapping the card itself (openTreePersonModal), just discoverable
+    // without needing to open the card first (matches the reference site's
+    // per-card "+" convention).
+    const plusBtn=`<div onclick="openTreePersonModal(${p.id})" title="הוסף קרוב" style="position:absolute;left:${pp.cx-9}px;top:${pp.bottom+3}px;width:18px;height:18px;border-radius:50%;background:var(--blue-mid);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">+</div>`;
+    return`<div onclick="openTreePersonModal(${p.id})" style="position:absolute;left:${pp.x}px;top:${pp.y}px;width:${TREE_NODE_W}px;height:${TREE_NODE_H}px;background:var(--surface);${borderStyle};border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:4px;box-sizing:border-box;text-align:center;gap:1px">
+      ${deceased}
+      <span style="width:24px;height:24px;border-radius:50%;background:${avatarBg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="${avatarFg}"><circle cx="12" cy="8" r="4"/><path d="M12 14c-5 0-8 2.5-8 6v1h16v-1c0-3.5-3-6-8-6z"/></svg>
+      </span>
       <span style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(p.name||'ללא שם')}</span>
-    </div>`;
+      ${p.surname?`<span style="font-size:9px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(p.surname)}</span>`:''}
+      ${years}
+    </div>${plusBtn}`;
   }).join('');
   canvas.style.width=maxX+'px';
   canvas.style.height=totalH+'px';
   canvas.innerHTML=`<svg width="${maxX}" height="${totalH}" style="position:absolute;top:0;left:0;pointer-events:none">${svgLines}</svg>${cards}`;
-}
-// Drag-to-reposition: a person can be moved anywhere on the canvas, and that
-// explicit (x,y) is then honored by _treeLayout instead of the auto layout
-// for that person specifically — everyone else keeps auto-arranging around
-// it. A pointerdown that never moves past a small threshold is treated as a
-// tap (opens the person's action sheet) rather than a drag, so clicking
-// still works exactly as before.
-let _treeDrag=null;
-function _treeStartDrag(e,id){
-  e.preventDefault();
-  const card=e.currentTarget;
-  card.setPointerCapture(e.pointerId);
-  _treeDrag={id,card,startX:e.clientX,startY:e.clientY,
-    origLeft:parseFloat(card.style.left)||0,origTop:parseFloat(card.style.top)||0,moved:false};
-  card.style.cursor='grabbing';
-  card.onpointermove=_treeDragMove;
-  card.onpointerup=_treeDragEnd;
-  card.onpointercancel=_treeDragEnd;
-}
-function _treeDragMove(e){
-  const d=_treeDrag;if(!d)return;
-  const dx=e.clientX-d.startX,dy=e.clientY-d.startY;
-  if(!d.moved&&(Math.abs(dx)>4||Math.abs(dy)>4)){d.moved=true;d.card.style.zIndex=10;}
-  if(!d.moved)return;
-  d.card.style.left=(d.origLeft+dx)+'px';
-  d.card.style.top=(d.origTop+dy)+'px';
-}
-function _treeDragEnd(e){
-  const d=_treeDrag;if(!d)return;
-  d.card.onpointermove=null;d.card.onpointerup=null;d.card.onpointercancel=null;
-  d.card.style.cursor='grab';d.card.style.zIndex='';
-  _treeDrag=null;
-  if(!d.moved){openTreePersonModal(d.id);return;}
-  const p=familyTree.find(x=>x.id===d.id);if(!p)return;
-  p.x=parseFloat(d.card.style.left);
-  p.y=parseFloat(d.card.style.top);
-  save();
-  renderFamilyTree();
-}
-function resetTreePersonPosition(){
-  const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
-  delete p.x;delete p.y;
-  closeTreePersonModal();
-  save();renderFamilyTree();
+  applyTreeZoom();
 }
 function _treeGenderBtnMap(){return{'':'treeGenderNone',boy:'treeGenderBoy',girl:'treeGenderGirl'};}
 function _renderTreeGenderButtons(g){
@@ -1088,11 +1308,20 @@ function openTreePersonModal(id){
   _treeActivePersonId=id;
   const p=familyTree.find(x=>x.id===id);if(!p)return;
   document.getElementById('treePersonNameInp').value=p.name||'';
+  document.getElementById('treePersonSurnameInp').value=p.surname||'';
+  document.getElementById('treePersonBirthYearInp').value=p.birthYear||'';
+  document.getElementById('treePersonDeceasedChk').checked=!!p.deceased;
+  document.getElementById('treePersonDeathYearInp').value=p.deathYear||'';
+  document.getElementById('treePersonDeathYearInp').style.display=p.deceased?'block':'none';
   _renderTreeGenderButtons(p.gender||'');
   const addParentBtn=document.getElementById('treeAddParentBtn');
   if(addParentBtn)addParentBtn.style.display=(p.parentIds&&p.parentIds.length>=2)?'none':'block';
-  const resetPosBtn=document.getElementById('treeResetPosBtn');
-  if(resetPosBtn)resetPosBtn.style.display=(p.x!=null&&p.y!=null)?'block':'none';
+  // Hiding this once a spouse already exists prevents the confusing state
+  // of ending up with 3+ "spouses" on one person — e.g. clicking "add
+  // spouse" on the seeded root couple's placeholder instead of just
+  // renaming the already-existing placeholder "הורה 2" card.
+  const addSpouseBtn=document.getElementById('treeAddSpouseBtn');
+  if(addSpouseBtn)addSpouseBtn.style.display=(p.spouseIds&&p.spouseIds.length>0)?'none':'block';
   document.getElementById('treePersonModal').style.display='flex';
 }
 function closeTreePersonModal(){
@@ -1107,7 +1336,35 @@ function saveTreePersonName(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   const v=(document.getElementById('treePersonNameInp').value||'').trim();
   if(v)p.name=v;
+  p.surname=(document.getElementById('treePersonSurnameInp').value||'').trim();
+  p.birthYear=(document.getElementById('treePersonBirthYearInp').value||'').trim();
+  p.deathYear=(document.getElementById('treePersonDeathYearInp').value||'').trim();
   save();renderFamilyTree();
+}
+function toggleTreePersonDeceased(){
+  const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
+  p.deceased=document.getElementById('treePersonDeceasedChk').checked;
+  document.getElementById('treePersonDeathYearInp').style.display=p.deceased?'block':'none';
+  save();renderFamilyTree();
+}
+// Swaps this person's position in `familyTree` with the sibling immediately
+// to their left/right (same parent set — see _treeLayout's stable-sort tie
+// order) — a constrained, no-mess way to control left-right order directly,
+// instead of relying on birth-year data that's often missing or free-form
+// dragging that got confusing.
+function moveTreeSibling(dir){
+  const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
+  const key=ids=>[...(ids||[])].sort((a,b)=>a-b).join(',');
+  const myKey=key(p.parentIds);
+  const siblingIdxs=[];
+  familyTree.forEach((x,i)=>{ if(key(x.parentIds)===myKey)siblingIdxs.push(i); });
+  const idx=familyTree.indexOf(p);
+  const pos=siblingIdxs.indexOf(idx);
+  const swapIdx=siblingIdxs[pos+dir];
+  if(swapIdx==null)return;
+  [familyTree[idx],familyTree[swapIdx]]=[familyTree[swapIdx],familyTree[idx]];
+  save();renderFamilyTree();
+  _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
 function deleteTreePerson(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
@@ -1120,6 +1377,7 @@ function deleteTreePerson(){
   });
   closeTreePersonModal();
   save();renderFamilyTree();
+  _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
 function addRootTreePerson(){
   _treeActivePersonId=null;
@@ -1134,6 +1392,10 @@ function openTreeAddModal(relation){
   const titles={root:'הוספת אדם',parent:'הוספת הורה',spouse:'הוספת בן/בת זוג',sibling:'הוספת אח/אחות',child:'הוספת ילד/ה'};
   document.getElementById('treeAddModalTitle').textContent=titles[relation]||'הוספת אדם';
   document.getElementById('treeAddNameInp').value='';
+  // Sibling/child naturally carry the same surname as the person you're
+  // adding from — prefill it so it's not typed again every time (still editable).
+  const base=familyTree.find(x=>x.id===_treeActivePersonId);
+  document.getElementById('treeAddSurnameInp').value=(relation==='sibling'||relation==='child')&&base?(base.surname||''):'';
   document.getElementById('treeAddModal').style.display='flex';
   setTimeout(()=>document.getElementById('treeAddNameInp')?.focus(),50);
 }
@@ -1143,9 +1405,12 @@ function closeTreeAddModal(){
 function confirmTreeAdd(){
   const name=(document.getElementById('treeAddNameInp').value||'').trim();
   if(!name)return;
+  const surname=(document.getElementById('treeAddSurnameInp').value||'').trim();
   const relation=_treeAddRelation;
   const base=familyTree.find(x=>x.id===_treeActivePersonId);
-  const newPerson={id:nxtTreePerson++,name,gender:'',parentIds:[],spouseIds:[]};
+  // Firestore's setDoc throws on any `undefined` field value, so this must
+  // never end up undefined (e.g. when base is the seeded root placeholder).
+  const newPerson={id:nxtTreePerson++,name,surname,gender:'',parentIds:[],spouseIds:[],sourceFamId:(base&&base.sourceFamId!=null)?base.sourceFamId:null,birthYear:'',deathYear:'',deceased:false};
   if(relation==='parent'){
     if(!base)return;
     if(!base.parentIds)base.parentIds=[];
@@ -1156,6 +1421,13 @@ function confirmTreeAdd(){
     if(!base.spouseIds)base.spouseIds=[];
     base.spouseIds.push(newPerson.id);
     newPerson.spouseIds=[base.id];
+    // If this person already has kids recorded with only one parent (base),
+    // offer to attach the new spouse as their second parent too — otherwise
+    // the new spouse would show with no connection to those existing kids.
+    const singleParentKids=familyTree.filter(x=>x.parentIds&&x.parentIds.length===1&&x.parentIds[0]===base.id);
+    if(singleParentKids.length&&confirm('לשייך את '+name+' גם כהורה השני של '+singleParentKids.length+' הילדים הקיימים של '+(base.name||'האדם הזה')+'?')){
+      singleParentKids.forEach(k=>k.parentIds=[base.id,newPerson.id]);
+    }
   }else if(relation==='sibling'){
     if(!base)return;
     newPerson.parentIds=[...(base.parentIds||[])];
@@ -1168,6 +1440,7 @@ function confirmTreeAdd(){
   closeTreeAddModal();
   closeTreePersonModal();
   save();renderFamilyTree();
+  _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
 
 function openFundDetail(){
