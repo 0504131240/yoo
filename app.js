@@ -5941,6 +5941,34 @@ function toggleGoalPaid(famId){
   save();render();
   renderGoalPayModal();
 }
+// Emails everyone who still owes toward this goal fund — skips families
+// hidden from it (g.hiddenFrom, e.g. a surprise-gift collection) and
+// anyone who's already paid their equal share, same eligibility/split
+// logic as the "who paid" checklist above.
+function sendGoalReminderEmails(goalId){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
+  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
+  if(perFamily<=0){alert('לא הוגדר סכום מטרה לקופה הזו — אין לפי מה לחשב חלק שווה ולשלוח תזכורת.');return;}
+  const unpaid=eligible.filter(f=>(f.email||f.email2)&&(g.contributions[f.id]||0)<perFamily);
+  if(!unpaid.length){alert('כל מי שיש לו כתובת מייל כבר שילם, או שאין למי לשלוח.');return;}
+  if(!confirm(`לשלוח תזכורת תשלום ל-${unpaid.length} משפחות שעדיין לא שילמו עבור "${g.name}"?`))return;
+  unpaid.forEach(f=>{
+    const name=f.name.replace('משפחת','').trim();
+    const paidSoFar=Math.round(g.contributions[f.id]||0);
+    const owe=Math.round(perFamily-paidSoFar);
+    const msg=`תזכורת תשלום: ${g.name}\n\nסכום המטרה הכולל: ₪${g.target.toLocaleString()}\nהחלק שלך: ₪${perFamily.toLocaleString()}${paidSoFar>0?`\nשילמת עד כה: ₪${paidSoFar.toLocaleString()}`:''}\n\n⚠️ יתרה לתשלום: ₪${owe.toLocaleString()}`;
+    const cardRows=[['סכום המטרה הכולל',`₪${g.target.toLocaleString()}`],['החלק שלך',`₪${perFamily.toLocaleString()}`,true]];
+    if(paidSoFar>0)cardRows.push(['שילמת עד כה',`₪${paidSoFar.toLocaleString()}`]);
+    let bodyHtml=_eCard(cardRows);
+    bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרה לתשלום ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+    bodyHtml+=_paymentBlock(owe,g.name,null,null);
+    const html=_emailWrap(bodyHtml,g.name,'🎯','',name);
+    sendEmailNotif([{email:f.email,email2:f.email2,name}],`🎯 תזכורת תשלום: ${g.name} · ינקלביץ`,msg,html);
+  });
+  showToast(`📧 נשלחה תזכורת ל-${unpaid.length} משפחות`);
+}
 
 let _depositFamId=null;
 let _depositMode='deposit';
