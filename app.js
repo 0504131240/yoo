@@ -5954,20 +5954,29 @@ function sendGoalReminderEmails(goalId){
   const unpaid=eligible.filter(f=>(f.email||f.email2)&&(g.contributions[f.id]||0)<perFamily);
   if(!unpaid.length){alert('כל מי שיש לו כתובת מייל כבר שילם, או שאין למי לשלוח.');return;}
   if(!confirm(`לשלוח תזכורת תשלום ל-${unpaid.length} משפחות שעדיין לא שילמו עבור "${g.name}"?`))return;
-  unpaid.forEach(f=>{
-    const name=f.name.replace('משפחת','').trim();
-    const paidSoFar=Math.round(g.contributions[f.id]||0);
-    const owe=Math.round(perFamily-paidSoFar);
-    const msg=`תזכורת תשלום: ${g.name}\n\nסכום המטרה הכולל: ₪${g.target.toLocaleString()}\nהחלק שלך: ₪${perFamily.toLocaleString()}${paidSoFar>0?`\nשילמת עד כה: ₪${paidSoFar.toLocaleString()}`:''}\n\n⚠️ יתרה לתשלום: ₪${owe.toLocaleString()}`;
-    const cardRows=[['סכום המטרה הכולל',`₪${g.target.toLocaleString()}`],['החלק שלך',`₪${perFamily.toLocaleString()}`,true]];
-    if(paidSoFar>0)cardRows.push(['שילמת עד כה',`₪${paidSoFar.toLocaleString()}`]);
-    let bodyHtml=_eCard(cardRows);
-    bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרה לתשלום ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
-    bodyHtml+=_paymentBlock(owe,g.name,null,null);
-    const html=_emailWrap(bodyHtml,g.name,'🎯','',name);
-    sendEmailNotif([{email:f.email,email2:f.email2,name}],`🎯 תזכורת תשלום: ${g.name} · ינקלביץ`,msg,html);
+  // sendEmailNotif staggers a single family's own email/email2 pair by
+  // 600ms internally, but calling it back-to-back for every family here
+  // would still fire ALL families' first email at once (and all their
+  // second email 600ms later) — a burst EmailJS can silently throttle,
+  // which looked like "only the first email address per family got it".
+  // Space each family's own call out too, well past that internal 600ms,
+  // so no two families' sends land in the same window.
+  unpaid.forEach((f,idx)=>{
+    setTimeout(()=>{
+      const name=f.name.replace('משפחת','').trim();
+      const paidSoFar=Math.round(g.contributions[f.id]||0);
+      const owe=Math.round(perFamily-paidSoFar);
+      const msg=`תזכורת תשלום: ${g.name}\n\nסכום המטרה הכולל: ₪${g.target.toLocaleString()}\nהחלק שלך: ₪${perFamily.toLocaleString()}${paidSoFar>0?`\nשילמת עד כה: ₪${paidSoFar.toLocaleString()}`:''}\n\n⚠️ יתרה לתשלום: ₪${owe.toLocaleString()}`;
+      const cardRows=[['סכום המטרה הכולל',`₪${g.target.toLocaleString()}`],['החלק שלך',`₪${perFamily.toLocaleString()}`,true]];
+      if(paidSoFar>0)cardRows.push(['שילמת עד כה',`₪${paidSoFar.toLocaleString()}`]);
+      let bodyHtml=_eCard(cardRows);
+      bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרה לתשלום ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+      bodyHtml+=_paymentBlock(owe,g.name,null,null);
+      const html=_emailWrap(bodyHtml,g.name,'🎯','',name);
+      sendEmailNotif([{email:f.email,email2:f.email2,name}],`🎯 תזכורת תשלום: ${g.name} · ינקלביץ`,msg,html);
+    },idx*1500);
   });
-  showToast(`📧 נשלחה תזכורת ל-${unpaid.length} משפחות`);
+  showToast(`📧 שולח תזכורת ל-${unpaid.length} משפחות...`);
 }
 
 let _depositFamId=null;
