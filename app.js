@@ -864,7 +864,7 @@ function closeFamiliesHomeOverlay(){
 // above) — seeded once from the current families/kids, then edited freely by
 // anyone (add parents/siblings/spouses/children, rename, delete) since a
 // genealogical tree outgrows what the payments app's family units model.
-const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=22,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
+const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
 let _treeActivePersonId=null,_treeAddRelation=null;
 
 // The families already in the app are treated as siblings of one another —
@@ -1067,6 +1067,12 @@ function _treeLayout(people){
     const minX=levelCursor[unit.level]||0;
     let x=minX;
     if(kids.length){
+      // An earlier same-level sibling with no kids of its own never touches
+      // levelCursor at this unit's children's level, so that cursor can lag
+      // far behind where THIS unit is about to be placed. Sync it forward
+      // first, or this unit's children get laid out starting near the left
+      // edge of the whole canvas instead of under their actual parent.
+      levelCursor[unit.level+1]=Math.max(levelCursor[unit.level+1]||0,minX);
       const seen=new Set(),kidUnits=[];
       kids.forEach(k=>{
         if(seen.has(k.id))return;
@@ -1202,7 +1208,12 @@ function renderFamilyTree(){
       if(drawnPairs.has(key)||!pos[sid])return;
       drawnPairs.add(key);
       const a=pos[p.id],b=pos[sid];
-      svgLines+=`<line x1="${a.cx}" y1="${a.cy}" x2="${b.cx}" y2="${b.cy}" stroke="var(--border)" stroke-width="2"/>`;
+      // Dashed + lighter, on purpose: a marriage link needs to read as
+      // visually distinct from the solid parent→child lineage lines below,
+      // otherwise a spouse sitting right next to their partner's siblings
+      // reads as if the bus line above connects them too (as if they were
+      // a sibling themselves rather than someone who married in).
+      svgLines+=`<line x1="${a.cx}" y1="${a.cy}" x2="${b.cx}" y2="${b.cy}" stroke="var(--text3)" stroke-width="1.5" stroke-dasharray="4,3"/>`;
     });
   });
   // Group children sharing the exact same parent set so siblings share one
@@ -1230,12 +1241,12 @@ function renderFamilyTree(){
     const farKids=g.kids.filter(kid=>pos[kid]&&claimedBy[kid]!==key);
     if(localKids.length){
       const kidXs=localKids.map(kid=>pos[kid].cx);
-      svgLines+=`<line x1="${dropX}" y1="${dropY}" x2="${dropX}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
+      svgLines+=`<line x1="${dropX}" y1="${dropY}" x2="${dropX}" y2="${busY}" stroke="var(--text2)" stroke-width="2.5"/>`;
       const minX=Math.min(dropX,...kidXs),maxXk=Math.max(dropX,...kidXs);
-      svgLines+=`<line x1="${minX}" y1="${busY}" x2="${maxXk}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
+      svgLines+=`<line x1="${minX}" y1="${busY}" x2="${maxXk}" y2="${busY}" stroke="var(--text2)" stroke-width="2.5"/>`;
       localKids.forEach(kid=>{
         const kp=pos[kid];
-        svgLines+=`<line x1="${kp.cx}" y1="${busY}" x2="${kp.cx}" y2="${kp.y}" stroke="var(--border)" stroke-width="2"/>`;
+        svgLines+=`<line x1="${kp.cx}" y1="${busY}" x2="${kp.cx}" y2="${kp.y}" stroke="var(--text2)" stroke-width="2.5"/>`;
       });
     }
     farKids.forEach(kid=>{
@@ -1257,9 +1268,9 @@ function renderFamilyTree(){
     list.forEach((c,i)=>{
       const frac=Math.min(0.3+i*0.3,0.85);
       const busY=c.dropY+(c.ky-c.dropY)*frac;
-      svgLines+=`<line x1="${c.dropX}" y1="${c.dropY}" x2="${c.dropX}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
-      svgLines+=`<line x1="${c.dropX}" y1="${busY}" x2="${c.kx}" y2="${busY}" stroke="var(--border)" stroke-width="2"/>`;
-      svgLines+=`<line x1="${c.kx}" y1="${busY}" x2="${c.kx}" y2="${c.ky}" stroke="var(--border)" stroke-width="2"/>`;
+      svgLines+=`<line x1="${c.dropX}" y1="${c.dropY}" x2="${c.dropX}" y2="${busY}" stroke="var(--text2)" stroke-width="2.5"/>`;
+      svgLines+=`<line x1="${c.dropX}" y1="${busY}" x2="${c.kx}" y2="${busY}" stroke="var(--text2)" stroke-width="2.5"/>`;
+      svgLines+=`<line x1="${c.kx}" y1="${busY}" x2="${c.kx}" y2="${c.ky}" stroke="var(--text2)" stroke-width="2.5"/>`;
     });
   });
   const cards=people.map(p=>{
