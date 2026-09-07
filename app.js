@@ -1100,7 +1100,16 @@ function _treeLayout(people){
   }
   function layoutUnit(unit){
     const key=[...unit.ids].sort((a,b)=>a-b).join(',');
-    const kids=childrenByKey.get(key)||[];
+    let kids=childrenByKey.get(key)||[];
+    // A kid recorded with only ONE parent so far (the other not added yet,
+    // or genuinely unknown) has their own single-id key ("116", not
+    // "116,117") and would otherwise never match this couple's combined
+    // key — rendering as if some unrelated branch had to reach clear
+    // across the tree for them. Fold those in as this unit's kids too.
+    if(unit.ids.length===2){
+      const singleKids=unit.ids.flatMap(id=>childrenByKey.get(String(id))||[]);
+      if(singleKids.length)kids=[...kids,...singleKids.filter(k=>!kids.includes(k))];
+    }
     const width=unit.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
     const minX=levelCursor[unit.level]||0;
     let x=minX;
@@ -1219,7 +1228,23 @@ function _treeLayout(people){
   // spouse's much deeper lineage (see _treeComputeLevels), so filtering by
   // level===0 here would silently drop such a root out of the layout
   // entirely instead of just rendering it deeper.
-  const rootPeople=people.filter(p=>!(p.parentIds&&p.parentIds.length));
+  // A person with no recorded parents who married someone who DOES have
+  // recorded parents isn't a real top-level ancestor — they just married
+  // into that spouse's family, and get positioned normally (paired with
+  // their spouse) once that spouse's own real parent unit processes them
+  // as its child. Treating them as an independent root here lets them grab
+  // usedInUnit on their spouse first, before the spouse's actual family
+  // gets a chance to claim the couple together — the spouse then shows up
+  // as a normal kid with no local bus line, wrongly rendered as if some
+  // unrelated branch had to reach across the whole tree for them.
+  const rootPeople=people.filter(p=>{
+    if(p.parentIds&&p.parentIds.length)return false;
+    const marriedIntoRealFamily=(p.spouseIds||[]).some(sid=>{
+      const s=byId.get(sid);
+      return s&&s.parentIds&&s.parentIds.length;
+    });
+    return !marriedIntoRealFamily;
+  });
   const rootIdSet=new Set(rootPeople.map(p=>p.id));
   const previewUsed=new Set();
   const rootUnits=[];
@@ -1398,8 +1423,18 @@ function renderFamilyTree(){
     // their own recorded parents can get positioned under THAT branch
     // instead (see _treeLayout's makeUnit/claimedBy), so this group's own
     // line to them has to reach across rather than join the normal bus.
-    const localKids=g.kids.filter(kid=>pos[kid]&&claimedBy[kid]===key);
-    const farKids=g.kids.filter(kid=>pos[kid]&&claimedBy[kid]!==key);
+    // A single-recorded-parent kid's own key ("116") is a strict subset of
+    // the couple unit that actually claimed them ("116,117" once the other
+    // parent's spouse joined) — compare by containment, not exact match,
+    // or they'd wrongly count as "far" even though _treeLayout folded them
+    // in as a normal local child of that same couple.
+    const isLocal=kid=>{
+      if(!claimedBy[kid])return false;
+      const claimedIds=claimedBy[kid].split(',').map(Number);
+      return g.parentIds.every(pid=>claimedIds.includes(pid));
+    };
+    const localKids=g.kids.filter(kid=>pos[kid]&&isLocal(kid));
+    const farKids=g.kids.filter(kid=>pos[kid]&&!isLocal(kid));
     if(localKids.length){
       const kidXs=localKids.map(kid=>pos[kid].cx);
       svgLines+=`<line x1="${dropX}" y1="${dropY}" x2="${dropX}" y2="${busY}" stroke="var(--text2)" stroke-width="2.5"/>`;
