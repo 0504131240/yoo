@@ -5940,6 +5940,14 @@ function toggleGoalPaid(famId){
   g.contributions[famId]=paid?0:perFamily;
   save();render();
   renderGoalPayModal();
+  if(!paid){
+    // just marked as paid (not un-marking) — let them know, but never leak
+    // that this goal fund exists to anyone it's deliberately hidden from
+    // (e.g. a surprise-gift collection).
+    const f=getFam(famId);
+    const name=f?f.name.replace('משפחת','').trim():'';
+    addNotif('🎯',name+' סומן/ה כמי ששילם/ה עבור "'+g.name+'"',undefined,g.hiddenFrom,'important',[famId]);
+  }
 }
 // Opens a per-EMAIL-ADDRESS picker (not per-family — a family with two
 // saved addresses gets two separate rows) for everyone who still owes
@@ -6107,6 +6115,7 @@ function confirmDeposit(){
   const _notifyFamId=_depositFamId;
   closeDepositSheet();
   save();render();
+  addNotif(isDeposit?'💰':'💸',name+(isDeposit?' הפקיד/ה ₪':' משך/ה ₪')+amt.toLocaleString()+(isDeposit?' לארנק':' מהארנק'),undefined,undefined,'important',[_notifyFamId]);
   sendFundUpdateEmail(_notifyFamId,amt,isDeposit?'הפקדה לארנק':'משיכה מהארנק');
 }
 
