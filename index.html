@@ -939,6 +939,7 @@
       <button onclick="openTreeAddModal('child')" style="padding:12px 6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">⬇️</span>הוסף ילד/ה</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="openTreeLinkSiblingModal()" style="padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🔗 קשר לאח/אחות קיים/ת</button>
       <button onclick="deleteTreePerson()" style="padding:10px;border-radius:var(--r2);border:1.5px solid #c33;background:transparent;color:#c33;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🗑 מחק אדם</button>
       <button onclick="closeTreePersonModal()" style="padding:10px;border-radius:var(--r2);border:none;background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
     </div>
@@ -958,6 +959,15 @@
   </div>
 </div>
 
+<!-- Family tree: link two existing people as siblings -->
+<div id="treeLinkSiblingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2100;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeLinkSiblingModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:340px;max-height:78vh;box-sizing:border-box;display:flex;flex-direction:column">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;text-align:center;color:var(--text)">🔗 קשר לאח/אחות קיים/ת</div>
+    <input type="text" id="treeLinkSiblingSearch" placeholder="חיפוש לפי שם" oninput="renderTreeLinkSiblingList(this.value)" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:10px">
+    <div id="treeLinkSiblingList" style="overflow-y:auto;flex:1;min-height:0"></div>
+    <button onclick="closeTreeLinkSiblingModal()" style="margin-top:10px;padding:10px;border-radius:var(--r2);border:none;background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+  </div>
+</div>
 
 <!-- Fund detail — lightweight home-screen overlay (replaces the old "קופה" tab) -->
 <div id="fundDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFundDetail()">

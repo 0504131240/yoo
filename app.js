@@ -1443,6 +1443,63 @@ function confirmTreeAdd(){
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
 
+// Links two people ALREADY in the tree as siblings — unlike "הוסף אח/אחות"
+// (which creates a brand-new person), this is for two people who are both
+// already recorded but weren't connected as each other's siblings yet.
+// "Sibling" isn't its own relationship in this data model — it's derived
+// from sharing the exact same parentIds — so linking two people really
+// means making their parentIds match.
+function _treeParentKey(ids){return[...(ids||[])].sort((a,b)=>a-b).join(',');}
+function openTreeLinkSiblingModal(){
+  const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
+  document.getElementById('treeLinkSiblingSearch').value='';
+  renderTreeLinkSiblingList('');
+  document.getElementById('treeLinkSiblingModal').style.display='flex';
+  setTimeout(()=>document.getElementById('treeLinkSiblingSearch')?.focus(),50);
+}
+function closeTreeLinkSiblingModal(){
+  document.getElementById('treeLinkSiblingModal').style.display='none';
+}
+function renderTreeLinkSiblingList(filter){
+  const el=document.getElementById('treeLinkSiblingList');if(!el)return;
+  const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
+  const q=(filter||'').trim().toLowerCase();
+  const myKey=_treeParentKey(p.parentIds);
+  const candidates=familyTree.filter(x=>{
+    if(x.id===p.id)return false;
+    if(_treeParentKey(x.parentIds)===myKey&&myKey)return false; // already siblings
+    const full=((x.name||'')+' '+(x.surname||'')).toLowerCase();
+    return!q||full.includes(q);
+  });
+  if(!candidates.length){el.innerHTML='<div style="padding:16px;text-align:center;font-size:13px;color:var(--text3)">לא נמצאו אנשים</div>';return;}
+  el.innerHTML=candidates.map(x=>`<div onclick="linkAsSiblings(${x.id})" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer">
+    <span style="font-size:18px">${x.gender==='boy'?'👦':x.gender==='girl'?'👧':'👤'}</span>
+    <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(x.name||'ללא שם')}${x.surname?' '+esc(x.surname):''}</span>
+  </div>`).join('');
+}
+function linkAsSiblings(otherId){
+  const a=familyTree.find(x=>x.id===_treeActivePersonId);if(!a)return;
+  const b=familyTree.find(x=>x.id===otherId);if(!b)return;
+  const aHas=!!(a.parentIds&&a.parentIds.length);
+  const bHas=!!(b.parentIds&&b.parentIds.length);
+  if(!aHas&&!bHas){
+    alert('צריך שלפחות לאחד מהם יהיה הורה בעץ — הוסיפו הורה לאחד מהם ונסו שוב.');
+    return;
+  }
+  if(aHas&&bHas){
+    if(!confirm(`ל-${a.name||'האדם הראשון'} ול-${b.name||'האדם השני'} יש כרגע הורים שונים. לשייך את ${b.name||'השני'} להורים של ${a.name||'הראשון'}? (הקשר הקודם של ${b.name||'השני'} להורים שלו יוסר — ההורים עצמם יישארו בעץ)`))return;
+    b.parentIds=[...a.parentIds];
+  }else if(aHas){
+    b.parentIds=[...a.parentIds];
+  }else{
+    a.parentIds=[...b.parentIds];
+  }
+  closeTreeLinkSiblingModal();
+  closeTreePersonModal();
+  save();renderFamilyTree();
+  _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
+}
+
 function openFundDetail(){
   renderFund();
   document.getElementById('fundDetailOverlay').style.display='flex';
