@@ -988,8 +988,21 @@ function _treeComputeLevels(people){
     });
   }
   people.forEach(p=>{ if(level[p.id]==null)level[p.id]=0; }); // orphaned/cyclic refs fallback
+  // A recorded parent must always end up exactly one row above their own
+  // child — no matter how many extra generations are recorded on the
+  // CHILD's SPOUSE's side. The pass above only computes each person's row
+  // from their own blood ancestry in isolation, so this relaxation loop
+  // keeps re-applying three rules together until nothing changes anymore:
+  // (1) spouses always share the same row, (2) a child sits at least one
+  // row below every recorded parent, (3) a recorded parent gets pulled
+  // DOWN to exactly one row above their child when the child ended up
+  // deeper (pushed down to match a spouse with a longer recorded lineage).
+  // Rule 3 cascades through that parent's own recorded parents and spouse
+  // on the next round too, so an entire "shallow" side of the family
+  // shifts down together, generation by generation, to line up with
+  // whatever "deep" side it married into.
   let al=true,g2=0;
-  while(al&&g2<100){
+  while(al&&g2<300){
     al=false;g2++;
     people.forEach(p=>{
       (p.spouseIds||[]).forEach(sid=>{
@@ -999,7 +1012,20 @@ function _treeComputeLevels(people){
         if(level[sid]!==m){level[sid]=m;al=true;}
       });
     });
+    people.forEach(p=>{
+      (p.parentIds||[]).forEach(pid=>{
+        if(!byId.has(pid))return;
+        const want=level[p.id]-1;
+        if(level[pid]<want){level[pid]=want;al=true;}
+        else if(level[pid]>want){level[p.id]=level[pid]+1;al=true;}
+      });
+    });
   }
+  // Normalize so the shallowest person sits at row 0 (relaxation can in
+  // theory leave everything shifted down if a root ends up deeper than
+  // originally computed via the cascade above).
+  const minLevel=people.length?Math.min(...people.map(p=>level[p.id])):0;
+  if(minLevel!==0)people.forEach(p=>{level[p.id]-=minLevel;});
   return level;
 }
 // Top-down layout: level 0 keeps insertion order, every level below is
@@ -1100,10 +1126,40 @@ function _treeLayout(people){
       if(ranges.length){
         const minAll=Math.min(...ranges.map(r=>r.min)),maxAll=Math.max(...ranges.map(r=>r.max));
         const center=(minAll+maxAll)/2;
-        x=Math.max(minX,center-width/2);
+        if(spans.length===0){
+          // Every one of this unit's kids was already positioned by a
+          // different branch (e.g. a married-in spouse's own recorded
+          // parents, positioned as part of THEIR side of the tree) — this
+          // unit has nothing of its own left to lay out here, it just
+          // needs to sit above wherever that kid actually ended up. The
+          // usual "must come after whatever else was already placed at
+          // this level" rule (minX) only makes sense for units competing
+          // for room in the normal left-to-right processing order — here
+          // it would just shove this unit to the far end of the row,
+          // nowhere near its real anchor. Find genuinely free space near
+          // the actual target instead.
+          let candidate=center-width/2;
+          const occupied=[];
+          for(const pid in pos){
+            if(Math.round(pos[pid].y/TREE_LEVEL_H)===unit.level)occupied.push(pos[pid].x);
+          }
+          let moved=true,g=0;
+          while(moved&&g++<200){
+            moved=false;
+            for(const ox of occupied){
+              if(candidate<ox+TREE_NODE_W&&candidate+width>ox){candidate=ox+TREE_NODE_W+TREE_H_GAP;moved=true;}
+            }
+          }
+          x=candidate;
+          // Now genuinely anchored right above its own kid — render it as
+          // a normal local connector, not the staggered "far" elbow style.
+          kids.forEach(k=>{ if(pos[k.id])claimedBy[k.id]=key; });
+        } else {
+          x=Math.max(minX,center-width/2);
+        }
       }
     }
-    levelCursor[unit.level]=x+width+TREE_H_GAP;
+    levelCursor[unit.level]=Math.max(levelCursor[unit.level]||0,x+width+TREE_H_GAP);
     unit.ids.forEach((id,i)=>{
       const ix=x+i*(TREE_NODE_W+TREE_COUPLE_GAP);
       pos[id]={x:ix,y:unit.level*TREE_LEVEL_H,cx:ix+TREE_NODE_W/2,cy:unit.level*TREE_LEVEL_H+TREE_NODE_H/2,bottom:unit.level*TREE_LEVEL_H+TREE_NODE_H};
@@ -1117,7 +1173,12 @@ function _treeLayout(people){
   // to each other (on the correct side of their kids' couple) regardless
   // of where they happened to be in the array, otherwise one side's own
   // parents can end up nowhere near where their child actually landed.
-  const rootPeople=people.filter(p=>level[p.id]===0);
+  // "Root" means no recorded parents — NOT level 0. The relaxation above
+  // can push a shallow-ancestry root down several rows to align with a
+  // spouse's much deeper lineage (see _treeComputeLevels), so filtering by
+  // level===0 here would silently drop such a root out of the layout
+  // entirely instead of just rendering it deeper.
+  const rootPeople=people.filter(p=>!(p.parentIds&&p.parentIds.length));
   const rootIdSet=new Set(rootPeople.map(p=>p.id));
   const previewUsed=new Set();
   const rootUnits=[];
@@ -1175,6 +1236,17 @@ function _treeLayout(people){
     const u=makeUnit(byId.get(ids[0]));
     if(u)layoutUnit(u);
   });
+  // A married-in ancestor unit anchored above someone near the tree's own
+  // left edge (see the spans.length===0 branch above) can land at a
+  // negative x if there was nothing else at that level to push it clear
+  // of — shift the WHOLE layout right so nothing renders off-canvas.
+  const allX=Object.values(pos).map(pp=>pp.x);
+  const minX=allX.length?Math.min(...allX):0;
+  if(minX<0){
+    Object.keys(pos).forEach(id=>{
+      pos[id].x-=minX;pos[id].cx-=minX;
+    });
+  }
   return {pos,maxLevel,claimedBy};
 }
 function renderFamilyTree(){
