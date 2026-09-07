@@ -767,6 +767,7 @@ async function load(){
       if(p.deathYear===undefined){p.deathYear='';_treeMigrated=true;}
       if(p.deceased===undefined){p.deceased=false;_treeMigrated=true;}
       if(p.surname===undefined){p.surname='';_treeMigrated=true;}
+      if(p.maidenName===undefined){p.maidenName='';_treeMigrated=true;}
     });
     if(_savAmtMigrated||_kidsMigrated||_bdaysCleared||_treeMigrated)save();
     render();setTimeout(handleHash,100);
@@ -909,7 +910,7 @@ function _buildSeedFamilyTree(){
     });
   });
   // Never leave these undefined (Firestore's setDoc throws on that).
-  people.forEach(p=>{p.birthYear='';p.deathYear='';p.deceased=false;});
+  people.forEach(p=>{p.birthYear='';p.deathYear='';p.deceased=false;p.maidenName='';});
   return people;
 }
 // Rebuilds the tree from scratch using the current families/kids data —
@@ -1285,6 +1286,7 @@ function renderFamilyTree(){
         <svg width="14" height="14" viewBox="0 0 24 24" fill="${avatarFg}"><circle cx="12" cy="8" r="4"/><path d="M12 14c-5 0-8 2.5-8 6v1h16v-1c0-3.5-3-6-8-6z"/></svg>
       </span>
       <span style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(p.name||'ללא שם')}</span>
+      ${p.gender==='girl'&&p.maidenName?`<span style="font-size:8px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">(לבית ${esc(p.maidenName)})</span>`:''}
       ${p.surname?`<span style="font-size:9px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(p.surname)}</span>`:''}
       ${years}
     </div>${plusBtn}`;
@@ -1309,6 +1311,8 @@ function openTreePersonModal(id){
   const p=familyTree.find(x=>x.id===id);if(!p)return;
   document.getElementById('treePersonNameInp').value=p.name||'';
   document.getElementById('treePersonSurnameInp').value=p.surname||'';
+  document.getElementById('treePersonMaidenNameInp').value=p.maidenName||'';
+  document.getElementById('treePersonMaidenNameInp').style.display=p.gender==='girl'?'block':'none';
   document.getElementById('treePersonBirthYearInp').value=p.birthYear||'';
   document.getElementById('treePersonDeceasedChk').checked=!!p.deceased;
   document.getElementById('treePersonDeathYearInp').value=p.deathYear||'';
@@ -1330,13 +1334,17 @@ function closeTreePersonModal(){
 }
 function setTreePersonGender(g){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
-  p.gender=g;_renderTreeGenderButtons(g);save();renderFamilyTree();
+  p.gender=g;_renderTreeGenderButtons(g);
+  const mn=document.getElementById('treePersonMaidenNameInp');
+  if(mn)mn.style.display=g==='girl'?'block':'none';
+  save();renderFamilyTree();
 }
 function saveTreePersonName(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   const v=(document.getElementById('treePersonNameInp').value||'').trim();
   if(v)p.name=v;
   p.surname=(document.getElementById('treePersonSurnameInp').value||'').trim();
+  p.maidenName=(document.getElementById('treePersonMaidenNameInp').value||'').trim();
   p.birthYear=(document.getElementById('treePersonBirthYearInp').value||'').trim();
   p.deathYear=(document.getElementById('treePersonDeathYearInp').value||'').trim();
   save();renderFamilyTree();
@@ -1410,7 +1418,7 @@ function confirmTreeAdd(){
   const base=familyTree.find(x=>x.id===_treeActivePersonId);
   // Firestore's setDoc throws on any `undefined` field value, so this must
   // never end up undefined (e.g. when base is the seeded root placeholder).
-  const newPerson={id:nxtTreePerson++,name,surname,gender:'',parentIds:[],spouseIds:[],sourceFamId:(base&&base.sourceFamId!=null)?base.sourceFamId:null,birthYear:'',deathYear:'',deceased:false};
+  const newPerson={id:nxtTreePerson++,name,surname,gender:'',parentIds:[],spouseIds:[],sourceFamId:(base&&base.sourceFamId!=null)?base.sourceFamId:null,birthYear:'',deathYear:'',deceased:false,maidenName:''};
   if(relation==='parent'){
     if(!base)return;
     if(!base.parentIds)base.parentIds=[];
