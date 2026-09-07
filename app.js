@@ -1074,12 +1074,37 @@ function _treeLayout(people){
     childrenByKey.get(key).push(p);
   });
   const levelCursor={}; // next free x per level, so sibling subtrees never overlap
+  // Nudges a candidate x away from anything ALREADY in `pos` at the given
+  // level, in the given direction, until clear. This is the one place that
+  // checks real occupied space (not just the monotonic levelCursor) — an
+  // anchor-only insertion (see spans.length===0 below) deliberately skips
+  // levelCursor, so without this a normal placement processed afterward
+  // would have no way to know that territory is taken.
+  function resolveOverlap(idealX,width,lvl,pushLeft){
+    let candidate=idealX;
+    const occupied=[];
+    for(const pid in pos){
+      if(Math.round(pos[pid].y/TREE_LEVEL_H)===lvl)occupied.push(pos[pid].x);
+    }
+    let moved=true,g=0;
+    while(moved&&g++<200){
+      moved=false;
+      for(const ox of occupied){
+        if(candidate<ox+TREE_NODE_W&&candidate+width>ox){
+          candidate=pushLeft?ox-width-TREE_H_GAP:ox+TREE_NODE_W+TREE_H_GAP;
+          moved=true;
+        }
+      }
+    }
+    return candidate;
+  }
   function layoutUnit(unit){
     const key=[...unit.ids].sort((a,b)=>a-b).join(',');
     const kids=childrenByKey.get(key)||[];
     const width=unit.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
     const minX=levelCursor[unit.level]||0;
     let x=minX;
+    let isAnchorOnly=false,pushLeft=false;
     if(kids.length){
       // An earlier same-level sibling with no kids of its own never touches
       // levelCursor at this unit's children's level, so that cursor can lag
@@ -1127,6 +1152,7 @@ function _treeLayout(people){
         const minAll=Math.min(...ranges.map(r=>r.min)),maxAll=Math.max(...ranges.map(r=>r.max));
         const center=(minAll+maxAll)/2;
         if(spans.length===0){
+          isAnchorOnly=true;
           // Every one of this unit's kids was already positioned by a
           // different branch (e.g. a married-in spouse's own recorded
           // parents, positioned as part of THEIR side of the tree) — this
@@ -1137,29 +1163,44 @@ function _treeLayout(people){
           // for room in the normal left-to-right processing order — here
           // it would just shove this unit to the far end of the row,
           // nowhere near its real anchor. Find genuinely free space near
-          // the actual target instead.
-          let candidate=center-width/2;
-          const occupied=[];
-          for(const pid in pos){
-            if(Math.round(pos[pid].y/TREE_LEVEL_H)===unit.level)occupied.push(pos[pid].x);
-          }
-          let moved=true,g=0;
-          while(moved&&g++<200){
-            moved=false;
-            for(const ox of occupied){
-              if(candidate<ox+TREE_NODE_W&&candidate+width>ox){candidate=ox+TREE_NODE_W+TREE_H_GAP;moved=true;}
-            }
-          }
-          x=candidate;
+          // the actual target instead — nudging toward whichever side its
+          // anchor kid actually sits on within their own couple (male
+          // right, female left, matching the rest of the tree), so when
+          // BOTH spouses of a marriage each have their own separately-
+          // recorded parents, the two ancestor branches spread apart to
+          // either side instead of both fighting to land in the same spot.
+          const anchorKid=kids.find(k=>claimedBy[k.id]!==key&&pos[k.id]);
+          pushLeft=!!(anchorKid&&anchorKid.gender==='girl');
+          x=center-width/2;
           // Now genuinely anchored right above its own kid — render it as
           // a normal local connector, not the staggered "far" elbow style.
+          // This insertion can legitimately land "out of turn" spatially
+          // (anywhere its real descendant ended up), so — unlike a normal
+          // placement — it must NOT advance the shared level cursor, or it
+          // would shove the next NORMAL sibling processed at this level
+          // further right than its own centering actually calls for.
           kids.forEach(k=>{ if(pos[k.id])claimedBy[k.id]=key; });
         } else {
           x=Math.max(minX,center-width/2);
         }
       }
     }
-    levelCursor[unit.level]=Math.max(levelCursor[unit.level]||0,x+width+TREE_H_GAP);
+    // Universal safety net: an anchor-only insertion deliberately skips
+    // levelCursor (it can legitimately land "out of turn" spatially), so a
+    // normal placement's own levelCursor-based x isn't guaranteed to be
+    // clear of one. Re-check against everything actually in `pos` at this
+    // level right before committing — a no-op when x is already clear
+    // (the overwhelmingly common case), a minimal nudge otherwise.
+    x=resolveOverlap(x,width,unit.level,pushLeft);
+    if(!isAnchorOnly){
+      // Only the normal, deterministic left-to-right sequence advances the
+      // shared cursor — an anchor-only insertion can legitimately land
+      // "out of turn" spatially (anywhere its real descendant ended up),
+      // and must never inflate the baseline the NEXT normal sibling is
+      // measured against, or that sibling gets shoved rightward for no
+      // reason of its own.
+      levelCursor[unit.level]=Math.max(levelCursor[unit.level]||0,x+width+TREE_H_GAP);
+    }
     unit.ids.forEach((id,i)=>{
       const ix=x+i*(TREE_NODE_W+TREE_COUPLE_GAP);
       pos[id]={x:ix,y:unit.level*TREE_LEVEL_H,cx:ix+TREE_NODE_W/2,cy:unit.level*TREE_LEVEL_H+TREE_NODE_H/2,bottom:unit.level*TREE_LEVEL_H+TREE_NODE_H};
