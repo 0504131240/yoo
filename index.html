@@ -897,7 +897,6 @@
     <button onclick="closeFamilyTreeOverlay()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
     <span style="font-size:16px;font-weight:800;color:var(--text)">🌳 אילן יוחסין</span>
     <div style="display:flex;gap:6px">
-      <button onclick="resetFamilyTree()" title="בנה מחדש מהנתונים" style="background:var(--surface2);color:var(--text2);border:none;border-radius:var(--r2);padding:7px 10px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">🔄</button>
       <button onclick="addRootTreePerson()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:7px 12px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ הוסף אדם</button>
     </div>
   </div>
@@ -914,6 +913,16 @@
 <!-- Family tree: person action sheet -->
 <div id="treePersonModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreePersonModal()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:340px;box-sizing:border-box">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div id="treePersonPhotoPreview" style="width:52px;height:52px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--border)"></div>
+      <div style="flex:1">
+        <label style="display:inline-block;padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">
+          📷 העלה תמונה
+          <input type="file" accept="image/*" id="treePersonPhoto" style="display:none" onchange="previewTreePersonPhoto(this)">
+        </label>
+        <button onclick="clearTreePersonPhoto()" id="treePersonPhotoClear" style="display:none;margin-top:4px;margin-right:6px;padding:6px 10px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:#c33;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">✕ הסר</button>
+      </div>
+    </div>
     <input type="text" id="treePersonNameInp" placeholder="שם פרטי" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:15px;font-weight:700;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;text-align:center" onchange="saveTreePersonName()">
     <input type="text" id="treePersonSurnameInp" placeholder="שם משפחה" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;text-align:center" onchange="saveTreePersonName()">
     <input type="text" id="treePersonMaidenNameInp" placeholder="שם משפחה לפני הנישואין (לבית)" style="display:none;width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 12px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px;text-align:center" onchange="saveTreePersonName()">

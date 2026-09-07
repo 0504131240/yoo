@@ -871,8 +871,7 @@ let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
 // each one's own blood relative (see rootSurname below) is seeded as a
 // child of one shared placeholder root couple, instead of each family
 // being its own disconnected root. Rename that placeholder pair to the
-// real grandparents once seeded (see resetFamilyTree() to redo this from
-// scratch on an already-seeded tree).
+// real grandparents once seeded.
 function seedFamilyTreeIfEmpty(){
   if(familyTree.length||!families.length)return;
   familyTree=_buildSeedFamilyTree();
@@ -912,17 +911,6 @@ function _buildSeedFamilyTree(){
   // Never leave these undefined (Firestore's setDoc throws on that).
   people.forEach(p=>{p.birthYear='';p.deathYear='';p.deceased=false;p.maidenName='';});
   return people;
-}
-// Rebuilds the tree from scratch using the current families/kids data —
-// discards any manual edits made in the tree itself (added people,
-// renames, extra relations). Offered as an explicit, confirmed action
-// rather than happening automatically, since it's destructive.
-function resetFamilyTree(){
-  if(!confirm('לבנות את העץ מחדש מהנתונים הקיימים? כל עריכה ידנית בעץ (שינויי שם, אנשים שהוספתם, קשרים נוספים) תימחק ותוחלף בעץ חדש.'))return;
-  familyTree=_buildSeedFamilyTree();
-  save();
-  renderFamilyTree();
-  _fitTreeWhenReady();
 }
 function openFamilyTreeOverlay(){
   seedFamilyTreeIfEmpty();
@@ -1295,10 +1283,13 @@ function renderFamilyTree(){
     // without needing to open the card first (matches the reference site's
     // per-card "+" convention).
     const plusBtn=`<div onclick="openTreePersonModal(${p.id})" title="הוסף קרוב" style="position:absolute;left:${pp.cx-9}px;top:${pp.bottom+3}px;width:18px;height:18px;border-radius:50%;background:var(--blue-mid);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">+</div>`;
-    return`<div onclick="openTreePersonModal(${p.id})" style="position:absolute;left:${pp.x}px;top:${pp.y}px;width:${TREE_NODE_W}px;height:${TREE_NODE_H}px;background:var(--surface);${borderStyle};border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:4px;box-sizing:border-box;text-align:center;gap:1px">
+    // Draggable so two same-parent siblings can swap left-right order by
+    // dropping one card onto another — deliberately just a swap (not free
+    // positioning), so the layout stays deterministic and never overlaps.
+    return`<div onclick="openTreePersonModal(${p.id})" draggable="true" ondragstart="treeCardDragStart(event,${p.id})" ondragend="treeCardDragEnd(event)" ondragover="treeCardDragOver(event)" ondragleave="treeCardDragLeave(event)" ondrop="treeCardDrop(event,${p.id})" style="position:absolute;left:${pp.x}px;top:${pp.y}px;width:${TREE_NODE_W}px;height:${TREE_NODE_H}px;background:var(--surface);${borderStyle};border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:4px;box-sizing:border-box;text-align:center;gap:1px">
       ${deceased}
-      <span style="width:24px;height:24px;border-radius:50%;background:${avatarBg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="${avatarFg}"><circle cx="12" cy="8" r="4"/><path d="M12 14c-5 0-8 2.5-8 6v1h16v-1c0-3.5-3-6-8-6z"/></svg>
+      <span style="width:24px;height:24px;border-radius:50%;background:${avatarBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
+        ${p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`:`<svg width="14" height="14" viewBox="0 0 24 24" fill="${avatarFg}"><circle cx="12" cy="8" r="4"/><path d="M12 14c-5 0-8 2.5-8 6v1h16v-1c0-3.5-3-6-8-6z"/></svg>`}
       </span>
       <span style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(p.name||'ללא שם')}</span>
       ${p.gender==='girl'&&p.maidenName?`<span style="font-size:8px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">(לבית ${esc(p.maidenName)})</span>`:''}
@@ -1324,6 +1315,13 @@ function _renderTreeGenderButtons(g){
 function openTreePersonModal(id){
   _treeActivePersonId=id;
   const p=familyTree.find(x=>x.id===id);if(!p)return;
+  _treePersonEditPhoto=undefined;
+  const photoInp=document.getElementById('treePersonPhoto');
+  if(photoInp)photoInp.value='';
+  const photoPreview=document.getElementById('treePersonPhotoPreview');
+  const photoClear=document.getElementById('treePersonPhotoClear');
+  if(photoPreview)photoPreview.innerHTML=p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`:'<span style="font-size:22px">👤</span>';
+  if(photoClear)photoClear.style.display=p.photo?'inline-block':'none';
   document.getElementById('treePersonNameInp').value=p.name||'';
   document.getElementById('treePersonSurnameInp').value=p.surname||'';
   document.getElementById('treePersonMaidenNameInp').value=p.maidenName||'';
@@ -1376,7 +1374,13 @@ function toggleTreePersonDeceased(){
   renderFamilyTree();
 }
 function saveTreePersonChanges(){
+  const p=familyTree.find(x=>x.id===_treeActivePersonId);
+  if(p&&_treePersonEditPhoto!==undefined){
+    p.photo=_treePersonEditPhoto||null;
+    _treePersonEditPhoto=undefined;
+  }
   save();
+  renderFamilyTree();
   showToast('נשמר ✓');
 }
 // Swaps this person's position in `familyTree` with the sibling immediately
@@ -1395,6 +1399,49 @@ function moveTreeSibling(dir){
   const swapIdx=siblingIdxs[pos+dir];
   if(swapIdx==null)return;
   [familyTree[idx],familyTree[swapIdx]]=[familyTree[swapIdx],familyTree[idx]];
+  save();renderFamilyTree();
+  _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
+}
+// Drag-and-drop reordering: dropping one card onto another swaps their
+// positions in `familyTree` (the same array-order swap moveTreeSibling
+// does) rather than allowing free positioning — so the tree's layout stays
+// deterministic and cards never end up floating outside the grid. Only
+// two people sharing the exact same parentIds set are swappable.
+let _treeDragId=null;
+function treeCardDragStart(e,id){
+  _treeDragId=id;
+  e.dataTransfer.effectAllowed='move';
+  try{e.dataTransfer.setData('text/plain',String(id));}catch(err){}
+  e.currentTarget.style.opacity='0.4';
+}
+function treeCardDragEnd(e){
+  e.currentTarget.style.opacity='';
+  _treeDragId=null;
+}
+function treeCardDragOver(e){
+  if(_treeDragId==null)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  e.currentTarget.style.outline='2px dashed var(--blue-mid)';
+}
+function treeCardDragLeave(e){
+  e.currentTarget.style.outline='';
+}
+function treeCardDrop(e,targetId){
+  e.preventDefault();
+  e.currentTarget.style.outline='';
+  const sourceId=_treeDragId;
+  _treeDragId=null;
+  if(sourceId==null||sourceId===targetId)return;
+  const a=familyTree.find(x=>x.id===sourceId),b=familyTree.find(x=>x.id===targetId);
+  if(!a||!b)return;
+  const key=ids=>[...(ids||[])].sort((x,y)=>x-y).join(',');
+  if(key(a.parentIds)!==key(b.parentIds)){
+    showToast('אפשר להחליף מקום רק בין אחים מאותם הורים');
+    return;
+  }
+  const idxA=familyTree.indexOf(a),idxB=familyTree.indexOf(b);
+  [familyTree[idxA],familyTree[idxB]]=[familyTree[idxB],familyTree[idxA]];
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -3592,6 +3639,12 @@ function famAva(f, size=34, extra=''){
 }
 let _famEditId=null;
 let _famEditPhoto=undefined;
+// The photo repos (crop/zoom) modal is one shared instance used by both the
+// family-photo flow and the tree-person-photo flow below — this flag says
+// which staging variable/preview elements confirmPhotoRepos() should write
+// into once the user finishes cropping.
+let _photoReposTarget='fam';
+let _treePersonEditPhoto=undefined;
 // undefined = untouched this sheet-open (don't overwrite f.anniversary*),
 // null = explicitly cleared, {hebYear,hebMonth,hebDay} = a new pick. Kept
 // separate from the shared _kidPickedDate/_kidLegacyDate (which the same
@@ -3603,6 +3656,14 @@ let _reposImgSize=null,_reposOffset={x:0,y:0},_reposDragging=false,_reposStart=n
 let _reposZoom=1,_reposBaseW=0,_reposBaseH=0,_pinchStartDist=null,_pinchStartZoom=1;
 function previewFamPhoto(inp){
   if(!inp.files||!inp.files[0])return;
+  _photoReposTarget='fam';
+  const reader=new FileReader();
+  reader.onload=e=>openPhotoRepos(e.target.result);
+  reader.readAsDataURL(inp.files[0]);
+}
+function previewTreePersonPhoto(inp){
+  if(!inp.files||!inp.files[0])return;
+  _photoReposTarget='treePerson';
   const reader=new FileReader();
   reader.onload=e=>openPhotoRepos(e.target.result);
   reader.readAsDataURL(inp.files[0]);
@@ -3694,10 +3755,14 @@ function confirmPhotoRepos(){
   canvas.width=160;canvas.height=160;
   const ratio=160/s.sz;
   canvas.getContext('2d').drawImage(imgEl,_reposOffset.x*ratio,_reposOffset.y*ratio,s.w*ratio,s.h*ratio);
-  _famEditPhoto=canvas.toDataURL('image/jpeg',0.75);
-  const preview=document.getElementById('famEditPhotoPreview');
-  const clearBtn=document.getElementById('famEditPhotoClear');
-  if(preview) preview.innerHTML=`<img src="${_famEditPhoto}" style="width:100%;height:100%;object-fit:cover">`;
+  const dataUrl=canvas.toDataURL('image/jpeg',0.75);
+  const previewId=_photoReposTarget==='treePerson'?'treePersonPhotoPreview':'famEditPhotoPreview';
+  const clearBtnId=_photoReposTarget==='treePerson'?'treePersonPhotoClear':'famEditPhotoClear';
+  if(_photoReposTarget==='treePerson') _treePersonEditPhoto=dataUrl;
+  else _famEditPhoto=dataUrl;
+  const preview=document.getElementById(previewId);
+  const clearBtn=document.getElementById(clearBtnId);
+  if(preview) preview.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
   if(clearBtn) clearBtn.style.display='inline-block';
   closePhotoRepos();
 }
@@ -3716,6 +3781,15 @@ function clearFamPhoto(){
   const inp=document.getElementById('famEditPhoto');
   if(inp) inp.value='';
   if(preview) preview.innerHTML=f?`<span style="background:${cl.bg};color:${cl.c};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">${ini(f.name)}</span>`:'';
+  if(clearBtn) clearBtn.style.display='none';
+}
+function clearTreePersonPhoto(){
+  _treePersonEditPhoto=null;
+  const preview=document.getElementById('treePersonPhotoPreview');
+  const clearBtn=document.getElementById('treePersonPhotoClear');
+  const inp=document.getElementById('treePersonPhoto');
+  if(inp) inp.value='';
+  if(preview) preview.innerHTML='<span style="font-size:22px">👤</span>';
   if(clearBtn) clearBtn.style.display='none';
 }
 function openFamEditSheet(fid){
