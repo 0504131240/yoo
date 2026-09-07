@@ -957,6 +957,16 @@
   </div>
 </div>
 
+<!-- Family tree: per-card "+" quick-add menu -->
+<div id="treeQuickAddModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2050;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeQuickAddMenu()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:14px;width:100%;max-width:280px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px">
+    <button onclick="quickAddRelation('parent')" style="padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px">⬆️ הוסף הורה</button>
+    <button onclick="quickAddRelation('sibling')" style="padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px">👫 הוסף אח/אחות</button>
+    <button onclick="quickAddRelation('child')" style="padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px">⬇️ הוסף ילד/ה</button>
+    <button onclick="closeTreeQuickAddMenu()" style="padding:10px;border-radius:var(--r2);border:none;background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;margin-top:4px">ביטול</button>
+  </div>
+</div>
+
 <!-- Family tree: add-relation name entry -->
 <div id="treeAddModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2100;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeAddModal()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:320px;box-sizing:border-box">

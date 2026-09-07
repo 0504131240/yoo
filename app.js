@@ -1278,11 +1278,10 @@ function renderFamilyTree(){
     const deceased=p.deceased?`<span style="position:absolute;top:2px;left:2px;font-size:9px">🕯️</span>`:'';
     const years=(p.birthYear||p.deathYear)?`<span style="font-size:8px;color:var(--text2)">${esc(p.birthYear||'')}${p.deceased||p.deathYear?'–'+esc(p.deathYear||''):''}</span>`:'';
     // A small "+" below the card is a quick, always-visible shortcut straight
-    // into this person's add-relation options — the same destination as
-    // tapping the card itself (openTreePersonModal), just discoverable
-    // without needing to open the card first (matches the reference site's
-    // per-card "+" convention).
-    const plusBtn=`<div onclick="openTreePersonModal(${p.id})" title="הוסף קרוב" style="position:absolute;left:${pp.cx-9}px;top:${pp.bottom+3}px;width:18px;height:18px;border-radius:50%;background:var(--blue-mid);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">+</div>`;
+    // into this person's add-relation options (parent/sibling/child) —
+    // discoverable without opening the full person card first (matches the
+    // reference site's per-card "+" convention).
+    const plusBtn=`<div onclick="event.stopPropagation();openTreeQuickAddMenu(${p.id})" title="הוסף קרוב" style="position:absolute;left:${pp.cx-9}px;top:${pp.bottom+3}px;width:18px;height:18px;border-radius:50%;background:var(--blue-mid);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">+</div>`;
     // Draggable so two same-parent siblings can swap left-right order by
     // dropping one card onto another — deliberately just a swap (not free
     // positioning), so the layout stays deterministic and never overlaps.
@@ -1462,6 +1461,20 @@ function deleteTreePerson(){
 function addRootTreePerson(){
   _treeActivePersonId=null;
   openTreeAddModal('root');
+}
+// The per-card "+" button's own small menu — jumps straight to the
+// add-relation form (parent/sibling/child) without opening the full person
+// card first, unlike tapping the card itself.
+function openTreeQuickAddMenu(id){
+  _treeActivePersonId=id;
+  document.getElementById('treeQuickAddModal').style.display='flex';
+}
+function closeTreeQuickAddMenu(){
+  document.getElementById('treeQuickAddModal').style.display='none';
+}
+function quickAddRelation(relation){
+  closeTreeQuickAddMenu();
+  openTreeAddModal(relation);
 }
 function openTreeAddModal(relation){
   if(relation==='sibling'){
