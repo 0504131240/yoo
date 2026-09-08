@@ -1996,6 +1996,7 @@ function renderTreeLinkSiblingList(filter){
   </div>`).join('');
 }
 function linkAsSiblings(otherId){
+  if(_blockedByTreeLock())return;
   const a=familyTree.find(x=>x.id===_treeActivePersonId);if(!a)return;
   const b=familyTree.find(x=>x.id===otherId);if(!b)return;
   const aHas=!!(a.parentIds&&a.parentIds.length);
@@ -2495,6 +2496,12 @@ async function startRealtimeSync(){
           renderMessages();
         }
       }
+      // Picked up live (not just on page load) so an admin locking the tree
+      // takes effect immediately for anyone who already has it open, rather
+      // than only from their next reload.
+      treeLocked=!!d.treeLocked;
+      const treeOverlay=document.getElementById('familyTreeOverlay');
+      if(treeOverlay&&treeOverlay.style.display==='flex')_updateTreeLockBtn();
       _initialSync=false;
     });
   }catch(e){console.warn('realtime sync:',e);}
