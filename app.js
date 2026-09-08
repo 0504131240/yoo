@@ -1352,61 +1352,58 @@ function _treeLayout(people){
     flatUnits.forEach((u,i)=>placeUnitAt(u,leftEdges[i]));
   }
 
-  // Top-down tidy-up: a row of ancestors is often WIDER than the row of
-  // children below it (every couple there needs its own full width, while
-  // their children may sit two to a couple), so that row has to spread —
-  // and a unit at the bottom of it can end up with BOTH of its parent
-  // couples off to the same side. Both connecting lines then reach the
-  // same way and leave a hole under one parent. Where it's possible,
-  // slide such a unit back to sit between its two parents — but only into
-  // space that is genuinely free in its own row, never past a neighbour
-  // and never changing the left-to-right order.
+  // Top-down pass over the ancestry. Along a line of ancestry a couple sits
+  // midway between the husband's parents and the wife's parents — or, where
+  // only one side is recorded, that one child sits directly under their
+  // parents — so the generation above always has room laid out side by
+  // side. The row is then re-fitted with the same isotonic placement used
+  // above, which makes room for those targets by spreading the row rather
+  // than giving up when a neighbour is in the way; it never reorders.
+  //
+  // Only units on a single-child line of ancestry get a target. A couple
+  // with several children of its own must stay centred on those children
+  // instead, and siblings must stay spread as a group under their shared
+  // parents rather than each piling onto the same spot — everyone else
+  // simply keeps their current position and is pushed aside only if the
+  // targets above genuinely need the room.
   const unitLeftX=u=>Math.min(...u.ids.map(id=>pos[id].x));
   const unitCenterX=u=>{const xs=u.ids.map(id=>pos[id].cx);return (Math.min(...xs)+Math.max(...xs))/2;};
+  const kidUnitsOf=u=>{
+    const ks=new Set();
+    childPersonsOf.get(u).forEach(cid=>{ const ku=unitOf[cid]; if(ku)ks.add(ku); });
+    return ks;
+  };
   for(let l=1;l<=maxLevel;l++){
     const row=units.filter(u=>u.level===l&&u.ids.every(id=>pos[id])).sort((a,b)=>unitLeftX(a)-unitLeftX(b));
-    row.forEach((u,idx)=>{
+    if(!row.length)continue;
+    const desired=row.map(u=>{
       const links=u.ids.map(id=>({id,pu:parentUnitOfMember(id)}))
-        .filter(l=>l.pu&&l.pu!==u&&l.pu.ids.every(id=>pos[id]));
-      const parents=[...new Set(links.map(l=>l.pu))];
-      if(!parents.length)return;
-      // Only in the ancestry part of the tree, where a couple leads down to
-      // a single line. A couple with several children is the other case —
-      // there its own children below are what it needs to stay centred on,
-      // and pulling it up to its parents' midpoint would drag it off them.
-      const kidUnits=new Set();
-      childPersonsOf.get(u).forEach(cid=>{ const ku=unitOf[cid]; if(ku)kidUnits.add(ku); });
-      if(kidUnits.size>1)return;
-      // …and only where each parent couple leads down to this one child.
-      // Siblings must stay spread as a group centred under their shared
-      // parents; pulling each of them individually under those parents
-      // would just pile them up on the same spot.
-      const onlyChild=parents.every(pu=>{
-        const ks=new Set();
-        childPersonsOf.get(pu).forEach(cid=>{ const ku=unitOf[cid]; if(ku)ks.add(ku); });
-        return ks.size<=1;
-      });
-      if(!onlyChild)return;
-      // With BOTH sides recorded the couple sits midway between his parents
-      // and hers. With only one side recorded there's no midpoint to find —
-      // then it's that one child who belongs directly under their parents,
-      // not the middle of the couple.
-      let target,anchor;
+        .filter(k=>k.pu&&k.pu!==u&&k.pu.ids.every(id=>pos[id]));
+      const parents=[...new Set(links.map(k=>k.pu))];
+      if(!parents.length)return unitCenterX(u);
+      // Exactly one child: that's a link in a line of ancestry. Several
+      // children means this couple must stay centred on them instead, and
+      // NO children means a leaf, which belongs to its sibling group's own
+      // layout rather than being pulled out of it.
+      if(kidUnitsOf(u).size!==1)return unitCenterX(u);
+      if(!parents.every(pu=>kidUnitsOf(pu).size<=1))return unitCenterX(u);
       if(parents.length>1){
-        const centers=parents.map(unitCenterX);
-        target=(Math.min(...centers)+Math.max(...centers))/2;
-        anchor=unitCenterX(u);
-      } else {
-        target=unitCenterX(parents[0]);
-        anchor=pos[links[0].id].cx;
+        const cs=parents.map(unitCenterX);
+        return (Math.min(...cs)+Math.max(...cs))/2;
       }
-      const prev=row[idx-1],next=row[idx+1];
-      const minLeft=prev?unitLeftX(prev)+uWidth(prev)+TREE_H_GAP:-Infinity;
-      const maxLeft=next?unitLeftX(next)-TREE_H_GAP-uWidth(u):Infinity;
-      let newLeft=unitLeftX(u)+(target-anchor);
-      newLeft=Math.min(Math.max(newLeft,minLeft),maxLeft);
-      const delta=newLeft-unitLeftX(u);
-      if(Math.abs(delta)<1)return;
+      // One side only: aim that child under their parents, which means
+      // offsetting the couple by however far the child sits from its middle.
+      return unitCenterX(parents[0])+(unitCenterX(u)-pos[links[0].id].cx);
+    });
+    const want=new Map(row.map((u,i)=>[u,desired[i]]));
+    // Same minimum gaps as the original placement — siblings at the tight
+    // couple gap, everyone else at the standard one — so re-fitting a row
+    // that has no targets in it leaves that row exactly as it was.
+    const rowGap=i=>(clusterOfUnit.get(row[i])===clusterOfUnit.get(row[i+1]))?TREE_COUPLE_GAP:TREE_H_GAP;
+    const edges=_treePlaceRow(row,uWidth,rowGap,u=>want.get(u));
+    row.forEach((u,i)=>{
+      const delta=edges[i]-unitLeftX(u);
+      if(Math.abs(delta)<0.01)return;
       u.ids.forEach(id=>{ pos[id].x+=delta; pos[id].cx+=delta; });
     });
   }
