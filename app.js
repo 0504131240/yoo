@@ -34,6 +34,9 @@ let yahrzeits=[];
 // then on, since a genealogical tree needs relations families/kids don't
 // model (grandparents, siblings-in-law, multiple generations...).
 let familyTree=[];
+// Admin can lock the tree so only they can add/edit/delete/reorder people —
+// everyone else gets a popup instead of the change going through.
+let treeLocked=false;
 let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1,nxtNotif=1,nxtPoll=1,nxtCountdown=1,nxtYahrzeit=1,nxtTreePerson=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
@@ -611,6 +614,7 @@ function saveLocal(){
     localStorage.setItem('countdowns',JSON.stringify(countdowns));
     localStorage.setItem('yahrzeits',JSON.stringify(yahrzeits));
     localStorage.setItem('familyTree',JSON.stringify(familyTree));
+    localStorage.setItem('treeLocked',treeLocked?'1':'0');
   }catch(e){}
 }
 
@@ -639,6 +643,7 @@ function _restoreAllFromLocalCache(){
   const cds=localStorage.getItem('countdowns');if(cds)countdowns=JSON.parse(cds);
   const yhz=localStorage.getItem('yahrzeits');if(yhz)yahrzeits=JSON.parse(yhz);
   const ftr=localStorage.getItem('familyTree');if(ftr)familyTree=JSON.parse(ftr);
+  const tlk=localStorage.getItem('treeLocked');if(tlk!=null)treeLocked=tlk==='1';
   nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
   nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
   nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
@@ -664,7 +669,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,globalSettled,visits,notifications,polls,countdowns,yahrzeits,familyTree});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,globalSettled,visits,notifications,polls,countdowns,yahrzeits,familyTree,treeLocked});
     localStorage.removeItem('pendingSave');
     localStorage.removeItem('pendingSaveAt');
     showSyncStatus('✓ נשמר',2000);
@@ -704,6 +709,7 @@ async function load(){
     countdowns=d.countdowns||[];
     yahrzeits=d.yahrzeits||[];
     familyTree=d.familyTree||[];
+    treeLocked=!!d.treeLocked;
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
@@ -866,6 +872,28 @@ function closeFamiliesHomeOverlay(){
 // genealogical tree outgrows what the payments app's family units model.
 const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
 let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
+// Admin-only lock: every tree-mutating entry point calls this first and
+// bails out (popping the same in-page message instead) when it's true and
+// the caller isn't the unlocked admin.
+function _blockedByTreeLock(){
+  if(!treeLocked||editMode)return false;
+  document.getElementById('treeLockedModal').style.display='flex';
+  return true;
+}
+function closeTreeLockedModal(){
+  document.getElementById('treeLockedModal').style.display='none';
+}
+function toggleTreeLock(){
+  treeLocked=!treeLocked;
+  save();
+  _updateTreeLockBtn();
+  showToast(treeLocked?'🔒 העץ ננעל — רק המנהל יכול לערוך':'🔓 העץ נפתח לעריכה לכולם');
+}
+function _updateTreeLockBtn(){
+  const btn=document.getElementById('treeLockBtn');if(!btn)return;
+  btn.textContent=treeLocked?'🔒':'🔓';
+  btn.title=treeLocked?'העץ נעול — לחצו לפתוח לעריכה לכולם':'העץ פתוח — לחצו לנעול עריכה לכולם חוץ מהמנהל';
+}
 
 // The families already in the app are treated as siblings of one another —
 // each one's own blood relative (see rootSurname below) is seeded as a
@@ -918,6 +946,7 @@ function openFamilyTreeOverlay(){
   const wrap0=document.getElementById('treeCanvasWrap');
   if(wrap0){wrap0.scrollTop=0;wrap0.scrollLeft=0;} // known state immediately, before the fit even runs
   renderFamilyTree();
+  _updateTreeLockBtn();
   _fitTreeWhenReady(); // canvas needs a layout pass first for its size to be known
 }
 function closeFamilyTreeOverlay(){
@@ -1562,6 +1591,16 @@ function setTreePersonGender(g){
 // triggering a save (and its sync-status flicker) each time.
 function saveTreePersonName(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
+  if(_blockedByTreeLock()){
+    // Snap the fields back to the actual (unchanged) data — otherwise the
+    // input keeps showing what they just typed even though nothing saved.
+    document.getElementById('treePersonNameInp').value=p.name||'';
+    document.getElementById('treePersonSurnameInp').value=p.surname||'';
+    document.getElementById('treePersonMaidenNameInp').value=p.maidenName||'';
+    document.getElementById('treePersonBirthYearInp').value=p.birthYear||'';
+    document.getElementById('treePersonDeathYearInp').value=p.deathYear||'';
+    return;
+  }
   const v=(document.getElementById('treePersonNameInp').value||'').trim();
   if(v)p.name=v;
   p.surname=(document.getElementById('treePersonSurnameInp').value||'').trim();
@@ -1572,17 +1611,21 @@ function saveTreePersonName(){
 }
 function toggleTreePersonDeceased(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
+  if(_blockedByTreeLock()){
+    document.getElementById('treePersonDeceasedChk').checked=!!p.deceased;
+    return;
+  }
   p.deceased=document.getElementById('treePersonDeceasedChk').checked;
   document.getElementById('treePersonDeathYearInp').style.display=p.deceased?'block':'none';
   renderFamilyTree();
 }
 function saveTreePersonChanges(){
+  if(_blockedByTreeLock())return;
   const p=familyTree.find(x=>x.id===_treeActivePersonId);
   if(p&&_treePersonEditPhoto!==undefined){
     p.photo=_treePersonEditPhoto||null;
     _treePersonEditPhoto=undefined;
   }
-  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();
   renderFamilyTree();
   showToast('נשמר ✓');
@@ -1594,6 +1637,7 @@ function saveTreePersonChanges(){
 // instead of relying on birth-year data that's often missing or free-form
 // dragging that got confusing.
 function moveTreeSibling(dir){
+  if(_blockedByTreeLock())return;
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   const key=ids=>[...(ids||[])].sort((a,b)=>a-b).join(',');
   const myKey=key(p.parentIds);
@@ -1604,7 +1648,6 @@ function moveTreeSibling(dir){
   const swapIdx=siblingIdxs[pos+dir];
   if(swapIdx==null)return;
   [familyTree[idx],familyTree[swapIdx]]=[familyTree[swapIdx],familyTree[idx]];
-  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -1638,6 +1681,7 @@ function treeCardDrop(e,targetId){
   e.currentTarget.style.outline='';
   const sourceId=_treeDragId;
   _treeDragId=null;
+  if(_blockedByTreeLock())return;
   if(sourceId==null||sourceId===targetId)return;
   const a=familyTree.find(x=>x.id===sourceId),b=familyTree.find(x=>x.id===targetId);
   if(!a||!b)return;
@@ -1648,11 +1692,11 @@ function treeCardDrop(e,targetId){
   }
   const idxA=familyTree.indexOf(a),idxB=familyTree.indexOf(b);
   [familyTree[idxA],familyTree[idxB]]=[familyTree[idxB],familyTree[idxA]];
-  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
 function deleteTreePerson(){
+  if(_blockedByTreeLock())return;
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   if(!confirm('למחוק את '+(p.name||'האדם הזה')+'? הקשרים המשפחתיים שלו יוסרו, אבל שאר בני המשפחה יישארו בעץ.'))return;
   const id=p.id;
@@ -1662,7 +1706,6 @@ function deleteTreePerson(){
     if(x.spouseIds)x.spouseIds=x.spouseIds.filter(sid=>sid!==id);
   });
   closeTreePersonModal();
-  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -1685,6 +1728,7 @@ function quickAddRelation(relation){
   openTreeAddModal(relation);
 }
 function openTreeAddModal(relation){
+  if(_blockedByTreeLock())return;
   if(relation==='sibling'){
     const p=familyTree.find(x=>x.id===_treeActivePersonId);
     if(!p||!p.parentIds||!p.parentIds.length){alert('קודם צריך שלאדם הזה יהיה הורה בעץ — לחצו "הוסף הורה", ורק אז אפשר להוסיף אח/אחות.');return;}
@@ -1729,6 +1773,7 @@ function toggleTreeAddDeceased(){
   document.getElementById('treeAddDeathYearInp').style.display=document.getElementById('treeAddDeceasedChk').checked?'block':'none';
 }
 function confirmTreeAdd(){
+  if(_blockedByTreeLock())return;
   const name=(document.getElementById('treeAddNameInp').value||'').trim();
   if(!name)return;
   const surname=(document.getElementById('treeAddSurnameInp').value||'').trim();
@@ -1769,7 +1814,6 @@ function confirmTreeAdd(){
   familyTree.push(newPerson);
   closeTreeAddModal();
   closeTreePersonModal();
-  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -1782,6 +1826,7 @@ function confirmTreeAdd(){
 // means making their parentIds match.
 function _treeParentKey(ids){return[...(ids||[])].sort((a,b)=>a-b).join(',');}
 function openTreeLinkSiblingModal(){
+  if(_blockedByTreeLock())return;
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   document.getElementById('treeLinkSiblingSearch').value='';
   renderTreeLinkSiblingList('');
@@ -1827,7 +1872,6 @@ function linkAsSiblings(otherId){
   }
   closeTreeLinkSiblingModal();
   closeTreePersonModal();
-  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }

@@ -661,6 +661,15 @@
   </div>
 </div>
 
+<!-- Shown instead of letting a non-admin change through, while the tree is locked -->
+<div id="treeLockedModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2950;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeLockedModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:22px;width:100%;max-width:340px;box-sizing:border-box;text-align:center">
+    <div style="font-size:30px;margin-bottom:8px">🔒</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:18px">טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם</div>
+    <button onclick="closeTreeLockedModal()" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>
+  </div>
+</div>
+
 <!-- Settings hub modal -->
 <div id="settingsHubModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1650;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeSettingsHubModal()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
@@ -887,6 +896,7 @@
     <button onclick="closeFamilyTreeOverlay()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
     <span style="font-size:16px;font-weight:800;color:var(--text)">🌳 אילן יוחסין</span>
     <div style="display:flex;gap:6px">
+      <button id="treeLockBtn" onclick="toggleTreeLock()" class="edit-only" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--r2);padding:7px 10px;font-size:14px;cursor:pointer">🔓</button>
       <button onclick="addRootTreePerson()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:7px 12px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ הוסף אדם</button>
     </div>
   </div>
