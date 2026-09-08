@@ -871,6 +871,11 @@ function closeFamiliesHomeOverlay(){
 // anyone (add parents/siblings/spouses/children, rename, delete) since a
 // genealogical tree outgrows what the payments app's family units model.
 const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
+// Gap between two different couples in the same row. Deliberately much
+// larger than TREE_COUPLE_GAP (the spacing between two spouses) — that
+// contrast is what makes each pair read as a pair rather than the row
+// reading as one long line of people.
+const TREE_UNIT_GAP=100;
 let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
 // Admin-only lock: every tree-mutating entry point calls this first and
 // bails out (popping the same in-page message instead) — blocks the admin
@@ -1159,44 +1164,17 @@ function _treeLayout(people){
     units.push(u);
     ids.forEach(id=>unitOf[id]=u);
   });
-  // Spouse spacing INSIDE a couple is normally tight, but when BOTH spouses
-  // have their own separately-recorded parents the two parent couples each
-  // need to sit directly above their own child — and two full-width parent
-  // couples simply don't fit above two spouses standing 126px apart. They'd
-  // be shoved aside and have to reach back across each other, which is what
-  // makes their connecting lines cross. So widen the gap between THESE two
-  // spouses instead, just enough that both parent couples fit side by side
-  // above them. Computed shallowest level first, since a couple's required
-  // spacing depends on how wide its members' own parent couples are.
+  // Spouses always stand at the same tight spacing, so a couple always
+  // reads as a couple. Different couples get a much wider gap between them
+  // (see TREE_UNIT_GAP below) — without that contrast the pairs blur into
+  // one long row and you can't tell who is married to whom.
   const parentUnitOfMember=id=>{
     const p=byId.get(id);
     if(!p.parentIds||!p.parentIds.length)return null;
     for(const pid of p.parentIds){ const pu=unitOf[pid]; if(pu)return pu; }
     return null;
   };
-  const unitWidth=new Map();
-  for(let l=0;l<=maxLevel;l++){
-    units.forEach(u=>{
-      if(u.level!==l)return;
-      if(u.ids.length<2){ unitWidth.set(u,TREE_NODE_W); return; }
-      let step=TREE_NODE_W+TREE_COUPLE_GAP;
-      const p0=parentUnitOfMember(u.ids[0]),p1=parentUnitOfMember(u.ids[1]);
-      if(p0&&p1&&p0!==p1){
-        const w0=unitWidth.has(p0)?unitWidth.get(p0):TREE_NODE_W;
-        const w1=unitWidth.has(p1)?unitWidth.get(p1):TREE_NODE_W;
-        // Capped at twice the normal spouse spacing: a long documented line
-        // of cross-lineage marriages would otherwise keep compounding the
-        // requirement generation after generation, spreading couples so far
-        // apart that the extra crowding costs more than the crossings it
-        // avoids. Measured on the real tree and on a stress copy with two
-        // parents added to every root, this cap is where both the crossing
-        // count and the centering error come out best.
-        step=Math.max(step,Math.min(2*(TREE_NODE_W+TREE_COUPLE_GAP),(w0+w1)/2+TREE_H_GAP));
-      }
-      unitWidth.set(u,step+TREE_NODE_W);
-    });
-  }
-  const uWidth=u=>unitWidth.get(u);
+  const uWidth=u=>u.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
   const unitMinIndex=u=>Math.min(...u.ids.map(id=>arrayIndex.get(id)));
 
   // True-sibling clusters: people sharing the exact recorded parents set
@@ -1362,8 +1340,30 @@ function _treeLayout(people){
     const clusterOfFlatUnit=new Map();
     ordered.forEach(c=>c.members.forEach(u=>clusterOfFlatUnit.set(u,c)));
     const unitChildCx=u=>{
-      const xs=[...childPersonsOf.get(u)].map(cid=>pos[cid]).filter(Boolean).map(p=>p.cx);
-      return xs.length?(Math.min(...xs)+Math.max(...xs))/2:null;
+      const kids=[...childPersonsOf.get(u)].filter(cid=>pos[cid]);
+      if(!kids.length)return null;
+      // When this unit's only child married someone whose OWN parents are
+      // also recorded, both parent couples want the very same spot — right
+      // above two spouses standing side by side — and they can't both have
+      // it. Instead of pulling those spouses apart (which stops them from
+      // reading as a couple), fan the two parent couples out to either side
+      // of the couple's midpoint. Each stays on its own child's side, so
+      // their connecting lines still never reach across each other.
+      if(kids.length===1){
+        const c=kids[0],cu=unitOf[c];
+        if(cu&&cu.ids.length===2){
+          const other=cu.ids.find(id=>id!==c);
+          const op=parentUnitOfMember(other);
+          if(op&&op!==u&&pos[other]){
+            const mid=(pos[c].cx+pos[other].cx)/2;
+            return pos[c].cx<pos[other].cx
+              ?mid-TREE_H_GAP/2-uWidth(u)/2
+              :mid+TREE_H_GAP/2+uWidth(u)/2;
+          }
+        }
+      }
+      const xs=kids.map(cid=>pos[cid].cx);
+      return (Math.min(...xs)+Math.max(...xs))/2;
     };
     const unitAvgOf=new Map(flatUnits.map(u=>[u,unitChildCx(u)]));
     const unitVirtual=new Map();
@@ -1386,7 +1386,11 @@ function _treeLayout(people){
       ui=uj;
     }
     const desiredByUnit=new Map(flatUnits.map(u=>[u,unitAvgOf.get(u)!=null?unitAvgOf.get(u):unitVirtual.get(u)]));
-    const gapAfter=i=>(clusterOfFlatUnit.get(flatUnits[i])===clusterOfFlatUnit.get(flatUnits[i+1]))?TREE_COUPLE_GAP:TREE_H_GAP;
+    // Every boundary between two different couples gets the same wide gap —
+    // several times the spacing between spouses — so each pair stands out
+    // as a pair. Siblings used to sit at the spouse gap, which made a row
+    // of married siblings read as one undifferentiated line of people.
+    const gapAfter=()=>TREE_UNIT_GAP;
     const leftEdges=_treePlaceRow(flatUnits,uWidth,gapAfter,u=>desiredByUnit.get(u));
     flatUnits.forEach((u,i)=>placeUnitAt(u,leftEdges[i]));
   }
