@@ -1159,7 +1159,44 @@ function _treeLayout(people){
     units.push(u);
     ids.forEach(id=>unitOf[id]=u);
   });
-  const uWidth=u=>u.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
+  // Spouse spacing INSIDE a couple is normally tight, but when BOTH spouses
+  // have their own separately-recorded parents the two parent couples each
+  // need to sit directly above their own child — and two full-width parent
+  // couples simply don't fit above two spouses standing 126px apart. They'd
+  // be shoved aside and have to reach back across each other, which is what
+  // makes their connecting lines cross. So widen the gap between THESE two
+  // spouses instead, just enough that both parent couples fit side by side
+  // above them. Computed shallowest level first, since a couple's required
+  // spacing depends on how wide its members' own parent couples are.
+  const parentUnitOfMember=id=>{
+    const p=byId.get(id);
+    if(!p.parentIds||!p.parentIds.length)return null;
+    for(const pid of p.parentIds){ const pu=unitOf[pid]; if(pu)return pu; }
+    return null;
+  };
+  const unitWidth=new Map();
+  for(let l=0;l<=maxLevel;l++){
+    units.forEach(u=>{
+      if(u.level!==l)return;
+      if(u.ids.length<2){ unitWidth.set(u,TREE_NODE_W); return; }
+      let step=TREE_NODE_W+TREE_COUPLE_GAP;
+      const p0=parentUnitOfMember(u.ids[0]),p1=parentUnitOfMember(u.ids[1]);
+      if(p0&&p1&&p0!==p1){
+        const w0=unitWidth.has(p0)?unitWidth.get(p0):TREE_NODE_W;
+        const w1=unitWidth.has(p1)?unitWidth.get(p1):TREE_NODE_W;
+        // Capped at twice the normal spouse spacing: a long documented line
+        // of cross-lineage marriages would otherwise keep compounding the
+        // requirement generation after generation, spreading couples so far
+        // apart that the extra crowding costs more than the crossings it
+        // avoids. Measured on the real tree and on a stress copy with two
+        // parents added to every root, this cap is where both the crossing
+        // count and the centering error come out best.
+        step=Math.max(step,Math.min(2*(TREE_NODE_W+TREE_COUPLE_GAP),(w0+w1)/2+TREE_H_GAP));
+      }
+      unitWidth.set(u,step+TREE_NODE_W);
+    });
+  }
+  const uWidth=u=>unitWidth.get(u);
   const unitMinIndex=u=>Math.min(...u.ids.map(id=>arrayIndex.get(id)));
 
   // True-sibling clusters: people sharing the exact recorded parents set
@@ -1255,8 +1292,9 @@ function _treeLayout(people){
 
   const pos={};
   const placeUnitAt=(u,leftX)=>{
+    const step=uWidth(u)-TREE_NODE_W;
     u.ids.forEach((id,i)=>{
-      const ix=leftX+i*(TREE_NODE_W+TREE_COUPLE_GAP);
+      const ix=leftX+i*step;
       pos[id]={x:ix,y:u.level*TREE_LEVEL_H,cx:ix+TREE_NODE_W/2,cy:u.level*TREE_LEVEL_H+TREE_NODE_H/2,bottom:u.level*TREE_LEVEL_H+TREE_NODE_H};
     });
   };
