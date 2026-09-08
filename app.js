@@ -1129,13 +1129,13 @@ function _pava(targets){
   blocks.forEach(b=>{ for(let i=b.start;i<=b.end;i++)out[i]=b.val; });
   return out;
 }
-function _treePlaceRow(orderedClusters,widthOf,desiredCenterOf){
-  const n=orderedClusters.length;
-  const w=orderedClusters.map(widthOf);
+function _treePlaceRow(items,widthOf,gapAfterOf,desiredCenterOf){
+  const n=items.length;
+  const w=items.map(widthOf);
   const off=new Array(n);
   off[0]=0;
-  for(let i=1;i<n;i++)off[i]=off[i-1]+w[i-1]+TREE_H_GAP;
-  const targets=orderedClusters.map((c,i)=>(desiredCenterOf(c)-w[i]/2)-off[i]);
+  for(let i=1;i<n;i++)off[i]=off[i-1]+w[i-1]+gapAfterOf(i-1);
+  const targets=items.map((it,i)=>(desiredCenterOf(it)-w[i]/2)-off[i]);
   const y=_pava(targets);
   return y.map((yi,i)=>yi+off[i]);
 }
@@ -1194,7 +1194,6 @@ function _treeLayout(people){
     });
     clustersByLevel[l]=clusters;
   }
-  const cWidth=c=>c.members.reduce((s,m)=>s+uWidth(m),0)+Math.max(0,c.members.length-1)*TREE_COUPLE_GAP;
   const cMinIndex=c=>Math.min(...c.members.map(unitMinIndex));
 
   // Each cluster's parent UNIT (all members share the exact same recorded
@@ -1313,12 +1312,45 @@ function _treeLayout(people){
       if(av!==bv)return av-bv;
       return clusterRank(a)-clusterRank(b);
     });
-    const desiredByCluster=new Map(rowClusters.map(c=>[c,avgOf.get(c)!=null?avgOf.get(c):virtual.get(c)]));
-    const leftEdges=_treePlaceRow(ordered,cWidth,c=>desiredByCluster.get(c));
-    ordered.forEach((c,i)=>{
-      let cx=leftEdges[i];
-      c.members.forEach(u=>{ placeUnitAt(u,cx); cx+=uWidth(u)+TREE_COUPLE_GAP; });
-    });
+
+    // Cluster order only decides SEQUENCE — actual X placement happens per
+    // UNIT, each centered on its OWN attributed children, not the whole
+    // sibling group's combined span. Without this, a multi-member cluster
+    // (several full siblings) was centered as one block and its members
+    // then laid out sequentially inside that block, completely disconnected
+    // from where each individual sibling's own kids ended up — exactly the
+    // "parent not above its own children" bug this fixes.
+    const flatUnits=ordered.flatMap(c=>c.members);
+    const clusterOfFlatUnit=new Map();
+    ordered.forEach(c=>c.members.forEach(u=>clusterOfFlatUnit.set(u,c)));
+    const unitChildCx=u=>{
+      const xs=[...childPersonsOf.get(u)].map(cid=>pos[cid]).filter(Boolean).map(p=>p.cx);
+      return xs.length?(Math.min(...xs)+Math.max(...xs))/2:null;
+    };
+    const unitAvgOf=new Map(flatUnits.map(u=>[u,unitChildCx(u)]));
+    const unitVirtual=new Map();
+    flatUnits.forEach(u=>{ if(unitAvgOf.get(u)!=null)unitVirtual.set(u,unitAvgOf.get(u)); });
+    let ui=0;
+    while(ui<flatUnits.length){
+      if(unitVirtual.has(flatUnits[ui])){ ui++; continue; }
+      let uj=ui;
+      while(uj<flatUnits.length&&!unitVirtual.has(flatUnits[uj]))uj++;
+      const leftVal=ui>0?unitVirtual.get(flatUnits[ui-1]):null;
+      const rightVal=uj<flatUnits.length?unitVirtual.get(flatUnits[uj]):null;
+      for(let k=ui;k<uj;k++){
+        let v;
+        if(leftVal!=null&&rightVal!=null)v=leftVal+(rightVal-leftVal)*((k-ui+1)/(uj-ui+1));
+        else if(leftVal!=null)v=leftVal;
+        else if(rightVal!=null)v=rightVal;
+        else v=unitRank.get(flatUnits[k]);
+        unitVirtual.set(flatUnits[k],v);
+      }
+      ui=uj;
+    }
+    const desiredByUnit=new Map(flatUnits.map(u=>[u,unitAvgOf.get(u)!=null?unitAvgOf.get(u):unitVirtual.get(u)]));
+    const gapAfter=i=>(clusterOfFlatUnit.get(flatUnits[i])===clusterOfFlatUnit.get(flatUnits[i+1]))?TREE_COUPLE_GAP:TREE_H_GAP;
+    const leftEdges=_treePlaceRow(flatUnits,uWidth,gapAfter,u=>desiredByUnit.get(u));
+    flatUnits.forEach((u,i)=>placeUnitAt(u,leftEdges[i]));
   }
 
   // Shift everything into positive space.
