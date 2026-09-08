@@ -871,11 +871,12 @@ function closeFamiliesHomeOverlay(){
 // anyone (add parents/siblings/spouses/children, rename, delete) since a
 // genealogical tree outgrows what the payments app's family units model.
 const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
-// Gap between two different couples in the same row. Deliberately much
-// larger than TREE_COUPLE_GAP (the spacing between two spouses) — that
-// contrast is what makes each pair read as a pair rather than the row
-// reading as one long line of people.
-const TREE_UNIT_GAP=70;
+// Gap left between the two parent couples that split around a married
+// couple (his parents on one side, hers on the other). Wider than the
+// normal TREE_H_GAP so those two families read as two separate lines
+// rather than one block — this is the ONLY place spacing is widened;
+// spouses, siblings and everyone else keep the standard gaps.
+const TREE_FANOUT_GAP=120;
 let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
 // Admin-only lock: every tree-mutating entry point calls this first and
 // bails out (popping the same in-page message instead) — blocks the admin
@@ -1165,9 +1166,7 @@ function _treeLayout(people){
     ids.forEach(id=>unitOf[id]=u);
   });
   // Spouses always stand at the same tight spacing, so a couple always
-  // reads as a couple. Different couples get a much wider gap between them
-  // (see TREE_UNIT_GAP below) — without that contrast the pairs blur into
-  // one long row and you can't tell who is married to whom.
+  // reads as a couple, and every other gap in the row stays standard too.
   const parentUnitOfMember=id=>{
     const p=byId.get(id);
     if(!p.parentIds||!p.parentIds.length)return null;
@@ -1357,8 +1356,8 @@ function _treeLayout(people){
           if(op&&op!==u&&pos[other]){
             const mid=(pos[c].cx+pos[other].cx)/2;
             return pos[c].cx<pos[other].cx
-              ?mid-TREE_H_GAP/2-uWidth(u)/2
-              :mid+TREE_H_GAP/2+uWidth(u)/2;
+              ?mid-TREE_FANOUT_GAP/2-uWidth(u)/2
+              :mid+TREE_FANOUT_GAP/2+uWidth(u)/2;
           }
         }
       }
@@ -1386,17 +1385,11 @@ function _treeLayout(people){
       ui=uj;
     }
     const desiredByUnit=new Map(flatUnits.map(u=>[u,unitAvgOf.get(u)!=null?unitAvgOf.get(u):unitVirtual.get(u)]));
-    // A wider gap is only needed where a COUPLE meets its neighbour: two
-    // spouses sit close together, so without extra room around the pair the
-    // neighbour looks like it belongs to it. Rows of single people (an
-    // unmarried generation of children, say) keep the normal gap — applying
-    // the wide one everywhere just stretches the whole tree for nothing.
-    // Siblings used to sit at the SPOUSE gap, which made a row of married
-    // siblings read as one undifferentiated line of people.
-    const gapAfter=i=>{
-      const a=flatUnits[i],b=flatUnits[i+1];
-      return (a.ids.length===2||(b&&b.ids.length===2))?TREE_UNIT_GAP:TREE_H_GAP;
-    };
+    // Normal spacing everywhere: spouses stay tight, siblings and unrelated
+    // couples keep the standard gap. The only place extra room is added is
+    // between two parent couples splitting around a married couple — see
+    // TREE_FANOUT_GAP in unitChildCx above.
+    const gapAfter=i=>(clusterOfFlatUnit.get(flatUnits[i])===clusterOfFlatUnit.get(flatUnits[i+1]))?TREE_COUPLE_GAP:TREE_H_GAP;
     const leftEdges=_treePlaceRow(flatUnits,uWidth,gapAfter,u=>desiredByUnit.get(u));
     flatUnits.forEach((u,i)=>placeUnitAt(u,leftEdges[i]));
   }
