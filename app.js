@@ -1153,12 +1153,42 @@ function _treeLayout(people){
     const seen=new Set(),clusters=[];
     rowsUnits[l].forEach(u=>{
       if(seen.has(u))return;
-      const primary=u.ids.find(id=>byId.get(id).parentIds&&byId.get(id).parentIds.length);
+      const sibUnitsOf=id=>{
+        const p=byId.get(id);
+        if(!p.parentIds||!p.parentIds.length)return [];
+        const pkey=[...p.parentIds].sort((a,b)=>a-b).join(',');
+        return [...new Set((childrenByKey.get(pkey)||[]).map(s=>unitOf[s.id]).filter(su=>su&&su.level===l))];
+      };
+      // RTL sibling order: first recorded stays rightmost, so a newly added
+      // sibling appears to the LEFT of the ones before it.
+      const rtl=arr=>arr.slice().sort((a,b)=>unitMinIndex(b)-unitMinIndex(a));
+      const parented=u.ids.filter(id=>byId.get(id).parentIds&&byId.get(id).parentIds.length);
+      const hasSibs=id=>sibUnitsOf(id).filter(su=>su!==u).length>0;
+      // Extending leftwards is right for a spouse standing on the LEFT of a
+      // couple — their brothers and sisters end up on their own side. For a
+      // spouse on the RIGHT it puts them on their partner's side instead,
+      // which then drags their parents across their in-laws' and crosses
+      // both families' lines up the tree. So that one case extends the
+      // other way: rightwards, away from the partner.
+      // Only for a couple BRIDGING two recorded families: that's where a
+      // sibling landing on the partner's side actually crosses the other
+      // family's line. When the partner has no recorded parents there is no
+      // other family to cross, so the plain order stands.
+      const rightMember=u.ids.length>1?u.ids[1]:null;
+      // …and only for a couple of siblings, not a large family. With many
+      // siblings the couple sits inside the group and the group spills onto
+      // both sides whatever we do, so moving it to one end only churns the
+      // established order without removing any crossing.
+      const rightSibCount=rightMember!=null?sibUnitsOf(rightMember).filter(su=>su!==u).length:0;
+      const rightSideSibs=rightMember!=null&&parented.length>1
+        &&parented.includes(rightMember)&&rightSibCount>0&&rightSibCount<=2
+        &&!hasSibs(u.ids[0]);
       let members=[u];
-      if(primary!=null){
-        const pkey=[...byId.get(primary).parentIds].sort((a,b)=>a-b).join(',');
-        const sibUnits=[...new Set((childrenByKey.get(pkey)||[]).map(s=>unitOf[s.id]).filter(su=>su&&su.level===l))];
-        if(sibUnits.length>1)members=sibUnits.slice().sort((a,b)=>unitMinIndex(b)-unitMinIndex(a));
+      if(rightSideSibs){
+        members=[u,...rtl(sibUnitsOf(rightMember).filter(su=>su!==u))];
+      } else if(parented.length>=1){
+        const sibUnits=sibUnitsOf(parented[0]);
+        if(sibUnits.length>1)members=rtl(sibUnits);
       }
       const cluster={members,level:l};
       members.forEach(m=>{ seen.add(m); clusterOfUnit.set(m,cluster); });
