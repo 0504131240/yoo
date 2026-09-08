@@ -873,10 +873,11 @@ function closeFamiliesHomeOverlay(){
 const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL_H=160;
 let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
 // Admin-only lock: every tree-mutating entry point calls this first and
-// bails out (popping the same in-page message instead) when it's true and
-// the caller isn't the unlocked admin.
+// bails out (popping the same in-page message instead) — blocks the admin
+// too, so toggleTreeLock() itself (the only way back out) must never call
+// this.
 function _blockedByTreeLock(){
-  if(!treeLocked||editMode)return false;
+  if(!treeLocked)return false;
   document.getElementById('treeLockedModal').style.display='flex';
   return true;
 }
@@ -887,12 +888,12 @@ function toggleTreeLock(){
   treeLocked=!treeLocked;
   save();
   _updateTreeLockBtn();
-  showToast(treeLocked?'🔒 העץ ננעל — רק המנהל יכול לערוך':'🔓 העץ נפתח לעריכה לכולם');
+  showToast(treeLocked?'🔒 העץ ננעל לגמרי — אף אחד לא יכול לערוך עד שתפתחו':'🔓 העץ נפתח לעריכה לכולם');
 }
 function _updateTreeLockBtn(){
   const btn=document.getElementById('treeLockBtn');if(!btn)return;
   btn.textContent=treeLocked?'🔒':'🔓';
-  btn.title=treeLocked?'העץ נעול — לחצו לפתוח לעריכה לכולם':'העץ פתוח — לחצו לנעול עריכה לכולם חוץ מהמנהל';
+  btn.title=treeLocked?'העץ נעול לגמרי (גם למנהל) — לחצו לפתוח':'העץ פתוח — לחצו לנעול לגמרי, כולל למנהל';
 }
 // "Tidy" view: when on, renderFamilyTree uses _treeLayoutTidy (even, uniform
 // per-generation spacing) instead of the default centered layout. Toggled by
@@ -1687,6 +1688,7 @@ function _renderTreeGenderButtons(g){
   });
 }
 function openTreePersonModal(id){
+  if(_blockedByTreeLock())return;
   _treeActivePersonId=id;
   const p=familyTree.find(x=>x.id===id);if(!p)return;
   _treePersonEditPhoto=undefined;
@@ -1859,6 +1861,7 @@ function addRootTreePerson(){
 // add-relation form (parent/sibling/child) without opening the full person
 // card first, unlike tapping the card itself.
 function openTreeQuickAddMenu(id){
+  if(_blockedByTreeLock())return;
   _treeActivePersonId=id;
   document.getElementById('treeQuickAddModal').style.display='flex';
 }
