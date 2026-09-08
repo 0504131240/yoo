@@ -1137,23 +1137,38 @@ function _treeLayout(people){
   // anchor-only insertion (see spans.length===0 below) deliberately skips
   // levelCursor, so without this a normal placement processed afterward
   // would have no way to know that territory is taken.
-  function resolveOverlap(idealX,width,lvl,pushLeft){
-    let candidate=idealX;
+  function resolveOverlap(idealX,width,lvl,pushLeft,bidirectional){
     const occupied=[];
     for(const pid in pos){
       if(Math.round(pos[pid].y/TREE_LEVEL_H)===lvl)occupied.push(pos[pid].x);
     }
-    let moved=true,g=0;
-    while(moved&&g++<200){
-      moved=false;
-      for(const ox of occupied){
-        if(candidate<ox+TREE_NODE_W&&candidate+width>ox){
-          candidate=pushLeft?ox-width-TREE_H_GAP:ox+TREE_NODE_W+TREE_H_GAP;
-          moved=true;
+    const sweep=goRight=>{
+      let candidate=idealX,moved=true,g=0;
+      while(moved&&g++<200){
+        moved=false;
+        for(const ox of occupied){
+          if(candidate<ox+TREE_NODE_W&&candidate+width>ox){
+            candidate=goRight?ox+TREE_NODE_W+TREE_H_GAP:ox-width-TREE_H_GAP;
+            moved=true;
+          }
         }
       }
+      return candidate;
+    };
+    // A crowded row can put several genuinely unrelated ancestor branches'
+    // ideal (anchor) spots right next to each other — sweeping in a single
+    // fixed direction can then walk one of them past every other occupied
+    // slot in that row before finding room, landing it far from the actual
+    // descendant it's meant to sit above instead of just beside its neighbor.
+    // Anchor-only placements (the only ones with real freedom to land off
+    // to either side — a normal placement must still respect minX, its
+    // "don't get placed before an earlier sibling" floor) try both
+    // directions and keep whichever needs the smaller nudge from the ideal.
+    if(bidirectional){
+      const right=sweep(true),left=sweep(false);
+      return Math.abs(right-idealX)<=Math.abs(left-idealX)?right:left;
     }
-    return candidate;
+    return sweep(!pushLeft);
   }
   function layoutUnit(unit){
     const key=[...unit.ids].sort((a,b)=>a-b).join(',');
@@ -1176,7 +1191,7 @@ function _treeLayout(people){
     const width=unit.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
     const minX=levelCursor[unit.level]||0;
     let x=minX;
-    let isAnchorOnly=false,pushLeft=false;
+    let isAnchorOnly=false,pushLeft=false,hasCrossLineageKid=false;
     if(kids.length){
       // An earlier same-level sibling with no kids of its own never touches
       // levelCursor at this unit's children's level, so that cursor can lag
@@ -1194,6 +1209,13 @@ function _treeLayout(people){
         claimedBy[k.id]=key;
       });
       const kidsSet=new Set(kids.map(k=>k.id));
+      // Set when a kid married someone with their own separately-tracked
+      // parents (see the narrowing below) — that kid's actual position was
+      // determined by whichever side won the race to lay the couple out,
+      // not by this unit's own left-to-right turn, so this unit's ideal
+      // (kid-centered) x can legitimately land far from minX purely because
+      // unrelated units happened to be processed first. Same reasoning as
+      // unit.isRoot below, just one (or more) levels deeper.
       const spans=kidUnits.map(ku=>{
         const span=layoutUnit(ku);
         const relevantIds=ku.ids.filter(id=>kidsSet.has(id));
@@ -1204,6 +1226,7 @@ function _treeLayout(people){
           // the whole couple's width, so this parent unit doesn't visually
           // land on top of the OTHER spouse's side (which would make it
           // look like our kid's parents are actually the spouse's parents).
+          hasCrossLineageKid=true;
           const xs=relevantIds.map(id=>pos[id].x);
           const minRX=Math.min(...xs),maxRX=Math.max(...xs)+TREE_NODE_W;
           return {x:minRX,width:maxRX-minRX};
@@ -1252,18 +1275,31 @@ function _treeLayout(people){
           // would shove the next NORMAL sibling processed at this level
           // further right than its own centering actually calls for.
           kids.forEach(k=>{ if(pos[k.id])claimedBy[k.id]=key; });
+        } else if(unit.isRoot||hasCrossLineageKid){
+          // A top-level root unit isn't really anyone's "sibling" — minX
+          // only means "whichever other independent root happened to get
+          // processed first", not a real ordering relationship. Same for a
+          // unit with a cross-lineage kid: that kid's actual position came
+          // from whichever side won the race to lay the married couple out,
+          // not from this unit's own turn. Enforcing minX in either case
+          // can walk this unit's ideal (kid-centered) position arbitrarily
+          // far from where its own descendants actually ended up, purely
+          // because unrelated branches were processed earlier and pushed
+          // the shared cursor ahead of it.
+          x=center-width/2;
         } else {
           x=Math.max(minX,center-width/2);
         }
       }
     }
-    // Universal safety net: an anchor-only insertion deliberately skips
-    // levelCursor (it can legitimately land "out of turn" spatially), so a
-    // normal placement's own levelCursor-based x isn't guaranteed to be
-    // clear of one. Re-check against everything actually in `pos` at this
-    // level right before committing — a no-op when x is already clear
-    // (the overwhelmingly common case), a minimal nudge otherwise.
-    x=resolveOverlap(x,width,unit.level,pushLeft);
+    // Universal safety net: an anchor-only, root, or cross-lineage insertion
+    // deliberately skips levelCursor (it can legitimately land "out of turn"
+    // spatially), so a normal placement's own levelCursor-based x isn't
+    // guaranteed to be clear of one. Re-check against everything actually in
+    // `pos` at this level right before committing — a no-op when x is
+    // already clear (the overwhelmingly common case), a minimal nudge
+    // otherwise.
+    x=resolveOverlap(x,width,unit.level,pushLeft,isAnchorOnly||unit.isRoot||hasCrossLineageKid);
     if(!isAnchorOnly){
       // Only the normal, deterministic left-to-right sequence advances the
       // shared cursor — an anchor-only insertion can legitimately land
@@ -1366,7 +1402,7 @@ function _treeLayout(people){
   });
   orderedRoots.forEach(ids=>{
     const u=makeUnit(byId.get(ids[0]));
-    if(u)layoutUnit(u);
+    if(u){u.isRoot=true;layoutUnit(u);}
   });
   // When a married couple's two sets of parents EACH exist in the tree
   // solely to be that one spouse's parents (their only recorded child),
