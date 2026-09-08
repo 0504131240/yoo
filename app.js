@@ -1396,16 +1396,44 @@ function _treeLayout(people){
   for(let l=1;l<=maxLevel;l++){
     const row=units.filter(u=>u.level===l&&u.ids.every(id=>pos[id])).sort((a,b)=>unitLeftX(a)-unitLeftX(b));
     row.forEach((u,idx)=>{
-      const parents=[...new Set(u.ids.map(id=>parentUnitOfMember(id)).filter(pu=>pu&&pu!==u&&pu.ids.every(id=>pos[id])))];
-      if(parents.length<2)return;
-      const centers=parents.map(unitCenterX);
-      const lo=Math.min(...centers),hi=Math.max(...centers),cur=unitCenterX(u);
-      if(cur>=lo&&cur<=hi)return; // already sits between its parents
-      const target=(lo+hi)/2;
+      const links=u.ids.map(id=>({id,pu:parentUnitOfMember(id)}))
+        .filter(l=>l.pu&&l.pu!==u&&l.pu.ids.every(id=>pos[id]));
+      const parents=[...new Set(links.map(l=>l.pu))];
+      if(!parents.length)return;
+      // Only in the ancestry part of the tree, where a couple leads down to
+      // a single line. A couple with several children is the other case —
+      // there its own children below are what it needs to stay centred on,
+      // and pulling it up to its parents' midpoint would drag it off them.
+      const kidUnits=new Set();
+      childPersonsOf.get(u).forEach(cid=>{ const ku=unitOf[cid]; if(ku)kidUnits.add(ku); });
+      if(kidUnits.size>1)return;
+      // …and only where each parent couple leads down to this one child.
+      // Siblings must stay spread as a group centred under their shared
+      // parents; pulling each of them individually under those parents
+      // would just pile them up on the same spot.
+      const onlyChild=parents.every(pu=>{
+        const ks=new Set();
+        childPersonsOf.get(pu).forEach(cid=>{ const ku=unitOf[cid]; if(ku)ks.add(ku); });
+        return ks.size<=1;
+      });
+      if(!onlyChild)return;
+      // With BOTH sides recorded the couple sits midway between his parents
+      // and hers. With only one side recorded there's no midpoint to find —
+      // then it's that one child who belongs directly under their parents,
+      // not the middle of the couple.
+      let target,anchor;
+      if(parents.length>1){
+        const centers=parents.map(unitCenterX);
+        target=(Math.min(...centers)+Math.max(...centers))/2;
+        anchor=unitCenterX(u);
+      } else {
+        target=unitCenterX(parents[0]);
+        anchor=pos[links[0].id].cx;
+      }
       const prev=row[idx-1],next=row[idx+1];
       const minLeft=prev?unitLeftX(prev)+uWidth(prev)+TREE_H_GAP:-Infinity;
       const maxLeft=next?unitLeftX(next)-TREE_H_GAP-uWidth(u):Infinity;
-      let newLeft=target-uWidth(u)/2;
+      let newLeft=unitLeftX(u)+(target-anchor);
       newLeft=Math.min(Math.max(newLeft,minLeft),maxLeft);
       const delta=newLeft-unitLeftX(u);
       if(Math.abs(delta)<1)return;
