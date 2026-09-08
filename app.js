@@ -1382,6 +1382,37 @@ function _treeLayout(people){
     flatUnits.forEach((u,i)=>placeUnitAt(u,leftEdges[i]));
   }
 
+  // Top-down tidy-up: a row of ancestors is often WIDER than the row of
+  // children below it (every couple there needs its own full width, while
+  // their children may sit two to a couple), so that row has to spread —
+  // and a unit at the bottom of it can end up with BOTH of its parent
+  // couples off to the same side. Both connecting lines then reach the
+  // same way and leave a hole under one parent. Where it's possible,
+  // slide such a unit back to sit between its two parents — but only into
+  // space that is genuinely free in its own row, never past a neighbour
+  // and never changing the left-to-right order.
+  const unitLeftX=u=>Math.min(...u.ids.map(id=>pos[id].x));
+  const unitCenterX=u=>{const xs=u.ids.map(id=>pos[id].cx);return (Math.min(...xs)+Math.max(...xs))/2;};
+  for(let l=1;l<=maxLevel;l++){
+    const row=units.filter(u=>u.level===l&&u.ids.every(id=>pos[id])).sort((a,b)=>unitLeftX(a)-unitLeftX(b));
+    row.forEach((u,idx)=>{
+      const parents=[...new Set(u.ids.map(id=>parentUnitOfMember(id)).filter(pu=>pu&&pu!==u&&pu.ids.every(id=>pos[id])))];
+      if(parents.length<2)return;
+      const centers=parents.map(unitCenterX);
+      const lo=Math.min(...centers),hi=Math.max(...centers),cur=unitCenterX(u);
+      if(cur>=lo&&cur<=hi)return; // already sits between its parents
+      const target=(lo+hi)/2;
+      const prev=row[idx-1],next=row[idx+1];
+      const minLeft=prev?unitLeftX(prev)+uWidth(prev)+TREE_H_GAP:-Infinity;
+      const maxLeft=next?unitLeftX(next)-TREE_H_GAP-uWidth(u):Infinity;
+      let newLeft=target-uWidth(u)/2;
+      newLeft=Math.min(Math.max(newLeft,minLeft),maxLeft);
+      const delta=newLeft-unitLeftX(u);
+      if(Math.abs(delta)<1)return;
+      u.ids.forEach(id=>{ pos[id].x+=delta; pos[id].cx+=delta; });
+    });
+  }
+
   // Shift everything into positive space.
   const allX=Object.values(pos).map(pp=>pp.x);
   const minX=allX.length?Math.min(...allX):0;
