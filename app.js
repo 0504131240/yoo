@@ -901,10 +901,6 @@ function _updateTreeLockBtn(){
   btn.textContent=treeLocked?'🔒':'🔓';
   btn.title=treeLocked?'העץ נעול לגמרי (גם למנהל) — לחצו לפתוח':'העץ פתוח — לחצו לנעול לגמרי, כולל למנהל';
 }
-// "Tidy" view: when on, renderFamilyTree uses _treeLayoutTidy (even, uniform
-// per-generation spacing) instead of the default centered layout. Toggled by
-// the ⧉ button in the tree toolbar and remembered per device.
-let _treeTidy=(function(){try{return localStorage.getItem('treeTidy')==='1';}catch(e){return false;}})();
 
 // The families already in the app are treated as siblings of one another —
 // each one's own blood relative (see rootSurname below) is seeded as a
@@ -956,17 +952,9 @@ function openFamilyTreeOverlay(){
   document.getElementById('familyTreeOverlay').style.display='flex';
   const wrap0=document.getElementById('treeCanvasWrap');
   if(wrap0){wrap0.scrollTop=0;wrap0.scrollLeft=0;} // known state immediately, before the fit even runs
-  _syncTreeTidyBtn();
   renderFamilyTree();
   _updateTreeLockBtn();
   _fitTreeWhenReady(); // canvas needs a layout pass first for its size to be known
-}
-// Reflect the remembered tidy on/off state onto the toolbar button.
-function _syncTreeTidyBtn(){
-  const btn=document.getElementById('treeTidyBtn');
-  if(!btn)return;
-  btn.style.background=_treeTidy?'var(--blue-mid)':'var(--surface2)';
-  btn.style.color=_treeTidy?'#fff':'var(--text2)';
 }
 function closeFamilyTreeOverlay(){
   document.getElementById('familyTreeOverlay').style.display='none';
@@ -1404,112 +1392,6 @@ function _treeLayout(people){
 
   return {pos,maxLevel,claimedBy};
 }
-// "Tidy" layout — the ⧉ button's clean, evenly-spaced arrangement. Every
-// generation is a row of units (a couple counts as one unit, male on the
-// right) separated by an identical gap, and a few barycenter passes slide
-// each row so parents sit centered above their children and children below
-// their parents. Unlike the default layout it never opens up the large
-// asymmetric gaps that bridged/married-in branches can create — it trades
-// exact parent-over-child centering for uniform, orderly spacing.
-// Reuses the default layout ONLY to inherit the correct left-right ORDER
-// (RTL: first child on the right, male on the right), then re-spaces evenly.
-function _treeLayoutTidy(people){
-  const byId=new Map(people.map(p=>[p.id,p]));
-  const base=_treeLayout(people); // for RTL-correct ordering only
-  const level=_treeComputeLevels(people);
-  const maxLevel=people.length?Math.max(...people.map(p=>level[p.id])):0;
-  // Pair spouses at the same level into units (male on the right), matching
-  // how the default layout groups couples so the two views stay consistent.
-  const used=new Set(),units=[],unitOf={};
-  people.forEach(p=>{
-    if(used.has(p.id))return;
-    const spouseId=(p.spouseIds||[]).find(sid=>byId.has(sid)&&level[sid]===level[p.id]&&!used.has(sid));
-    let ids=spouseId!=null?[p.id,spouseId]:[p.id];
-    if(ids.length===2){
-      const grank=id=>{const g=byId.get(id).gender;return g==='boy'?1:g==='girl'?-1:0;};
-      ids=ids.slice().sort((a,b)=>grank(a)-grank(b));
-    }
-    ids.forEach(id=>used.add(id));
-    const u={ids,level:level[p.id]};
-    units.push(u);
-    ids.forEach(id=>unitOf[id]=u);
-  });
-  const uWidth=u=>u.ids.length===2?TREE_NODE_W*2+TREE_COUPLE_GAP:TREE_NODE_W;
-  const uCenter=u=>u.x+uWidth(u)/2;
-  // Parent units (units holding any recorded parent) and, from those, kids.
-  const parentUnitsOf=u=>{
-    const set=new Set();
-    u.ids.forEach(id=>(byId.get(id).parentIds||[]).forEach(pid=>{const pu=unitOf[pid];if(pu&&pu!==u)set.add(pu);}));
-    return [...set];
-  };
-  const kidUnitsOf=new Map(units.map(u=>[u,[]]));
-  units.forEach(u=>parentUnitsOf(u).forEach(pu=>kidUnitsOf.get(pu).push(u)));
-  const parentUnitsMap=new Map(units.map(u=>[u,parentUnitsOf(u)]));
-  // Rows, each ordered left→right by the default layout's x so the RTL child
-  // order (first child on the right) and male-right couples carry over.
-  const baseX=u=>Math.min(...u.ids.map(id=>base.pos[id]?base.pos[id].x:0));
-  const rows=[];
-  for(let l=0;l<=maxLevel;l++)rows[l]=units.filter(u=>u.level===l).sort((a,b)=>baseX(a)-baseX(b));
-  const GAP=TREE_H_GAP;
-  // Lay a row out left→right with identical gaps, its block centered on `mid`.
-  const placeRow=(row,mid)=>{
-    const total=row.reduce((s,u)=>s+uWidth(u),0)+Math.max(0,row.length-1)*GAP;
-    let x=mid-total/2;
-    row.forEach(u=>{u.x=x;x+=uWidth(u)+GAP;});
-  };
-  // Seed: every row centered on 0, uniform gaps.
-  rows.forEach(row=>placeRow(row,0));
-  // Barycenter relaxation: alternately pull each row toward the centre of the
-  // rows it connects to (parents above, children below), re-spacing evenly
-  // each time so gaps stay uniform. Order within a row is kept stable — this
-  // only slides whole rows and re-centres them, never reshuffles siblings.
-  const centerOf=list=>list.length?list.reduce((s,u)=>s+uCenter(u),0)/list.length:null;
-  for(let pass=0;pass<12;pass++){
-    const down=pass%2===0;
-    const order=down?[...Array(maxLevel+1).keys()]:[...Array(maxLevel+1).keys()].reverse();
-    order.forEach(l=>{
-      const row=rows[l];if(!row||!row.length)return;
-      // desired centre for each unit from its neighbours in the adjacent row
-      const desired=row.map(u=>{
-        const nb=down?parentUnitsMap.get(u):kidUnitsOf.get(u);
-        return centerOf(nb);
-      });
-      const known=desired.filter(d=>d!=null);
-      if(!known.length)return;
-      const rowMid=known.reduce((s,d)=>s+d,0)/known.length;
-      placeRow(row,rowMid);
-    });
-  }
-  // Materialise unit x into per-person positions (couple members side by side,
-  // already male-right within u.ids), and flag every child as "local" so the
-  // renderer draws clean vertical bus lines rather than the far-elbow style.
-  const pos={},claimedBy={};
-  units.forEach(u=>{
-    u.ids.forEach((id,i)=>{
-      const ix=u.x+i*(TREE_NODE_W+TREE_COUPLE_GAP);
-      pos[id]={x:ix,y:u.level*TREE_LEVEL_H,cx:ix+TREE_NODE_W/2,cy:u.level*TREE_LEVEL_H+TREE_NODE_H/2,bottom:u.level*TREE_LEVEL_H+TREE_NODE_H};
-    });
-  });
-  people.forEach(p=>{
-    if(p.parentIds&&p.parentIds.length)claimedBy[p.id]=[...p.parentIds].sort((a,b)=>a-b).join(',');
-  });
-  // Shift everything into positive space (rows were centred on 0).
-  const allX=Object.values(pos).map(pp=>pp.x);
-  const minX=allX.length?Math.min(...allX):0;
-  if(minX<0)Object.values(pos).forEach(pp=>{pp.x-=minX;pp.cx-=minX;});
-  return {pos,maxLevel,claimedBy};
-}
-function toggleTreeTidy(){
-  _treeTidy=!_treeTidy;
-  try{localStorage.setItem('treeTidy',_treeTidy?'1':'0');}catch(e){}
-  const btn=document.getElementById('treeTidyBtn');
-  if(btn){
-    btn.style.background=_treeTidy?'var(--blue-mid)':'var(--surface2)';
-    btn.style.color=_treeTidy?'#fff':'var(--text2)';
-  }
-  renderFamilyTree();
-  _fitTreeWhenReady();
-}
 function renderFamilyTree(){
   const canvas=document.getElementById('treeCanvas');if(!canvas)return;
   const people=familyTree;
@@ -1518,7 +1400,7 @@ function renderFamilyTree(){
     canvas.innerHTML='<div class="empty" style="padding:40px 0"><span class="empty-ico">🌳</span>אין עדיין אנשים בעץ. לחצו על "+ הוסף אדם" כדי להתחיל.</div>';
     return;
   }
-  const {pos,maxLevel,claimedBy}=(_treeTidy?_treeLayoutTidy:_treeLayout)(people);
+  const {pos,maxLevel,claimedBy}=_treeLayout(people);
   const maxX=Math.max(...Object.values(pos).map(p=>p.x+TREE_NODE_W))+20;
   const totalH=(maxLevel+1)*TREE_LEVEL_H+20;
   let svgLines='';
