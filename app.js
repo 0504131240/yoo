@@ -1266,12 +1266,18 @@ function _treeLayout(people){
   // KNOWN real positions), then position this row, before moving up.
   for(let l=maxLevel;l>=0;l--){
     const rowClusters=clustersByLevel[l];
+    // Center on the SPAN of children (midpoint of min/max x), not their
+    // average — matches the original "parent sits centered over its
+    // children" convention: with one child, min===max, so the parent lands
+    // exactly centered on that one child; with several, the parent centers
+    // on their overall spread rather than being pulled toward wherever more
+    // of them happen to cluster.
     const childCxAvg=c=>{
       const xs=[];
       c.members.forEach(u=>childPersonsOf.get(u).forEach(cid=>{
         if(pos[cid])xs.push(pos[cid].cx);
       }));
-      return xs.length?xs.reduce((s,x)=>s+x,0)/xs.length:null;
+      return xs.length?(Math.min(...xs)+Math.max(...xs))/2:null;
     };
     // Structural (hierarchy-only) order — always well-defined, used as a
     // baseline and as the source of a "virtual" desired position for any
