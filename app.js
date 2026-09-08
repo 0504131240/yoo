@@ -875,7 +875,7 @@ const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL
 // larger than TREE_COUPLE_GAP (the spacing between two spouses) — that
 // contrast is what makes each pair read as a pair rather than the row
 // reading as one long line of people.
-const TREE_UNIT_GAP=100;
+const TREE_UNIT_GAP=70;
 let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
 // Admin-only lock: every tree-mutating entry point calls this first and
 // bails out (popping the same in-page message instead) — blocks the admin
@@ -1386,11 +1386,17 @@ function _treeLayout(people){
       ui=uj;
     }
     const desiredByUnit=new Map(flatUnits.map(u=>[u,unitAvgOf.get(u)!=null?unitAvgOf.get(u):unitVirtual.get(u)]));
-    // Every boundary between two different couples gets the same wide gap —
-    // several times the spacing between spouses — so each pair stands out
-    // as a pair. Siblings used to sit at the spouse gap, which made a row
-    // of married siblings read as one undifferentiated line of people.
-    const gapAfter=()=>TREE_UNIT_GAP;
+    // A wider gap is only needed where a COUPLE meets its neighbour: two
+    // spouses sit close together, so without extra room around the pair the
+    // neighbour looks like it belongs to it. Rows of single people (an
+    // unmarried generation of children, say) keep the normal gap — applying
+    // the wide one everywhere just stretches the whole tree for nothing.
+    // Siblings used to sit at the SPOUSE gap, which made a row of married
+    // siblings read as one undifferentiated line of people.
+    const gapAfter=i=>{
+      const a=flatUnits[i],b=flatUnits[i+1];
+      return (a.ids.length===2||(b&&b.ids.length===2))?TREE_UNIT_GAP:TREE_H_GAP;
+    };
     const leftEdges=_treePlaceRow(flatUnits,uWidth,gapAfter,u=>desiredByUnit.get(u));
     flatUnits.forEach((u,i)=>placeUnitAt(u,leftEdges[i]));
   }
