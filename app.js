@@ -872,6 +872,80 @@ const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL
 // spouses, siblings and everyone else keep the standard gaps.
 const TREE_FANOUT_GAP=120;
 let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
+// Sub-trees: a person can be marked as one, which folds their descendants
+// out of the main tree. `collapsed` is stored on the person, so the branch
+// stays folded away for everyone; opening one is a local view state that
+// lasts for the session and changes nothing for anybody else.
+let _treeExpanded=new Set();
+function _treeChildrenMap(){
+  const kids=new Map();
+  familyTree.forEach(p=>(p.parentIds||[]).forEach(pid=>{
+    if(!kids.has(pid))kids.set(pid,[]);
+    kids.get(pid).push(p.id);
+  }));
+  return kids;
+}
+function _treeDescendantCount(id,kids){
+  kids=kids||_treeChildrenMap();
+  const seen=new Set(),q=[...(kids.get(id)||[])];
+  while(q.length){
+    const x=q.pop();
+    if(seen.has(x))continue;
+    seen.add(x);
+    (kids.get(x)||[]).forEach(k=>q.push(k));
+  }
+  return seen.size;
+}
+function _treeHiddenIds(kids){
+  kids=kids||_treeChildrenMap();
+  const byId=new Map(familyTree.map(p=>[p.id,p]));
+  const hidden=new Set(),q=[];
+  familyTree.forEach(p=>{
+    if(p.collapsed&&!_treeExpanded.has(p.id))(kids.get(p.id)||[]).forEach(k=>q.push(k));
+  });
+  while(q.length){
+    const id=q.pop();
+    if(hidden.has(id))continue;
+    const p=byId.get(id);
+    if(!p)continue;
+    hidden.add(id);
+    (kids.get(id)||[]).forEach(k=>q.push(k));
+    // A spouse who married in goes with them. One who has their own
+    // recorded parents belongs to another documented family and stays
+    // visible there.
+    (p.spouseIds||[]).forEach(sid=>{
+      const s=byId.get(sid);
+      if(s&&!(s.parentIds&&s.parentIds.length))q.push(sid);
+    });
+  }
+  return hidden;
+}
+// Opening or closing a sub-tree from its card — view only, nothing saved.
+function toggleTreeSubtree(id){
+  if(_treeExpanded.has(id))_treeExpanded.delete(id);
+  else _treeExpanded.add(id);
+  renderFamilyTree();
+  _fitTreeWhenReady();
+}
+// Making someone a sub-tree (or folding their branch back in) — saved.
+function toggleTreePersonCollapsed(){
+  const p=familyTree.find(x=>x.id===_treeActivePersonId);
+  if(!p)return;
+  p.collapsed=!p.collapsed;
+  _treeExpanded.delete(p.id);
+  save();
+  _syncTreeSubtreeBtn(p);
+  renderFamilyTree();
+  _fitTreeWhenReady();
+  showToast(p.collapsed?'🌿 הצאצאים קופלו לתת-עץ':'🌳 הצאצאים חזרו לעץ הראשי');
+}
+function _syncTreeSubtreeBtn(p){
+  const btn=document.getElementById('treeSubtreeBtn');
+  if(!btn)return;
+  const n=_treeDescendantCount(p.id);
+  btn.style.display=n?'block':'none';
+  btn.textContent=p.collapsed?`🌳 החזר ${n} צאצאים לעץ הראשי`:`🌿 הפוך לתת-עץ (${n} צאצאים)`;
+}
 
 // The families already in the app are treated as siblings of one another —
 // each one's own blood relative (see rootSurname below) is seeded as a
@@ -1450,7 +1524,11 @@ function _treeLayout(people){
 }
 function renderFamilyTree(){
   const canvas=document.getElementById('treeCanvas');if(!canvas)return;
-  const people=familyTree;
+  // Anyone folded away inside a sub-tree is left out of the layout
+  // entirely, so the main tree is drawn as if that branch weren't there.
+  const _kidsMap=_treeChildrenMap();
+  const _hidden=_treeHiddenIds(_kidsMap);
+  const people=_hidden.size?familyTree.filter(p=>!_hidden.has(p.id)):familyTree;
   if(!people.length){
     canvas.style.width='';canvas.style.height='';
     canvas.innerHTML='<div class="empty" style="padding:40px 0"><span class="empty-ico">🌳</span>אין עדיין אנשים בעץ. לחצו על "+ הוסף אדם" כדי להתחיל.</div>';
@@ -1566,6 +1644,12 @@ function renderFamilyTree(){
     // Draggable so two same-parent siblings can swap left-right order by
     // dropping one card onto another — deliberately just a swap (not free
     // positioning), so the layout stays deterministic and never overlaps.
+    // A person marked as a sub-tree gets a badge showing how many
+    // descendants are folded away behind them; tapping it opens or closes
+    // that branch just for this session.
+    const _sub=p.collapsed?_treeDescendantCount(p.id,_kidsMap):0;
+    const _open=_treeExpanded.has(p.id);
+    const subBtn=_sub?`<div onclick="event.stopPropagation();toggleTreeSubtree(${p.id})" title="${_open?'סגור את תת-העץ':'פתח את תת-העץ'}" style="position:absolute;left:${pp.cx+13}px;top:${pp.bottom+3}px;height:18px;min-width:18px;padding:0 5px;border-radius:9px;background:${_open?'var(--text2)':'#2a9d8f'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">${_open?'−':'+'+_sub}</div>`:'';
     return`<div onclick="openTreePersonModal(${p.id})" draggable="true" ondragstart="treeCardDragStart(event,${p.id})" ondragend="treeCardDragEnd(event)" ondragover="treeCardDragOver(event)" ondragleave="treeCardDragLeave(event)" ondrop="treeCardDrop(event,${p.id})" style="position:absolute;left:${pp.x}px;top:${pp.y}px;width:${TREE_NODE_W}px;height:${TREE_NODE_H}px;background:var(--surface);${borderStyle};border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:4px;box-sizing:border-box;text-align:center;gap:1px">
       ${deceased}
       <span style="width:24px;height:24px;border-radius:50%;background:${avatarBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
@@ -1575,7 +1659,7 @@ function renderFamilyTree(){
       ${p.gender==='girl'&&p.maidenName?`<span style="font-size:8px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">(לבית ${esc(p.maidenName)})</span>`:''}
       ${p.surname?`<span style="font-size:9px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(p.surname)}</span>`:''}
       ${years}
-    </div>${plusBtn}`;
+    </div>${plusBtn}${subBtn}`;
   }).join('');
   canvas.style.width=maxX+'px';
   canvas.style.height=totalH+'px';
@@ -1619,6 +1703,7 @@ function openTreePersonModal(id){
   // renaming the already-existing placeholder "הורה 2" card.
   const addSpouseBtn=document.getElementById('treeAddSpouseBtn');
   if(addSpouseBtn)addSpouseBtn.style.display=(p.spouseIds&&p.spouseIds.length>0)?'none':'block';
+  _syncTreeSubtreeBtn(p);
   document.getElementById('treePersonModal').style.display='flex';
 }
 function closeTreePersonModal(){
