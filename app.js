@@ -978,9 +978,21 @@ function fitTreeToScreen(){
   const wrap=document.getElementById('treeCanvasWrap')||c.parentElement;
   if(!wrap||!c.offsetWidth||!c.offsetHeight)return;
   const fit=Math.min((wrap.clientWidth-48)/c.offsetWidth,(wrap.clientHeight-48)/c.offsetHeight,1);
-  _treeZoom=Math.max(0.15,Math.round(fit*100)/100);
+  // "⤢ הצג הכל" (show all/fit) should actually show everything — a floor
+  // much above what a wide, many-generation tree needs defeats that,
+  // forcing an overflow that then needs scrolling to see the rest at all.
+  _treeZoom=Math.max(0.05,Math.round(fit*100)/100);
   applyTreeZoom();
-  wrap.scrollTop=0;wrap.scrollLeft=0;
+  // A tree wide/tall enough that even the 0.15 floor can't shrink it to fit
+  // still overflows — pinning scroll to (0,0) then leaves the whole thing
+  // looking like it's "over on the right" (or bottom), since only the very
+  // left/top sliver is on screen and everything else needs scrolling to
+  // reach. Center the initial scroll on the middle of the tree instead, in
+  // this same untransformed coordinate space _treeLayout/renderFamilyTree
+  // already use (scrollWidth/Height track the layout size, not the scaled-
+  // down visual size, so the visible slice at zoom Z is clientWidth/Z wide).
+  wrap.scrollLeft=Math.max(0,(c.offsetWidth-wrap.clientWidth/_treeZoom)/2);
+  wrap.scrollTop=Math.max(0,(c.offsetHeight-wrap.clientHeight/_treeZoom)/2);
 }
 // Retries until the canvas has actually been laid out (offsetWidth/Height
 // read 0 right after a display:none→flex flip until the browser's next
