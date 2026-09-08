@@ -1582,6 +1582,7 @@ function saveTreePersonChanges(){
     p.photo=_treePersonEditPhoto||null;
     _treePersonEditPhoto=undefined;
   }
+  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();
   renderFamilyTree();
   showToast('נשמר ✓');
@@ -1603,6 +1604,7 @@ function moveTreeSibling(dir){
   const swapIdx=siblingIdxs[pos+dir];
   if(swapIdx==null)return;
   [familyTree[idx],familyTree[swapIdx]]=[familyTree[swapIdx],familyTree[idx]];
+  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -1646,6 +1648,7 @@ function treeCardDrop(e,targetId){
   }
   const idxA=familyTree.indexOf(a),idxB=familyTree.indexOf(b);
   [familyTree[idxA],familyTree[idxB]]=[familyTree[idxB],familyTree[idxA]];
+  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -1659,6 +1662,7 @@ function deleteTreePerson(){
     if(x.spouseIds)x.spouseIds=x.spouseIds.filter(sid=>sid!==id);
   });
   closeTreePersonModal();
+  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -1765,6 +1769,7 @@ function confirmTreeAdd(){
   familyTree.push(newPerson);
   closeTreeAddModal();
   closeTreePersonModal();
+  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
@@ -1822,6 +1827,7 @@ function linkAsSiblings(otherId){
   }
   closeTreeLinkSiblingModal();
   closeTreePersonModal();
+  addNotif('🌳','טובי הבוס אמר שיש גם עבודה חוץ מהאילן יוחסין שלכם');
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
 }
