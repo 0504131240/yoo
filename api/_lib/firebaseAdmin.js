@@ -123,4 +123,43 @@ function isShabbatNow() {
   return false;
 }
 
-module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, isShabbatNow };
+// Major Yom Tov days — same "no work" reasoning as Shabbat, so reminders
+// and crons should stay quiet then too. Only the Israel-observed single day
+// of each holiday (Rosh Hashana is the one exception kept as two days
+// everywhere); Chol Hamoed (Sukkot/Pesach's intermediate days) is
+// deliberately excluded since it isn't a rest day.
+const YOM_TOV_DAYS = [
+  { month: 'תשרי', day: 1 },  // Rosh Hashana, day 1
+  { month: 'תשרי', day: 2 },  // Rosh Hashana, day 2
+  { month: 'תשרי', day: 10 }, // Yom Kippur
+  { month: 'תשרי', day: 15 }, // Sukkot, day 1
+  { month: 'תשרי', day: 22 }, // Shmini Atzeret / Simchat Torah
+  { month: 'ניסן', day: 15 }, // Pesach, day 1
+  { month: 'ניסן', day: 21 }, // Pesach, day 7 (last day)
+  { month: 'סיוון', day: 6 }, // Shavuot
+];
+// Same rough, conservative, non-astronomical approach as isShabbatNow:
+// the Hebrew calendar day itself covers the holiday, and the same
+// Fri-16:00-style cutoff extends it back to cover erev (the evening
+// before, once the Gregorian day hasn't rolled over yet).
+function isYomTovNow() {
+  const tz = 'Asia/Jerusalem';
+  const hebParts = d => new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', {
+    timeZone: tz, day: 'numeric', month: 'long',
+  }).formatToParts(d);
+  const isYomTovDate = d => {
+    const parts = hebParts(d);
+    const day = parseInt(parts.find(p => p.type === 'day').value, 10);
+    const month = parts.find(p => p.type === 'month').value;
+    return YOM_TOV_DAYS.some(h => h.day === day && h.month === month);
+  };
+  const now = new Date();
+  if (isYomTovDate(now)) return true;
+  const hour = parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour: 'numeric', hour12: false,
+  }).formatToParts(now).find(p => p.type === 'hour').value, 10);
+  if (hour >= 16 && isYomTovDate(new Date(now.getTime() + 24 * 60 * 60 * 1000))) return true;
+  return false;
+}
+
+module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isYomTovNow };
