@@ -995,6 +995,10 @@ function _buildSeedFamilyTree(){
 function openFamilyTreeOverlay(){
   seedFamilyTreeIfEmpty();
   document.getElementById('familyTreeOverlay').style.display='flex';
+  // Always open in normal (non-stats) mode with a clean selection.
+  _treeStatsMode=false;_treeSel.clear();
+  const _sp=document.getElementById('treeStatsPanel');if(_sp)_sp.style.display='none';
+  const _sb=document.getElementById('treeStatsBtn');if(_sb){_sb.style.background='var(--surface2)';_sb.style.color='var(--text2)';}
   const wrap0=document.getElementById('treeCanvasWrap');
   if(wrap0){wrap0.scrollTop=0;wrap0.scrollLeft=0;} // known state immediately, before the fit even runs
   renderFamilyTree();
@@ -1649,9 +1653,18 @@ function renderFamilyTree(){
     // that branch just for this session.
     const _sub=p.collapsed?_treeDescendantCount(p.id,_kidsMap):0;
     const _open=_treeExpanded.has(p.id);
-    const subBtn=_sub?`<div onclick="event.stopPropagation();toggleTreeSubtree(${p.id})" title="${_open?'סגור את תת-העץ':'פתח את תת-העץ'}" style="position:absolute;left:${pp.cx+13}px;top:${pp.bottom+3}px;height:18px;min-width:18px;padding:0 5px;border-radius:9px;background:${_open?'var(--text2)':'#2a9d8f'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">${_open?'−':'+'+_sub}</div>`:'';
-    return`<div onclick="openTreePersonModal(${p.id})" draggable="true" ondragstart="treeCardDragStart(event,${p.id})" ondragend="treeCardDragEnd(event)" ondragover="treeCardDragOver(event)" ondragleave="treeCardDragLeave(event)" ondrop="treeCardDrop(event,${p.id})" style="position:absolute;left:${pp.x}px;top:${pp.y}px;width:${TREE_NODE_W}px;height:${TREE_NODE_H}px;background:var(--surface);${borderStyle};border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:4px;box-sizing:border-box;text-align:center;gap:1px">
-      ${deceased}
+    const subBtn=(_sub&&!_treeStatsMode)?`<div onclick="event.stopPropagation();toggleTreeSubtree(${p.id})" title="${_open?'סגור את תת-העץ':'פתח את תת-העץ'}" style="position:absolute;left:${pp.cx+13}px;top:${pp.bottom+3}px;height:18px;min-width:18px;padding:0 5px;border-radius:9px;background:${_open?'var(--text2)':'#2a9d8f'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">${_open?'−':'+'+_sub}</div>`:'';
+    // Statistics selection mode: a tap picks/unpicks the card (see
+    // treeCardClick) instead of opening it; the "+"/sub-tree buttons and
+    // drag are suppressed so the tree reads as a pick list. Chosen cards get
+    // a blue ring + ✓ badge, the rest dim so the selection stands out.
+    const _sel=_treeStatsMode&&_treeSel.has(p.id);
+    const _dim=_treeStatsMode&&!_sel;
+    const selRing=_sel?';box-shadow:0 0 0 3px var(--blue-mid),0 2px 6px rgba(0,0,0,0.08);border-color:var(--blue-mid)':'';
+    const selBadge=_sel?`<span style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:var(--blue-mid);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;line-height:1">✓</span>`:'';
+    const dragAttrs=_treeStatsMode?'':` draggable="true" ondragstart="treeCardDragStart(event,${p.id})" ondragend="treeCardDragEnd(event)" ondragover="treeCardDragOver(event)" ondragleave="treeCardDragLeave(event)" ondrop="treeCardDrop(event,${p.id})"`;
+    return`<div onclick="treeCardClick(${p.id})"${dragAttrs} style="position:absolute;left:${pp.x}px;top:${pp.y}px;width:${TREE_NODE_W}px;height:${TREE_NODE_H}px;background:var(--surface);${borderStyle}${selRing};border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:4px;box-sizing:border-box;text-align:center;gap:1px${_dim?';opacity:0.45':''}">
+      ${deceased}${selBadge}
       <span style="width:24px;height:24px;border-radius:50%;background:${avatarBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
         ${p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`:`<svg width="14" height="14" viewBox="0 0 24 24" fill="${avatarFg}"><circle cx="12" cy="8" r="4"/><path d="M12 14c-5 0-8 2.5-8 6v1h16v-1c0-3.5-3-6-8-6z"/></svg>`}
       </span>
@@ -1659,12 +1672,258 @@ function renderFamilyTree(){
       ${p.gender==='girl'&&p.maidenName?`<span style="font-size:8px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">(לבית ${esc(p.maidenName)})</span>`:''}
       ${p.surname?`<span style="font-size:9px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(p.surname)}</span>`:''}
       ${years}
-    </div>${plusBtn}${subBtn}`;
+    </div>${_treeStatsMode?'':plusBtn}${subBtn}`;
   }).join('');
   canvas.style.width=maxX+'px';
   canvas.style.height=totalH+'px';
   canvas.innerHTML=`<svg width="${maxX}" height="${totalH}" style="position:absolute;top:0;left:0;pointer-events:none">${svgLines}</svg>${cards}`;
   applyTreeZoom();
+}
+// ── Family-tree statistics ──────────────────────────────────────────────
+// A read-only selection overlay: in stats mode a card tap picks/unpicks the
+// person (optionally their whole branch) instead of opening them, and a
+// bottom sheet shows live figures — gender split, living/deceased, common
+// first names and surnames, birth-year and age ranges — for the selection,
+// or for the whole visible tree when nothing is picked. Nothing is saved.
+let _treeStatsMode=false,_treeSelBranch=false;
+let _treeSel=new Set();
+let _treeLasso=null; // {x0,y0,x1,y1} in unscaled canvas coords while dragging
+function toggleTreeStatsMode(){
+  _treeStatsMode=!_treeStatsMode;
+  if(!_treeStatsMode){_treeSel.clear();_treeLassoCancel();}
+  _ensureTreeStatsUI();
+  _initTreeLasso();
+  const panel=document.getElementById('treeStatsPanel');
+  if(panel)panel.style.display=_treeStatsMode?'flex':'none';
+  const btn=document.getElementById('treeStatsBtn');
+  if(btn){btn.style.background=_treeStatsMode?'var(--blue-mid)':'var(--surface2)';btn.style.color=_treeStatsMode?'#fff':'var(--text2)';}
+  renderFamilyTree();
+  if(_treeStatsMode)renderTreeStats();
+}
+// A card tap: pick/unpick in stats mode (whole branch when that toggle is
+// on), otherwise the normal "open this person" action.
+function treeCardClick(id){
+  if(!_treeStatsMode){openTreePersonModal(id);return;}
+  const ids=_treeSelBranch?[id,..._treeBranchIds(id)]:[id];
+  const turnOn=!_treeSel.has(id);
+  ids.forEach(x=>{ if(turnOn)_treeSel.add(x); else _treeSel.delete(x); });
+  renderFamilyTree();
+  renderTreeStats();
+}
+function _treeBranchIds(id){
+  const kids=_treeChildrenMap();
+  const out=new Set(),q=[...(kids.get(id)||[])];
+  while(q.length){const x=q.pop();if(out.has(x))continue;out.add(x);(kids.get(x)||[]).forEach(k=>q.push(k));}
+  return [...out];
+}
+// People currently drawn in the tree (anyone folded into a sub-tree is left
+// out, matching what renderFamilyTree shows).
+function _treeVisiblePeople(){
+  const kids=_treeChildrenMap();
+  const hidden=_treeHiddenIds(kids);
+  return hidden.size?familyTree.filter(p=>!hidden.has(p.id)):familyTree;
+}
+function treeStatsSelectAll(){_treeVisiblePeople().forEach(p=>_treeSel.add(p.id));renderFamilyTree();renderTreeStats();}
+function treeStatsClear(){_treeSel.clear();renderFamilyTree();renderTreeStats();}
+function toggleTreeSelBranch(){
+  _treeSelBranch=!_treeSelBranch;
+  const b=document.getElementById('treeSelBranchChk');
+  if(b){b.style.background=_treeSelBranch?'var(--blue-mid)':'transparent';b.style.color=_treeSelBranch?'#fff':'var(--text2)';b.style.borderColor=_treeSelBranch?'var(--blue-mid)':'var(--border)';}
+}
+// Drag-to-select ("lasso"): in stats mode, pressing on empty canvas space and
+// dragging draws a rectangle; every card it touches is ADDED to the selection
+// on release. Uses pointer events so a mouse drag (desktop) and a finger drag
+// (mobile) both work; a press that lands on a card is left to the card's own
+// tap handler (single pick). Listeners attach once to the scroll wrapper and
+// no-op whenever stats mode is off.
+function _initTreeLasso(){
+  const wrap=document.getElementById('treeCanvasWrap');
+  const canvas=document.getElementById('treeCanvas');
+  if(!wrap||!canvas||wrap._lassoInit)return;
+  wrap._lassoInit=true;
+  const toCanvas=(cx,cy)=>{const r=canvas.getBoundingClientRect();return {x:(cx-r.left)/_treeZoom,y:(cy-r.top)/_treeZoom};};
+  const onEmpty=t=>t===canvas||t===wrap||t.tagName==='svg'||t.tagName==='line';
+  wrap.addEventListener('pointerdown',e=>{
+    if(!_treeStatsMode||!onEmpty(e.target))return;
+    const p=toCanvas(e.clientX,e.clientY);
+    _treeLasso={x0:p.x,y0:p.y,x1:p.x,y1:p.y};
+    let box=document.getElementById('treeLassoBox');
+    if(!box){box=document.createElement('div');box.id='treeLassoBox';box.style.cssText='position:absolute;border:1.5px solid var(--blue-mid);background:rgba(12,68,124,0.12);border-radius:4px;z-index:3;pointer-events:none';canvas.appendChild(box);}
+    box.style.display='block';_updateLassoBox();
+    try{wrap.setPointerCapture(e.pointerId);}catch(_){}
+    e.preventDefault();
+  });
+  wrap.addEventListener('pointermove',e=>{
+    if(!_treeLasso)return;
+    const p=toCanvas(e.clientX,e.clientY);
+    _treeLasso.x1=p.x;_treeLasso.y1=p.y;_updateLassoBox();
+    e.preventDefault();
+  });
+  const finish=()=>{
+    if(!_treeLasso)return;
+    const L=_treeLasso;_treeLasso=null;
+    const box=document.getElementById('treeLassoBox');if(box)box.style.display='none';
+    const minX=Math.min(L.x0,L.x1),maxX=Math.max(L.x0,L.x1),minY=Math.min(L.y0,L.y1),maxY=Math.max(L.y0,L.y1);
+    if(maxX-minX<6&&maxY-minY<6)return; // a tap, not a drag
+    // Re-run the (deterministic) layout to know where each card sits, then
+    // add every card the rectangle overlaps to the selection.
+    const people=_treeVisiblePeople();
+    const {pos}=_treeLayout(people);
+    people.forEach(p=>{
+      const q=pos[p.id];if(!q)return;
+      if(q.x<maxX&&q.x+TREE_NODE_W>minX&&q.y<maxY&&q.y+TREE_NODE_H>minY)_treeSel.add(p.id);
+    });
+    renderFamilyTree();renderTreeStats();
+  };
+  wrap.addEventListener('pointerup',finish);
+  wrap.addEventListener('pointercancel',finish);
+}
+function _updateLassoBox(){
+  const box=document.getElementById('treeLassoBox');if(!box||!_treeLasso)return;
+  const L=_treeLasso;
+  box.style.left=Math.min(L.x0,L.x1)+'px';box.style.top=Math.min(L.y0,L.y1)+'px';
+  box.style.width=Math.abs(L.x1-L.x0)+'px';box.style.height=Math.abs(L.y1-L.y0)+'px';
+}
+function _treeLassoCancel(){
+  _treeLasso=null;
+  const box=document.getElementById('treeLassoBox');if(box)box.style.display='none';
+}
+// Build the floating stats window once and hang it inside the tree overlay,
+// so neither index.html nor admin.html needs to carry the markup. It's a
+// draggable pop-up (grab its title bar) rather than a fixed sheet, so it can
+// be moved aside to keep the tree visible while picking people.
+function _ensureTreeStatsUI(){
+  const overlay=document.getElementById('familyTreeOverlay');
+  if(!overlay||document.getElementById('treeStatsPanel'))return;
+  const panel=document.createElement('div');
+  panel.id='treeStatsPanel';
+  panel.style.cssText='display:none;position:absolute;top:72px;right:14px;width:320px;max-width:calc(100% - 28px);max-height:78vh;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,0.28);z-index:6;overflow:hidden';
+  panel.innerHTML=
+    '<div id="treeStatsHeader" style="padding:11px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0;cursor:move;touch-action:none;user-select:none;background:var(--surface2)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">'
+    +'<span style="font-size:15px;font-weight:800;color:var(--text)">⠿ 📊 סטטיסטיקות</span>'
+    +'<button onclick="toggleTreeStatsMode()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    +'<button onclick="treeStatsSelectAll()" style="padding:6px 12px;border-radius:20px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">בחר הכל</button>'
+    +'<button onclick="treeStatsClear()" style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">נקה</button>'
+    +'<button id="treeSelBranchChk" onclick="toggleTreeSelBranch()" title="בחירת אדם תסמן גם את כל צאצאיו" style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">👇 כולל צאצאים</button>'
+    +'<span id="treeStatsCount" style="margin-inline-start:auto;font-size:12px;font-weight:700;color:var(--text2)"></span>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--text3);margin-top:7px">💡 גררו על רקע ריק לבחירת כמה יחד · גררו את הכותרת כדי להזיז את החלון</div>'
+    +'</div>'
+    +'<div id="treeStatsBody" style="padding:12px 16px 18px;overflow-y:auto;flex:1;min-height:0"></div>';
+  overlay.appendChild(panel);
+  _initTreeStatsDrag(panel,panel.querySelector('#treeStatsHeader'));
+}
+// Make the stats pop-up draggable by its title bar, kept inside the overlay.
+function _initTreeStatsDrag(panel,handle){
+  if(!panel||!handle)return;
+  const overlay=document.getElementById('familyTreeOverlay');
+  let dragging=false,sx=0,sy=0,ox=0,oy=0;
+  handle.addEventListener('pointerdown',e=>{
+    if(e.target.closest('button'))return; // ✕ and the action pills aren't drag grips
+    const pr=panel.getBoundingClientRect(),orc=overlay.getBoundingClientRect();
+    ox=pr.left-orc.left;oy=pr.top-orc.top;sx=e.clientX;sy=e.clientY;dragging=true;
+    // Switch from the initial right/top anchor to explicit left/top so moving is smooth.
+    panel.style.left=ox+'px';panel.style.top=oy+'px';panel.style.right='auto';panel.style.bottom='auto';
+    try{handle.setPointerCapture(e.pointerId);}catch(_){}
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const orc=overlay.getBoundingClientRect();
+    let nx=ox+(e.clientX-sx),ny=oy+(e.clientY-sy);
+    nx=Math.max(0,Math.min(nx,orc.width-panel.offsetWidth));
+    ny=Math.max(0,Math.min(ny,orc.height-panel.offsetHeight));
+    panel.style.left=nx+'px';panel.style.top=ny+'px';
+    e.preventDefault();
+  });
+  const end=()=>{dragging=false;};
+  handle.addEventListener('pointerup',end);
+  handle.addEventListener('pointercancel',end);
+}
+function _treeStats(people){
+  const nowY=new Date().getFullYear();
+  let male=0,female=0,other=0,living=0,deceased=0;
+  const firstNames={},surnames={},birthYears=[],ages=[];
+  people.forEach(p=>{
+    if(p.gender==='boy')male++;else if(p.gender==='girl')female++;else other++;
+    if(p.deceased)deceased++;else living++;
+    const fn=(p.name||'').trim();if(fn){const k=fn.split(/\s+/)[0];firstNames[k]=(firstNames[k]||0)+1;}
+    const sn=(p.surname||'').trim();if(sn)surnames[sn]=(surnames[sn]||0)+1;
+    const by=parseInt(p.birthYear,10);
+    if(!isNaN(by)&&by>1000&&by<=nowY){
+      birthYears.push(by);
+      const end=p.deceased?(parseInt(p.deathYear,10)||nowY):nowY;
+      const age=end-by;if(age>=0&&age<130)ages.push(age);
+    }
+  });
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'he')).slice(0,5);
+  const sum=a=>a.reduce((x,y)=>x+y,0);
+  // Detailed age breakdown into life-stage brackets (only those with a birth
+  // year are counted). Non-overlapping ranges, youngest first.
+  const AGE_BRACKETS=[[0,2,'0–2'],[3,5,'3–5'],[6,12,'6–12'],[13,18,'13–18'],[19,25,'19–25'],[26,40,'26–40'],[41,60,'41–60'],[61,80,'61–80'],[81,999,'81+']];
+  const ageBuckets=AGE_BRACKETS.map(b=>({label:b[2],count:0}));
+  ages.forEach(a=>{ for(let i=0;i<AGE_BRACKETS.length;i++){ if(a>=AGE_BRACKETS[i][0]&&a<=AGE_BRACKETS[i][1]){ageBuckets[i].count++;break;} } });
+  return {n:people.length,male,female,other,living,deceased,
+    topNames:top(firstNames),topSurnames:top(surnames),
+    minBirth:birthYears.length?Math.min(...birthYears):null,
+    maxBirth:birthYears.length?Math.max(...birthYears):null,withBirth:birthYears.length,
+    minAge:ages.length?Math.min(...ages):null,maxAge:ages.length?Math.max(...ages):null,
+    avgAge:ages.length?Math.round(sum(ages)/ages.length):null,withAge:ages.length,ageBuckets};
+}
+function renderTreeStats(){
+  const body=document.getElementById('treeStatsBody');if(!body)return;
+  const all=_treeVisiblePeople();
+  const sel=all.filter(p=>_treeSel.has(p.id));
+  const useAll=sel.length===0;
+  const people=useAll?all:sel;
+  const cnt=document.getElementById('treeStatsCount');
+  if(cnt)cnt.textContent=useAll?`כל העץ · ${all.length} אנשים`:`נבחרו ${sel.length}`;
+  if(!people.length){body.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:24px 0">אין אנשים בעץ.</div>';return;}
+  const s=_treeStats(people);
+  const tile=(label,val,sub)=>`<div style="flex:1;min-width:82px;background:var(--surface2);border-radius:var(--r2);padding:10px 8px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text);line-height:1.1">${val}</div><div style="font-size:11px;color:var(--text2);margin-top:3px">${label}</div>${sub?`<div style="font-size:10px;color:var(--text3);margin-top:1px">${sub}</div>`:''}</div>`;
+  const pct=v=>s.n?Math.round(v/s.n*100):0;
+  const sec=t=>`<div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin:16px 0 8px">${t}</div>`;
+  // gender bar
+  const gseg=(v,c)=>v?`<div style="width:${pct(v)}%;background:${c}" title="${v}"></div>`:'';
+  const genderBar=`<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--surface2);margin-bottom:8px">${gseg(s.male,'#2a9d8f')}${gseg(s.female,'#e56399')}${gseg(s.other,'var(--text3)')}</div>`;
+  const chips=list=>list.length
+    ?`<div style="display:flex;flex-wrap:wrap;gap:6px">${list.map(([name,c])=>`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border-radius:16px;padding:5px 10px;font-size:12px;color:var(--text)"><span style="font-weight:700">${esc(name)}</span><span style="background:var(--blue-mid);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;font-weight:800">${c}</span></span>`).join('')}</div>`
+    :'<div style="font-size:12px;color:var(--text3)">— לא הוזנו —</div>';
+  let html='';
+  html+=`<div style="display:flex;gap:8px;flex-wrap:wrap">${tile('סה"כ אנשים',s.n)}${tile('חיים',s.living)}${tile('נפטרו',s.deceased)}</div>`;
+  html+=sec('מגדר');
+  html+=genderBar;
+  html+=`<div style="display:flex;gap:14px;font-size:12px;color:var(--text2)">`
+    +`<span>👦 זכרים: <b style="color:var(--text)">${s.male}</b> (${pct(s.male)}%)</span>`
+    +`<span>👧 נקבות: <b style="color:var(--text)">${s.female}</b> (${pct(s.female)}%)</span>`
+    +(s.other?`<span>ללא מגדר: <b style="color:var(--text)">${s.other}</b></span>`:'')
+    +`</div>`;
+  if(s.withBirth){
+    html+=sec('גילאים ושנות לידה');
+    html+=`<div style="display:flex;gap:8px;flex-wrap:wrap">`
+      +tile('שנות לידה',s.minBirth===s.maxBirth?s.minBirth:`${s.minBirth}–${s.maxBirth}`,`${s.withBirth} עם תאריך`)
+      +(s.withAge?tile('טווח גילאים',s.minAge===s.maxAge?s.minAge:`${s.minAge}–${s.maxAge}`,'שנים'):'')
+      +(s.withAge?tile('גיל ממוצע',s.avgAge,'שנים'):'')
+      +`</div>`;
+    if(s.withAge){
+      const maxB=Math.max(...s.ageBuckets.map(b=>b.count),1);
+      const rows=s.ageBuckets.filter(b=>b.count>0).map(b=>
+        `<div style="display:flex;align-items:center;gap:8px;margin-top:6px">`
+        +`<span style="width:46px;flex-shrink:0;font-size:11px;color:var(--text2)">${b.label}</span>`
+        +`<div style="flex:1;height:14px;background:var(--surface2);border-radius:7px;overflow:hidden"><div style="height:100%;width:${Math.round(b.count/maxB*100)}%;background:var(--blue-mid)"></div></div>`
+        +`<span style="width:22px;flex-shrink:0;text-align:center;font-size:12px;font-weight:800;color:var(--text)">${b.count}</span>`
+        +`</div>`).join('');
+      html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);margin:12px 0 2px">פילוח לפי קבוצת גיל</div>`+rows;
+    }
+  }
+  html+=sec('שמות פרטיים נפוצים');
+  html+=chips(s.topNames);
+  html+=sec('שמות משפחה נפוצים');
+  html+=chips(s.topSurnames);
+  body.innerHTML=html;
 }
 function _treeGenderBtnMap(){return{'':'treeGenderNone',boy:'treeGenderBoy',girl:'treeGenderGirl'};}
 function _renderTreeGenderButtons(g){
