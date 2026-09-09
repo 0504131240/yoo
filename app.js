@@ -1349,13 +1349,12 @@ function _treeLayout(people){
       // family's line. When the partner has no recorded parents there is no
       // other family to cross, so the plain order stands.
       const rightMember=u.ids.length>1?u.ids[1]:null;
-      // …and only for a couple of siblings, not a large family. With many
-      // siblings the couple sits inside the group and the group spills onto
-      // both sides whatever we do, so moving it to one end only churns the
-      // established order without removing any crossing.
+      // Applies regardless of how many siblings the right-side (male) member
+      // has — the father's/groom's side of a marriage should never flip to
+      // the left just because he happens to have 3+ siblings instead of 1-2.
       const rightSibCount=rightMember!=null?sibUnitsOf(rightMember).filter(su=>su!==u).length:0;
       const rightSideSibs=rightMember!=null&&parented.length>1
-        &&parented.includes(rightMember)&&rightSibCount>0&&rightSibCount<=2
+        &&parented.includes(rightMember)&&rightSibCount>0
         &&!hasSibs(u.ids[0]);
       let members=[u];
       if(rightSideSibs){
@@ -2060,7 +2059,24 @@ function openTreePersonModal(id){
   const addSpouseBtn=document.getElementById('treeAddSpouseBtn');
   if(addSpouseBtn)addSpouseBtn.style.display=(p.spouseIds&&p.spouseIds.length>0)?'none':'block';
   _syncTreeSubtreeBtn(p);
+  renderTreePersonKidsList(p);
   document.getElementById('treePersonModal').style.display='flex';
+}
+// The person sheet's own kids list: tapping a child jumps straight into
+// THEIR sheet (openTreePersonModal is idempotent — it just re-populates
+// the same modal for the new id), so you can drill down generation by
+// generation without ever closing back out to the canvas.
+function renderTreePersonKidsList(p){
+  const el=document.getElementById('treePersonKidsList');if(!el)return;
+  const kids=familyTree.filter(x=>x.parentIds&&x.parentIds.includes(p.id));
+  if(!kids.length){
+    el.innerHTML='<div style="font-size:11px;color:var(--text3);padding:2px 2px 4px">אין ילדים רשומים עדיין</div>';
+    return;
+  }
+  el.innerHTML=kids.map(k=>`<div onclick="openTreePersonModal(${k.id})" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--r2);border:1px solid var(--border);cursor:pointer">
+    <span style="font-size:15px">${k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👤'}</span>
+    <span style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.name||'ללא שם')}${k.surname?' '+esc(k.surname):''}</span>
+  </div>`).join('');
 }
 function closeTreePersonModal(){
   document.getElementById('treePersonModal').style.display='none';
@@ -2288,12 +2304,17 @@ function confirmTreeAdd(){
   }
   familyTree.push(newPerson);
   closeTreeAddModal();
-  closeTreePersonModal();
   _awardTreePoints(5);
   if(birthYear)_awardTreePoints(2);
   if(deathYear)_awardTreePoints(2);
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
+  // Back to the person we just added FROM (refreshed — e.g. showing the new
+  // child in their kids list right away) instead of dropping out to the
+  // bare canvas. A brand-new root person has no "back to" — that one still
+  // just closes.
+  if(base)openTreePersonModal(base.id);
+  else closeTreePersonModal();
 }
 // Family-tree filling competition: 5 points for a new person, 2 for newly
 // filling in a birth/death year, 5 for newly adding a photo (see the
