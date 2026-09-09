@@ -2268,58 +2268,136 @@ function renderTreeLeaderboard(){
     </div>`).join('');
 }
 
-// Links two people ALREADY in the tree as siblings — unlike "הוסף אח/אחות"
-// (which creates a brand-new person), this is for two people who are both
-// already recorded but weren't connected as each other's siblings yet.
+// Links two people ALREADY in the tree — unlike "הוסף הורה/בן-זוג/אח/ילד"
+// (which always creates a brand-new person), this is for two people who
+// are both already recorded but weren't connected to each other yet.
 // "Sibling" isn't its own relationship in this data model — it's derived
-// from sharing the exact same parentIds — so linking two people really
+// from sharing the exact same parentIds — so linking two as siblings really
 // means making their parentIds match.
 function _treeParentKey(ids){return[...(ids||[])].sort((a,b)=>a-b).join(',');}
-function openTreeLinkSiblingModal(){
+// Every ancestor of a person (their recorded parents, grandparents, …) —
+// the mirror image of _treeBranchIds (which walks DOWN to descendants).
+// Used to keep "link as child" from creating a cycle (making someone their
+// own ancestor's ancestor).
+function _treeAncestorIds(id){
+  const byId=new Map(familyTree.map(x=>[x.id,x]));
+  const out=new Set(),q=[id];
+  while(q.length){
+    const cur=byId.get(q.pop());if(!cur)continue;
+    (cur.parentIds||[]).forEach(pid=>{ if(!out.has(pid)){out.add(pid);q.push(pid);} });
+  }
+  return out;
+}
+// Step 1: which relationship to link as. Mirrors openTreeAddModal's own
+// visibility rules (a 3rd parent or 2nd spouse isn't a thing here either) —
+// unlike there, sibling/child are always offered since this is about
+// connecting to someone who ALREADY exists, not creating someone new.
+function openTreeLinkRelationModal(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
-  document.getElementById('treeLinkSiblingSearch').value='';
-  renderTreeLinkSiblingList('');
-  document.getElementById('treeLinkSiblingModal').style.display='flex';
-  setTimeout(()=>document.getElementById('treeLinkSiblingSearch')?.focus(),50);
+  const parentBtn=document.getElementById('treeLinkParentBtn');
+  if(parentBtn)parentBtn.style.display=(p.parentIds&&p.parentIds.length>=2)?'none':'flex';
+  const spouseBtn=document.getElementById('treeLinkSpouseBtn');
+  if(spouseBtn)spouseBtn.style.display=(p.spouseIds&&p.spouseIds.length>0)?'none':'flex';
+  document.getElementById('treeLinkRelationModal').style.display='flex';
 }
-function closeTreeLinkSiblingModal(){
-  document.getElementById('treeLinkSiblingModal').style.display='none';
+function closeTreeLinkRelationModal(){
+  document.getElementById('treeLinkRelationModal').style.display='none';
 }
-function renderTreeLinkSiblingList(filter){
-  const el=document.getElementById('treeLinkSiblingList');if(!el)return;
+function chooseTreeLinkRelation(relation){
+  closeTreeLinkRelationModal();
+  openTreeLinkPersonModal(relation);
+}
+const _TREE_LINK_TITLES={parent:'🔗 קשר להורה קיים/ת',spouse:'🔗 קשר לבן/בת זוג קיים/ת',sibling:'🔗 קשר לאח/אחות קיים/ת',child:'🔗 קשר לילד/ה קיים/ת'};
+let _treeLinkRelation=null;
+// Step 2: pick WHO, from everyone else in the tree already — filtered per
+// relation so the list never even offers something that would need
+// blocking on selection (an already-2-parents / already-married-in
+// candidate isn't relevant here; a cycle-creating one — a descendant as
+// your own parent, or an ancestor as your own child — genuinely can't be
+// filtered away safely, so those two are excluded outright).
+function openTreeLinkPersonModal(relation){
+  const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
+  _treeLinkRelation=relation;
+  const title=document.getElementById('treeLinkPersonTitle');
+  if(title)title.textContent=_TREE_LINK_TITLES[relation]||'🔗 קשר לבן משפחה קיים/ת';
+  document.getElementById('treeLinkPersonSearch').value='';
+  renderTreeLinkPersonList('');
+  document.getElementById('treeLinkPersonModal').style.display='flex';
+  setTimeout(()=>document.getElementById('treeLinkPersonSearch')?.focus(),50);
+}
+function closeTreeLinkPersonModal(){
+  document.getElementById('treeLinkPersonModal').style.display='none';
+}
+function renderTreeLinkPersonList(filter){
+  const el=document.getElementById('treeLinkPersonList');if(!el)return;
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
   const q=(filter||'').trim().toLowerCase();
-  const myKey=_treeParentKey(p.parentIds);
+  const exclude=new Set([p.id]);
+  if(_treeLinkRelation==='sibling'){
+    const myKey=_treeParentKey(p.parentIds);
+    if(myKey)familyTree.forEach(x=>{ if(_treeParentKey(x.parentIds)===myKey)exclude.add(x.id); }); // already siblings
+  }else if(_treeLinkRelation==='parent'){
+    _treeBranchIds(p.id).forEach(id=>exclude.add(id)); // a descendant can't also be your parent
+  }else if(_treeLinkRelation==='child'){
+    _treeAncestorIds(p.id).forEach(id=>exclude.add(id)); // an ancestor can't also be your child
+  }
   const candidates=familyTree.filter(x=>{
-    if(x.id===p.id)return false;
-    if(_treeParentKey(x.parentIds)===myKey&&myKey)return false; // already siblings
+    if(exclude.has(x.id))return false;
     const full=((x.name||'')+' '+(x.surname||'')).toLowerCase();
     return!q||full.includes(q);
   });
   if(!candidates.length){el.innerHTML='<div style="padding:16px;text-align:center;font-size:13px;color:var(--text3)">לא נמצאו אנשים</div>';return;}
-  el.innerHTML=candidates.map(x=>`<div onclick="linkAsSiblings(${x.id})" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer">
+  el.innerHTML=candidates.map(x=>`<div onclick="linkExistingAs(${x.id})" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer">
     <span style="font-size:18px">${x.gender==='boy'?'👦':x.gender==='girl'?'👧':'👤'}</span>
     <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(x.name||'ללא שם')}${x.surname?' '+esc(x.surname):''}</span>
   </div>`).join('');
 }
-function linkAsSiblings(otherId){
+// Step 3: commit the link. Each branch is written to be safe by
+// construction wherever the list above couldn't filter that out on its
+// own (sibling/child can overwrite the OTHER person's existing recorded
+// parents, so those two confirm first — parent/spouse only ever ADD to
+// data, never replace anything, so they don't need to).
+function linkExistingAs(otherId){
   const a=familyTree.find(x=>x.id===_treeActivePersonId);if(!a)return;
   const b=familyTree.find(x=>x.id===otherId);if(!b)return;
-  const aHas=!!(a.parentIds&&a.parentIds.length);
-  const bHas=!!(b.parentIds&&b.parentIds.length);
-  if(!aHas&&!bHas){
-    alert('צריך שלפחות לאחד מהם יהיה הורה בעץ — הוסיפו הורה לאחד מהם ונסו שוב.');
+  if(_treeLinkRelation==='sibling'){
+    const aHas=!!(a.parentIds&&a.parentIds.length);
+    const bHas=!!(b.parentIds&&b.parentIds.length);
+    if(!aHas&&!bHas){alert('צריך שלפחות לאחד מהם יהיה הורה בעץ — הוסיפו הורה לאחד מהם ונסו שוב.');return;}
+    if(aHas&&bHas){
+      if(!confirm(`ל-${a.name||'האדם הראשון'} ול-${b.name||'האדם השני'} יש כרגע הורים שונים. לשייך את ${b.name||'השני'} להורים של ${a.name||'הראשון'}? (הקשר הקודם של ${b.name||'השני'} להורים שלו יוסר — ההורים עצמם יישארו בעץ)`))return;
+      b.parentIds=[...a.parentIds];
+    }else if(aHas){
+      b.parentIds=[...a.parentIds];
+    }else{
+      a.parentIds=[...b.parentIds];
+    }
+  }else if(_treeLinkRelation==='spouse'){
+    if(!a.spouseIds)a.spouseIds=[];
+    if(!b.spouseIds)b.spouseIds=[];
+    a.spouseIds.push(b.id);
+    b.spouseIds.push(a.id);
+    // Same courtesy confirmTreeAdd offers when adding a brand-new spouse:
+    // attach them as the 2nd parent of kids `a` already has recorded alone.
+    const singleParentKids=familyTree.filter(x=>x.parentIds&&x.parentIds.length===1&&x.parentIds[0]===a.id);
+    if(singleParentKids.length&&confirm('לשייך את '+(b.name||'בן/בת הזוג')+' גם כהורה השני של '+singleParentKids.length+' הילדים הקיימים של '+(a.name||'האדם הזה')+'?')){
+      singleParentKids.forEach(k=>k.parentIds=[a.id,b.id]);
+    }
+  }else if(_treeLinkRelation==='parent'){
+    if(!a.parentIds)a.parentIds=[];
+    if(a.parentIds.length>=2){alert('כבר יש לאדם הזה 2 הורים.');return;}
+    if(a.parentIds.includes(b.id))return;
+    a.parentIds.push(b.id);
+  }else if(_treeLinkRelation==='child'){
+    if(b.parentIds&&b.parentIds.length){
+      if(!confirm('ל-'+(b.name||'האדם הזה')+' יש כבר הורים רשומים בעץ. להחליף אותם ולקשר כילד/ה של '+(a.name||'האדם הנוכחי')+'? (הקשר הקודם יוסר — ההורים הקודמים עצמם יישארו בעץ)'))return;
+    }
+    const spouseIds=a.spouseIds||[];
+    b.parentIds=spouseIds.length===1?[a.id,spouseIds[0]]:[a.id];
+  }else{
     return;
   }
-  if(aHas&&bHas){
-    if(!confirm(`ל-${a.name||'האדם הראשון'} ול-${b.name||'האדם השני'} יש כרגע הורים שונים. לשייך את ${b.name||'השני'} להורים של ${a.name||'הראשון'}? (הקשר הקודם של ${b.name||'השני'} להורים שלו יוסר — ההורים עצמם יישארו בעץ)`))return;
-    b.parentIds=[...a.parentIds];
-  }else if(aHas){
-    b.parentIds=[...a.parentIds];
-  }else{
-    a.parentIds=[...b.parentIds];
-  }
-  closeTreeLinkSiblingModal();
+  closeTreeLinkPersonModal();
   closeTreePersonModal();
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
