@@ -654,9 +654,23 @@
       <textarea id="broadcastMsg" rows="6" placeholder="כתבו כאן את ההודעה..." style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box;resize:vertical"></textarea>
     </div>
     <div id="broadcastErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center"></div>
-    <div style="display:flex;gap:8px;margin-top:14px">
+    <button onclick="previewBroadcastEmail()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;margin-top:12px">👁 תצוגה מקדימה</button>
+    <div style="display:flex;gap:8px;margin-top:8px">
       <button onclick="sendBroadcastEmail()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">📧 שלח לכולם</button>
       <button onclick="closeBroadcastModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- Broadcast email: HTML preview -->
+<div id="broadcastPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2800;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeBroadcastPreviewModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:480px;height:82vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:800;color:var(--text)">👁 כך המייל ייראה</span>
+      <button onclick="closeBroadcastPreviewModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="flex:1;min-height:0;background:#eef0f8">
+      <iframe id="broadcastPreviewFrame" title="תצוגה מקדימה של המייל" sandbox="" style="width:100%;height:100%;border:none;display:block"></iframe>
     </div>
   </div>
 </div>
@@ -889,6 +903,7 @@
     <button onclick="closeFamilyTreeOverlay()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
     <span style="font-size:16px;font-weight:800;color:var(--text)">🌳 אילן יוחסין</span>
     <div style="display:flex;gap:6px">
+      <button onclick="openTreeLeaderboardModal()" title="תחרות מילוי העץ" style="background:var(--surface2);color:var(--text);border:none;border-radius:var(--r2);width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">🏆</button>
       <button id="treeStatsBtn" onclick="toggleTreeStatsMode()" title="סטטיסטיקות — סמנו חלק מהעץ או את כולו" style="background:var(--surface2);color:var(--text2);border:none;border-radius:var(--r2);padding:7px 11px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">📊</button>
       <button onclick="addRootTreePerson()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:7px 12px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ הוסף אדם</button>
     </div>
@@ -900,6 +915,18 @@
     <button onclick="zoomTree(-0.15)" style="width:32px;height:32px;border-radius:50%;border:none;background:var(--surface2);color:var(--text);font-size:18px;font-weight:700;cursor:pointer;font-family:var(--font)">－</button>
     <button onclick="fitTreeToScreen()" style="padding:0 12px;height:32px;border-radius:16px;border:none;background:var(--surface2);color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:var(--font)">⤢ הצג הכל</button>
     <button onclick="zoomTree(0.15)" style="width:32px;height:32px;border-radius:50%;border:none;background:var(--surface2);color:var(--text);font-size:18px;font-weight:700;cursor:pointer;font-family:var(--font)">＋</button>
+  </div>
+</div>
+
+<!-- Family tree: filling competition leaderboard -->
+<div id="treeLeaderboardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeLeaderboardModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:380px;max-height:80vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800;color:var(--text)">🏆 תחרות מילוי העץ</span>
+      <button onclick="closeTreeLeaderboardModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:6px 18px 4px;font-size:12px;color:var(--text2);line-height:1.7">5 נק' על שם חדש בעץ · 2 נק' על הוספת שנת לידה/פטירה · 5 נק' על הוספת תמונה ⭐</div>
+    <div id="treeLeaderboardList" style="padding:12px 18px 18px;overflow-y:auto;flex:1;min-height:0"></div>
   </div>
 </div>
 

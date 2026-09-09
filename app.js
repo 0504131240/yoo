@@ -34,6 +34,8 @@ let yahrzeits=[];
 // then on, since a genealogical tree needs relations families/kids don't
 // model (grandparents, siblings-in-law, multiple generations...).
 let familyTree=[];
+// Family-tree filling competition: {email:{name,points}} — see _awardTreePoints().
+let treeScores={};
 let nxtMsg=1,nxtCal=1,nxtBday=1,nxtClaim=1,nxtNotif=1,nxtPoll=1,nxtCountdown=1,nxtYahrzeit=1,nxtTreePerson=1;
 let currentShell='home';
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDay=null,calHebrew=true;
@@ -326,6 +328,25 @@ function openBroadcastModal(){
 function closeBroadcastModal(){
   document.getElementById('broadcastModal').style.display='none';
 }
+// Shared by sendBroadcastEmail() and previewBroadcastEmail() so the preview
+// is always built exactly the same way as what actually gets sent.
+function _broadcastEmailHtml(subject,msg){
+  const bodyHtml=`<p style="white-space:pre-wrap;margin:0">${_esc(msg)}</p>`;
+  return _emailWrap(bodyHtml,subject,'📢','');
+}
+function previewBroadcastEmail(){
+  const subject=(document.getElementById('broadcastSubject')?.value||'').trim();
+  const msg=(document.getElementById('broadcastMsg')?.value||'').trim();
+  const err=document.getElementById('broadcastErr');
+  if(!subject||!msg){if(err){err.textContent='נא למלא נושא ותוכן כדי לראות תצוגה מקדימה';err.style.display='block';}return;}
+  if(err)err.style.display='none';
+  const frame=document.getElementById('broadcastPreviewFrame');
+  if(frame)frame.srcdoc=_broadcastEmailHtml(subject,msg);
+  document.getElementById('broadcastPreviewModal').style.display='flex';
+}
+function closeBroadcastPreviewModal(){
+  document.getElementById('broadcastPreviewModal').style.display='none';
+}
 function sendBroadcastEmail(){
   const subject=(document.getElementById('broadcastSubject')?.value||'').trim();
   const msg=(document.getElementById('broadcastMsg')?.value||'').trim();
@@ -334,8 +355,7 @@ function sendBroadcastEmail(){
   const recipients=families.filter(f=>f.email||f.email2).map(f=>({email:f.email,email2:f.email2,name:f.name.replace('משפחת','').trim()}));
   if(!recipients.length){if(err){err.textContent='אין משפחות עם כתובת מייל שמורה';err.style.display='block';}return;}
   if(err)err.style.display='none';
-  const bodyHtml=`<p style="white-space:pre-wrap;margin:0">${_esc(msg)}</p>`;
-  const html=_emailWrap(bodyHtml,subject,'📢','');
+  const html=_broadcastEmailHtml(subject,msg);
   sendEmailNotif(recipients,subject,msg,html);
   closeBroadcastModal();
   showToast('📧 ההודעה נשלחה לכולם');
@@ -611,6 +631,7 @@ function saveLocal(){
     localStorage.setItem('countdowns',JSON.stringify(countdowns));
     localStorage.setItem('yahrzeits',JSON.stringify(yahrzeits));
     localStorage.setItem('familyTree',JSON.stringify(familyTree));
+    localStorage.setItem('treeScores',JSON.stringify(treeScores));
   }catch(e){}
 }
 
@@ -639,6 +660,7 @@ function _restoreAllFromLocalCache(){
   const cds=localStorage.getItem('countdowns');if(cds)countdowns=JSON.parse(cds);
   const yhz=localStorage.getItem('yahrzeits');if(yhz)yahrzeits=JSON.parse(yhz);
   const ftr=localStorage.getItem('familyTree');if(ftr)familyTree=JSON.parse(ftr);
+  const trs=localStorage.getItem('treeScores');if(trs)treeScores=JSON.parse(trs);
   nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
   nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
   nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
@@ -664,7 +686,7 @@ async function save(){
   showSyncStatus('שומר...');
   try{
     const {db,doc,setDoc}=await fbInit();
-    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,globalSettled,visits,notifications,polls,countdowns,yahrzeits,familyTree});
+    await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,globalSettled,visits,notifications,polls,countdowns,yahrzeits,familyTree,treeScores});
     localStorage.removeItem('pendingSave');
     localStorage.removeItem('pendingSaveAt');
     showSyncStatus('✓ נשמר',2000);
@@ -704,6 +726,7 @@ async function load(){
     countdowns=d.countdowns||[];
     yahrzeits=d.yahrzeits||[];
     familyTree=d.familyTree||[];
+    treeScores=d.treeScores||{};
     nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
     nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;
     nxtBday=birthdays.length?Math.max(...birthdays.map(b=>b.id))+1:1;
@@ -872,6 +895,11 @@ const TREE_NODE_W=112,TREE_NODE_H=80,TREE_H_GAP=40,TREE_COUPLE_GAP=14,TREE_LEVEL
 // spouses, siblings and everyone else keep the standard gaps.
 const TREE_FANOUT_GAP=120;
 let _treeActivePersonId=null,_treeAddRelation=null,_treeAddGender='';
+// What birthYear/deathYear/photo looked like when the person sheet was
+// opened — compared against the current values in saveTreePersonChanges()
+// so points are only ever awarded for NEWLY filling in a field, never for
+// re-saving one that was already filled.
+let _treePersonSnapshot=null;
 // Sub-trees: a person can be marked as one, which folds their descendants
 // out of the main tree. `collapsed` is stored on the person, so the branch
 // stays folded away for everyone; opening one is a local view state that
@@ -1938,6 +1966,7 @@ function _renderTreeGenderButtons(g){
 function openTreePersonModal(id){
   _treeActivePersonId=id;
   const p=familyTree.find(x=>x.id===id);if(!p)return;
+  _treePersonSnapshot={birthYear:p.birthYear||'',deathYear:p.deathYear||'',photo:p.photo||null};
   _treePersonEditPhoto=undefined;
   const photoInp=document.getElementById('treePersonPhoto');
   if(photoInp)photoInp.value='';
@@ -1968,6 +1997,7 @@ function openTreePersonModal(id){
 function closeTreePersonModal(){
   document.getElementById('treePersonModal').style.display='none';
   _treeActivePersonId=null;
+  _treePersonSnapshot=null;
 }
 function setTreePersonGender(g){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);if(!p)return;
@@ -2002,6 +2032,11 @@ function saveTreePersonChanges(){
   if(p&&_treePersonEditPhoto!==undefined){
     p.photo=_treePersonEditPhoto||null;
     _treePersonEditPhoto=undefined;
+  }
+  if(p&&_treePersonSnapshot){
+    if(!_treePersonSnapshot.birthYear&&p.birthYear)_awardTreePoints(2);
+    if(!_treePersonSnapshot.deathYear&&p.deathYear)_awardTreePoints(2);
+    if(!_treePersonSnapshot.photo&&p.photo)_awardTreePoints(5);
   }
   save();
   renderFamilyTree();
@@ -2186,8 +2221,51 @@ function confirmTreeAdd(){
   familyTree.push(newPerson);
   closeTreeAddModal();
   closeTreePersonModal();
+  _awardTreePoints(5);
+  if(birthYear)_awardTreePoints(2);
+  if(deathYear)_awardTreePoints(2);
   save();renderFamilyTree();
   _fitTreeWhenReady(); // layout shifted — keep the whole tree in view
+}
+// Family-tree filling competition: 5 points for a new person, 2 for newly
+// filling in a birth/death year, 5 for newly adding a photo (see the
+// callers) — credited to whichever family email is filling in the tree on
+// THIS device (the index.html per-device email gate — see
+// _myFamId()/deviceEmailSlot3). Admin-side additions (admin.html has no
+// such per-email identity) aren't credited — this is a competition between
+// family members, not the admin.
+function _awardTreePoints(points){
+  if(_isAdminPage())return;
+  const fid=_myFamId();if(fid==null)return;
+  const fam=getFam(fid);if(!fam)return;
+  const slot=parseInt(localStorage.getItem('deviceEmailSlot3')||'1');
+  const email=_cleanEmail(slot===2?fam.email2:fam.email);
+  if(!email)return;
+  if(!treeScores[email])treeScores[email]={name:'',points:0};
+  treeScores[email].name=_regDisplayName(fam,slot)||email;
+  treeScores[email].points+=points;
+}
+function openTreeLeaderboardModal(){
+  renderTreeLeaderboard();
+  document.getElementById('treeLeaderboardModal').style.display='flex';
+}
+function closeTreeLeaderboardModal(){
+  document.getElementById('treeLeaderboardModal').style.display='none';
+}
+function renderTreeLeaderboard(){
+  const list=document.getElementById('treeLeaderboardList');if(!list)return;
+  const rows=Object.values(treeScores).sort((a,b)=>b.points-a.points);
+  if(!rows.length){
+    list.innerHTML='<div class="empty" style="padding:24px 0"><span class="empty-ico">🏆</span>עדיין אין נקודות — כל שם חדש שתוסיפו לעץ שווה 5 נקודות!</div>';
+    return;
+  }
+  const medals=['🥇','🥈','🥉'];
+  list.innerHTML=rows.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:6px">
+      <span style="font-size:17px;width:24px;text-align:center;flex-shrink:0">${medals[i]||(i+1)}</span>
+      <span style="flex:1;font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span>
+      <span style="font-size:13px;font-weight:800;color:var(--blue-mid);white-space:nowrap">${r.points} נק'</span>
+    </div>`).join('');
 }
 
 // Links two people ALREADY in the tree as siblings — unlike "הוסף אח/אחות"
