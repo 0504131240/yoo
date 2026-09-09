@@ -978,6 +978,16 @@
   </div>
 </div>
 
+<!-- Family tree: which child's line to keep visible when collapsing -->
+<div id="treeCollapsePickModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2100;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeCollapsePickModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:18px;width:100%;max-width:320px;max-height:78vh;box-sizing:border-box;display:flex;flex-direction:column">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px;text-align:center;color:var(--text)">🌿 הפוך לתת-עץ</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px;text-align:center">איזו שושלת להשאיר תמיד גלויה? שאר הילדים וצאצאיהם יתקפלו</div>
+    <div id="treeCollapsePickList" style="overflow-y:auto;flex:1;min-height:0"></div>
+    <button onclick="closeTreeCollapsePickModal()" style="margin-top:10px;padding:10px;border-radius:var(--r2);border:none;background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+  </div>
+</div>
+
 <!-- Family tree: per-card "+" quick-add menu -->
 <div id="treeQuickAddModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2050;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreeQuickAddMenu()">
   <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:14px;width:100%;max-width:280px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px">

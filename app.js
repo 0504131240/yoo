@@ -924,12 +924,19 @@ function _treeDescendantCount(id,kids){
   }
   return seen.size;
 }
+// A collapsed person can name ONE child whose entire line stays fully
+// visible (mainLineChildId) — that child, and everyone descending from
+// them, is completely untouched by the fold. Every OTHER child is folded
+// away — including the child themselves, not just their own descendants —
+// so a collapsed ancestor never leaves a "half-hidden" sibling showing.
 function _treeHiddenIds(kids){
   kids=kids||_treeChildrenMap();
   const byId=new Map(familyTree.map(p=>[p.id,p]));
   const hidden=new Set(),q=[];
   familyTree.forEach(p=>{
-    if(p.collapsed&&!_treeExpanded.has(p.id))(kids.get(p.id)||[]).forEach(k=>q.push(k));
+    if(p.collapsed&&!_treeExpanded.has(p.id)){
+      (kids.get(p.id)||[]).forEach(k=>{ if(k!==p.mainLineChildId)q.push(k); });
+    }
   });
   while(q.length){
     const id=q.pop();
@@ -948,6 +955,22 @@ function _treeHiddenIds(kids){
   }
   return hidden;
 }
+// How many descendants a collapsed person's card badge should actually
+// claim are hidden — same walk as _treeHiddenIds' own queue seed (skips
+// the exempted main-line child's whole branch), so the number on the card
+// never overstates what tapping it would reveal.
+function _treeHiddenDescendantCount(p,kids){
+  kids=kids||_treeChildrenMap();
+  const seen=new Set();
+  const q=(kids.get(p.id)||[]).filter(k=>k!==p.mainLineChildId);
+  while(q.length){
+    const x=q.pop();
+    if(seen.has(x))continue;
+    seen.add(x);
+    (kids.get(x)||[]).forEach(k=>q.push(k));
+  }
+  return seen.size;
+}
 // Opening or closing a sub-tree from its card — view only, nothing saved.
 function toggleTreeSubtree(id){
   if(_treeExpanded.has(id))_treeExpanded.delete(id);
@@ -956,16 +979,61 @@ function toggleTreeSubtree(id){
   _fitTreeWhenReady();
 }
 // Making someone a sub-tree (or folding their branch back in) — saved.
+// Un-collapsing is a direct single click. Collapsing, when this person has
+// 2+ children, first asks which child's own line to keep fully visible
+// (so a direct ancestor's line is never accidentally folded away along
+// with their siblings' branches) — with fewer than 2 children there's
+// nothing to choose between, so it collapses everything straight away.
 function toggleTreePersonCollapsed(){
   const p=familyTree.find(x=>x.id===_treeActivePersonId);
   if(!p)return;
-  p.collapsed=!p.collapsed;
+  if(p.collapsed){
+    p.collapsed=false;p.mainLineChildId=null;
+    _treeExpanded.delete(p.id);
+    save();
+    _syncTreeSubtreeBtn(p);
+    renderFamilyTree();
+    _fitTreeWhenReady();
+    showToast('🌳 הצאצאים חזרו לעץ הראשי');
+    return;
+  }
+  const kids=(_treeChildrenMap().get(p.id)||[]);
+  if(kids.length>=2){
+    openTreeCollapsePickModal(p.id,kids);
+    return;
+  }
+  _collapseTreePerson(p.id,null);
+}
+let _treeCollapseTargetId=null;
+function openTreeCollapsePickModal(personId,kidIds){
+  _treeCollapseTargetId=personId;
+  const byId=new Map(familyTree.map(x=>[x.id,x]));
+  const list=document.getElementById('treeCollapsePickList');
+  if(list){
+    list.innerHTML=kidIds.map(kid=>{
+      const k=byId.get(kid);
+      return`<div onclick="_collapseTreePerson(${personId},${kid})" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer">
+        <span style="font-size:18px">${k.gender==='boy'?'👦':k.gender==='girl'?'👧':'👤'}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(k.name||'ללא שם')}${k.surname?' '+esc(k.surname):''}</span>
+      </div>`;
+    }).join('')+`<div onclick="_collapseTreePerson(${personId},null)" style="padding:10px 4px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text2)">🌿 קפל הכל — בלי לשמר אף שושלת</div>`;
+  }
+  document.getElementById('treeCollapsePickModal').style.display='flex';
+}
+function closeTreeCollapsePickModal(){
+  document.getElementById('treeCollapsePickModal').style.display='none';
+  _treeCollapseTargetId=null;
+}
+function _collapseTreePerson(personId,mainLineChildId){
+  const p=familyTree.find(x=>x.id===personId);if(!p)return;
+  p.collapsed=true;p.mainLineChildId=mainLineChildId!=null?mainLineChildId:null;
   _treeExpanded.delete(p.id);
+  closeTreeCollapsePickModal();
   save();
   _syncTreeSubtreeBtn(p);
   renderFamilyTree();
   _fitTreeWhenReady();
-  showToast(p.collapsed?'🌿 הצאצאים קופלו לתת-עץ':'🌳 הצאצאים חזרו לעץ הראשי');
+  showToast('🌿 הצאצאים קופלו לתת-עץ');
 }
 function _syncTreeSubtreeBtn(p){
   const btn=document.getElementById('treeSubtreeBtn');
@@ -1679,7 +1747,7 @@ function renderFamilyTree(){
     // A person marked as a sub-tree gets a badge showing how many
     // descendants are folded away behind them; tapping it opens or closes
     // that branch just for this session.
-    const _sub=p.collapsed?_treeDescendantCount(p.id,_kidsMap):0;
+    const _sub=p.collapsed?_treeHiddenDescendantCount(p,_kidsMap):0;
     const _open=_treeExpanded.has(p.id);
     const subBtn=(_sub&&!_treeStatsMode)?`<div onclick="event.stopPropagation();toggleTreeSubtree(${p.id})" title="${_open?'סגור את תת-העץ':'פתח את תת-העץ'}" style="position:absolute;left:${pp.cx+13}px;top:${pp.bottom+3}px;height:18px;min-width:18px;padding:0 5px;border-radius:9px;background:${_open?'var(--text2)':'#2a9d8f'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);z-index:2">${_open?'−':'+'+_sub}</div>`:'';
     // Statistics selection mode: a tap picks/unpicks the card (see
