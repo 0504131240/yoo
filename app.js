@@ -1434,6 +1434,29 @@ function _treeLayout(people){
     });
   });
 
+  // A unit's fan-out target: among its own recorded children, the ONE (if
+  // exactly one) who is married to someone with their own separately-
+  // recorded parents. That child's own position anchors this ancestor
+  // unit's ordering AND X-target — not the whole sibling span — so an
+  // ancestor's own parents don't drift to the wrong side just because that
+  // ancestor happens to have siblings too, on top of the bridging marriage.
+  const bridgingTargetCx=u=>{
+    const kids=[...childPersonsOf.get(u)].filter(cid=>pos[cid]);
+    const candidates=kids.filter(cid=>{
+      const cu=unitOf[cid];
+      if(!cu||cu.ids.length!==2)return false;
+      const other=cu.ids.find(id=>id!==cid);
+      const op=parentUnitOfMember(other);
+      return op&&op!==u&&pos[other];
+    });
+    if(candidates.length!==1)return null;
+    const c=candidates[0],cu=unitOf[c];
+    const other=cu.ids.find(id=>id!==c);
+    const mid=(pos[c].cx+pos[other].cx)/2;
+    return pos[c].cx<pos[other].cx
+      ?mid-TREE_FANOUT_GAP/2-uWidth(u)/2
+      :mid+TREE_FANOUT_GAP/2+uWidth(u)/2;
+  };
   const pos={};
   const placeUnitAt=(u,leftX)=>{
     const step=uWidth(u)-TREE_NODE_W;
@@ -1455,9 +1478,11 @@ function _treeLayout(people){
     // of them happen to cluster.
     const childCxAvg=c=>{
       const xs=[];
-      c.members.forEach(u=>childPersonsOf.get(u).forEach(cid=>{
-        if(pos[cid])xs.push(pos[cid].cx);
-      }));
+      c.members.forEach(u=>{
+        const bt=bridgingTargetCx(u);
+        if(bt!=null){ xs.push(bt); return; }
+        childPersonsOf.get(u).forEach(cid=>{ if(pos[cid])xs.push(pos[cid].cx); });
+      });
       return xs.length?(Math.min(...xs)+Math.max(...xs))/2:null;
     };
     // Structural (hierarchy-only) order — always well-defined, used as a
@@ -1508,26 +1533,16 @@ function _treeLayout(people){
     const unitChildCx=u=>{
       const kids=[...childPersonsOf.get(u)].filter(cid=>pos[cid]);
       if(!kids.length)return null;
-      // When this unit's only child married someone whose OWN parents are
-      // also recorded, both parent couples want the very same spot — right
-      // above two spouses standing side by side — and they can't both have
-      // it. Instead of pulling those spouses apart (which stops them from
-      // reading as a couple), fan the two parent couples out to either side
-      // of the couple's midpoint. Each stays on its own child's side, so
-      // their connecting lines still never reach across each other.
-      if(kids.length===1){
-        const c=kids[0],cu=unitOf[c];
-        if(cu&&cu.ids.length===2){
-          const other=cu.ids.find(id=>id!==c);
-          const op=parentUnitOfMember(other);
-          if(op&&op!==u&&pos[other]){
-            const mid=(pos[c].cx+pos[other].cx)/2;
-            return pos[c].cx<pos[other].cx
-              ?mid-TREE_FANOUT_GAP/2-uWidth(u)/2
-              :mid+TREE_FANOUT_GAP/2+uWidth(u)/2;
-          }
-        }
-      }
+      // When one of this unit's children married someone whose OWN parents
+      // are also recorded, both parent couples want the very same spot —
+      // right above two spouses standing side by side — and they can't
+      // both have it. Instead of pulling those spouses apart (which stops
+      // them from reading as a couple), fan the two parent couples out to
+      // either side of the couple's midpoint. Each stays on its own
+      // child's side, so their connecting lines still never reach across
+      // each other — even when that child has siblings of their own too.
+      const bt=bridgingTargetCx(u);
+      if(bt!=null)return bt;
       const xs=kids.map(cid=>pos[cid].cx);
       return (Math.min(...xs)+Math.max(...xs))/2;
     };
