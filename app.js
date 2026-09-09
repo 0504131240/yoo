@@ -1358,7 +1358,13 @@ function _treeLayout(people){
         &&!hasSibs(u.ids[0]);
       let members=[u];
       if(rightSideSibs){
-        members=[u,...rtl(sibUnitsOf(rightMember).filter(su=>su!==u))];
+        // Include the married-in unit itself in the SAME rtl sort as its
+        // siblings (not pinned first/leftmost regardless of its own
+        // recorded position) — otherwise moveTreeSibling()/drag-reordering
+        // on this specific person silently stops moving them relative to
+        // their siblings, since their cluster position no longer reflects
+        // familyTree's own array order the way every other sibling's does.
+        members=rtl([u,...sibUnitsOf(rightMember).filter(su=>su!==u)]);
       } else if(parented.length>=1){
         const sibUnits=sibUnitsOf(parented[0]);
         if(sibUnits.length>1)members=rtl(sibUnits);
