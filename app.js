@@ -6317,6 +6317,10 @@ function goToClaimTransfer(claimId){
   openPartPayModal(ev?ev.id:null,f.name.replace('משפחת','').trim(),c.famId,tf.name.replace('משפחת','').trim(),c.toFid,c.amt,false,false);
 }
 
+// Small summary row on the funds page — tapping it opens savingsPotModal
+// with the full balance/expenses/event-contributions breakdown, same
+// click-to-expand pattern as the goal funds above (instead of always
+// showing that full card open on the funds page).
 function renderSavingsPot(){
   const el=document.getElementById('savingsPotSection');
   if(!el)return;
@@ -6325,6 +6329,33 @@ function renderSavingsPot(){
   const bal=contrib-expTotal;
   const contribEvs=events.map(ev=>({ev,amt:(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0)+(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0)})).filter(x=>x.amt>0.5);
   if(!contrib&&!expTotal&&!contribEvs.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="fund-settle-card" style="margin-bottom:10px">
+    <div class="home-row home-row-col" onclick="openSavingsPotModal()">
+      <div class="home-goal-top">
+        <div class="home-row-icon" style="background:var(--blue-bg);color:var(--blue)">💎</div>
+        <div class="home-row-body">
+          <div class="home-row-title">קופת חיסכון</div>
+          <div class="home-row-sub">יתרה ₪${bal.toLocaleString()}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  renderSavingsPotModal();
+}
+function openSavingsPotModal(){
+  renderSavingsPotModal();
+  document.getElementById('savingsPotModal').style.display='flex';
+}
+function closeSavingsPotModal(){
+  document.getElementById('savingsPotModal').style.display='none';
+}
+function renderSavingsPotModal(){
+  const el=document.getElementById('savingsPotModalContent');
+  if(!el)return;
+  const contrib=savingsPotContrib();
+  const expTotal=savingsPotExpTotal();
+  const bal=contrib-expTotal;
+  const contribEvs=events.map(ev=>({ev,amt:(ev.savingsPaid||[]).reduce((s,p)=>s+p.amt,0)+(ev.potToSavings||[]).reduce((s,p)=>s+p.amt,0)})).filter(x=>x.amt>0.5);
   const expRows=(savingsPot.expenses||[]).map(e=>
     `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <div style="flex:1">
@@ -6347,24 +6378,24 @@ function renderSavingsPot(){
       <span style="font-weight:700;color:var(--green-mid)">+₪${Math.round(amt).toLocaleString()}</span>
     </div>`).join('')}
   </div>`:'';
-  el.innerHTML=`<div class="fund-section-title">💎 קופת חיסכון</div>
-    <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:8px">
-      <div style="text-align:center;margin-bottom:4px">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:2px">יתרה</div>
-        <div style="font-size:32px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪${bal.toLocaleString()}</div>
-      </div>
-      ${contrib>0?`<div style="font-size:12px;color:var(--text2);text-align:center;margin-top:4px">נאסף: ₪${contrib.toLocaleString()} · הוצא: ₪${expTotal.toLocaleString()}</div>`:''}
-      ${expTotal>0?`<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:12px">${expRows}</div>`:''}
-      ${evList}
-      ${addForm}
-    </div>`;
+  el.innerHTML=`<div style="text-align:center;margin-bottom:4px">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:2px">יתרה</div>
+      <div style="font-size:32px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪${bal.toLocaleString()}</div>
+    </div>
+    ${contrib>0?`<div style="font-size:12px;color:var(--text2);text-align:center;margin-top:4px">נאסף: ₪${contrib.toLocaleString()} · הוצא: ₪${expTotal.toLocaleString()}</div>`:''}
+    ${expTotal>0?`<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:12px">${expRows}</div>`:''}
+    ${evList}
+    ${addForm}`;
 }
 function renderFund(){
   const mainTotal=fundTotal();
   const goalTotal2=_visibleGoalFunds(goalFunds.filter(g=>!g.archived&&!g.closed)).reduce((s,g)=>s+goalTotal(g),0);
   const evPotsTotal=events.filter(e=>e.open).reduce((s,ev)=>s+evNetPotBal(ev),0);
   const savTotal=savingsPotBal();
-  const grandTotal=mainTotal+goalTotal2+evPotsTotal+savTotal;
+  // Savings is shown in the breakdown below but left out of the grand
+  // total itself — it's money already set aside for something specific,
+  // not spare balance sitting in the other funds.
+  const grandTotal=mainTotal+goalTotal2+evPotsTotal;
 
   // Grand total card
   document.getElementById('grandTotalAmt').textContent='₪'+grandTotal.toLocaleString();
