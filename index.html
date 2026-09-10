@@ -1209,6 +1209,21 @@
   </div>
 </div>
 
+<!-- Goal fund payment-participation popup — pick which families see the
+     fund but are exempt from paying their equal share. -->
+<div id="goalPayersModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1750;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalPayersModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:0;width:100%;max-width:380px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span id="goalPayersTitle" style="font-size:15px;font-weight:800;color:var(--text)">👥 השתתפות בתשלום</span>
+      <button onclick="closeGoalPayersModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">מי שמסומן 🚫 יראה את הקופה כרגיל אבל לא ייכלל בחלוקה השווה ולא יקבל תזכורות תשלום</div>
+      <div id="goalPayersList"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Family self-service overlays (moved out of .main so they still
      display correctly even when the "home" shell, not "pay", is active) -->
     <div id="famEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeFamEditSheet()">

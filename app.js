@@ -3429,6 +3429,12 @@ const _visibleGoalFunds=list=>{
   const myId=_myFamId();
   return list.filter(g=>!(g.hiddenFrom||[]).includes(myId));
 };
+// Families who owe an equal share of this goal fund: everyone who can see
+// it (not in hiddenFrom) MINUS anyone marked as not participating in the
+// payment (g.nonPayers) — those still see the fund and its progress
+// normally, they're just left out of the split and the "who paid"/reminder
+// flows, unlike hiddenFrom which hides the fund's existence entirely.
+const _goalPayers=g=>families.filter(f=>!(g.hiddenFrom||[]).includes(f.id)&&!(g.nonPayers||[]).includes(f.id));
 function _fundTxForDisplay(){
   if(_isAdminPage())return fund.transactions;
   const fid=_myFamId();
@@ -6592,7 +6598,7 @@ function renderGoalFunds(){
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
-    const eligibleCount=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id)).length;
+    const eligibleCount=_goalPayers(g).length;
     const perFamily=g.target>0&&eligibleCount?Math.ceil(g.target/eligibleCount):0;
     const contributors=families.filter(f=>(g.contributions[f.id]||0)>0);
     const contribHtml=contributors.length?`
@@ -6624,6 +6630,7 @@ function renderGoalFunds(){
       <div style="padding:10px 12px" onclick="event.stopPropagation()">
         ${!g.closed?`<button class="edit-only" onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:''}
         <div class="card-actions edit-only" style="margin:0">
+          <button class="action-btn" onclick="openGoalPayersModal(${g.id})">👥 השתתפות</button>
           <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
           <button class="action-btn blue" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
           <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
@@ -6651,7 +6658,7 @@ function renderGoalPayModal(){
   const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g)return;
   const titleEl=document.getElementById('goalPayTitle');
   if(titleEl)titleEl.textContent='🎯 מי שילם? — '+g.name;
-  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const eligible=_goalPayers(g);
   const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
   const total=goalTotal(g);
   const progEl=document.getElementById('goalPayProgress');
@@ -6682,7 +6689,7 @@ function renderGoalPayModal(){
 function toggleGoalPaid(famId){
   if(!editMode)return;
   const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g)return;
-  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const eligible=_goalPayers(g);
   const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
   if(perFamily<=0)return;
   const paid=(g.contributions[famId]||0)>=perFamily;
@@ -6698,6 +6705,47 @@ function toggleGoalPaid(famId){
     addNotif('🎯',name+' סומן/ה כמי ששילם/ה עבור "'+g.name+'"',undefined,g.hiddenFrom,'important',[famId]);
   }
 }
+// Popup for picking which families are exempt from paying their share of
+// this goal fund while still seeing it normally — separate from
+// hiddenFrom, which hides the fund's existence entirely (a surprise gift).
+// Only offers families who can see the fund in the first place.
+let _goalPayersGoalId=null;
+function openGoalPayersModal(goalId){
+  if(!editMode)return;
+  _goalPayersGoalId=goalId;
+  renderGoalPayersModal();
+  document.getElementById('goalPayersModal').style.display='flex';
+}
+function closeGoalPayersModal(){
+  document.getElementById('goalPayersModal').style.display='none';
+  _goalPayersGoalId=null;
+}
+function renderGoalPayersModal(){
+  const g=goalFunds.find(x=>x.id===_goalPayersGoalId);if(!g)return;
+  const titleEl=document.getElementById('goalPayersTitle');
+  if(titleEl)titleEl.textContent='👥 השתתפות בתשלום — '+g.name;
+  const visible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  document.getElementById('goalPayersList').innerHTML=visible.map(f=>{
+    const excluded=(g.nonPayers||[]).includes(f.id);
+    return`<div onclick="toggleGoalNonPayer(${f.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${excluded?'var(--border)':'var(--green-mid)'};margin-bottom:6px;cursor:pointer;box-sizing:border-box;background:${excluded?'transparent':'var(--green-bg)'}">
+      ${famAva(f, 32, 'flex-shrink:0')}
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:1px">${excluded?'לא משתתף/ת בתשלום — עדיין רואה את הקופה':'משתתף/ת בתשלום'}</div>
+      </div>
+      <span style="font-size:18px;flex-shrink:0">${excluded?'🚫':'✅'}</span>
+    </div>`;
+  }).join('');
+}
+function toggleGoalNonPayer(famId){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===_goalPayersGoalId);if(!g)return;
+  g.nonPayers=g.nonPayers||[];
+  const idx=g.nonPayers.indexOf(famId);
+  if(idx>=0)g.nonPayers.splice(idx,1);else g.nonPayers.push(famId);
+  save();render();
+  renderGoalPayersModal();
+}
 // Opens a per-EMAIL-ADDRESS picker (not per-family — a family with two
 // saved addresses gets two separate rows) for everyone who still owes
 // toward this goal fund. Skips families hidden from it (g.hiddenFrom,
@@ -6707,7 +6755,7 @@ let _goalReminderGoalId=null;
 function openGoalReminderModal(goalId){
   if(!editMode)return;
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
-  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const eligible=_goalPayers(g);
   const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
   if(perFamily<=0){alert('לא הוגדר סכום מטרה לקופה הזו — אין לפי מה לחשב חלק שווה ולשלוח תזכורת.');return;}
   const unpaid=eligible.filter(f=>(f.email||f.email2)&&(g.contributions[f.id]||0)<perFamily);
@@ -6755,7 +6803,7 @@ function sendSelectedGoalReminders(){
     if(!byFam.has(fid))byFam.set(fid,[]);
     byFam.get(fid).push(cb.dataset.email);
   });
-  const eligible=families.filter(f=>!(g.hiddenFrom||[]).includes(f.id));
+  const eligible=_goalPayers(g);
   const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
   const famIds=[...byFam.keys()];
   closeGoalReminderModal();
