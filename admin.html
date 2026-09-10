@@ -1123,14 +1123,25 @@
             style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
           <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
             style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin:12px 0 6px">מי לא יראה את הקופה הזו? (אופציונלי — לדוגמה מתנה בהפתעה)</div>
-          <div class="chips" id="goalHideChips"></div>
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin:12px 0 6px">מי לא ישתתף בתשלום? (אופציונלי — עדיין יראה את הקופה)</div>
-          <div class="chips" id="goalNonPayChips"></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button type="button" onclick="openGoalFamPick('hide')" style="flex:1;padding:10px 8px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🙈 מי לא יראה<span id="goalHideCount" style="color:var(--blue-mid)"></span></button>
+            <button type="button" onclick="openGoalFamPick('pay')" style="flex:1;padding:10px 8px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🚫 מי לא משתתף<span id="goalNonPayCount" style="color:var(--blue-mid)"></span></button>
+          </div>
           <div style="display:flex;gap:8px;margin-top:14px">
             <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="addGoalFund()">✓ צור קופה</button>
             <button onclick="closeGoalForm()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Family picker popup shared by the two buttons above — which set
+           it edits (_goalHideFamIds vs _goalNonPayFamIds) is picked by
+           openGoalFamPick('hide'|'pay'). -->
+      <div id="goalFamPickModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1650;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalFamPick()">
+        <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+          <div id="goalFamPickTitle" style="font-size:14px;font-weight:700;margin-bottom:12px"></div>
+          <div class="chips" id="goalFamPickChips"></div>
+          <button onclick="closeGoalFamPick()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-top:14px">✓ סיימתי</button>
         </div>
       </div>
 

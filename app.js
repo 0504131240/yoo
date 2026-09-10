@@ -6486,33 +6486,48 @@ let _goalNonPayFamIds=new Set();
 function openGoalForm(){
   _goalHideFamIds=new Set();
   _goalNonPayFamIds=new Set();
-  renderGoalHideChips();
-  renderGoalNonPayChips();
+  _updateGoalFamPickCounts();
   document.getElementById('goalFormOverlay').style.display='flex';
 }
-function renderGoalHideChips(){
-  const el=document.getElementById('goalHideChips');if(!el)return;
+// Both "who can't see this fund" (_goalHideFamIds) and "who doesn't pay a
+// share" (_goalNonPayFamIds) are picked through the SAME popup — which set
+// it's editing is just which button opened it — so the create form itself
+// stays two short buttons instead of two whole family grids stacked on top
+// of it. openGoalPayersModal (a separate, existing popup) still covers
+// changing the non-payer set after the fund already exists.
+let _goalFamPickTarget=null;
+function openGoalFamPick(which){
+  _goalFamPickTarget=which;
+  const titleEl=document.getElementById('goalFamPickTitle');
+  if(titleEl)titleEl.textContent=which==='hide'?'🙈 מי לא יראה את הקופה הזו?':'🚫 מי לא ישתתף בתשלום?';
+  _renderGoalFamPickChips();
+  document.getElementById('goalFamPickModal').style.display='flex';
+}
+function _goalFamPickSet(){
+  return _goalFamPickTarget==='hide'?_goalHideFamIds:_goalNonPayFamIds;
+}
+function _renderGoalFamPickChips(){
+  const el=document.getElementById('goalFamPickChips');if(!el)return;
+  const set=_goalFamPickSet();
   el.innerHTML=families.map(f=>
-    `<button type="button" class="chip ${_goalHideFamIds.has(f.id)?'on':''}" onclick="toggleGoalHideFam(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
+    `<button type="button" class="chip ${set.has(f.id)?'on':''}" onclick="toggleGoalFamPick(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
   ).join('');
 }
-function toggleGoalHideFam(fid){
-  if(_goalHideFamIds.has(fid))_goalHideFamIds.delete(fid);else _goalHideFamIds.add(fid);
-  renderGoalHideChips();
+function toggleGoalFamPick(fid){
+  const set=_goalFamPickSet();
+  if(set.has(fid))set.delete(fid);else set.add(fid);
+  _renderGoalFamPickChips();
 }
-// Same chip picker as goalHideChips, but for "sees the fund, doesn't pay a
-// share" instead of "doesn't see it at all" — set directly at creation time
-// so it doesn't have to be set up separately afterward via the
-// openGoalPayersModal popup (that popup still works for changing it later).
-function renderGoalNonPayChips(){
-  const el=document.getElementById('goalNonPayChips');if(!el)return;
-  el.innerHTML=families.map(f=>
-    `<button type="button" class="chip ${_goalNonPayFamIds.has(f.id)?'on':''}" onclick="toggleGoalNonPayFam(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
-  ).join('');
+function closeGoalFamPick(){
+  document.getElementById('goalFamPickModal').style.display='none';
+  _goalFamPickTarget=null;
+  _updateGoalFamPickCounts();
 }
-function toggleGoalNonPayFam(fid){
-  if(_goalNonPayFamIds.has(fid))_goalNonPayFamIds.delete(fid);else _goalNonPayFamIds.add(fid);
-  renderGoalNonPayChips();
+function _updateGoalFamPickCounts(){
+  const hideEl=document.getElementById('goalHideCount');
+  if(hideEl)hideEl.textContent=_goalHideFamIds.size?` (${_goalHideFamIds.size})`:'';
+  const payEl=document.getElementById('goalNonPayCount');
+  if(payEl)payEl.textContent=_goalNonPayFamIds.size?` (${_goalNonPayFamIds.size})`:'';
 }
 function closeGoalForm(){
   document.getElementById('goalFormOverlay').style.display='none';
