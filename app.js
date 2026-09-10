@@ -597,7 +597,7 @@ function sendEmailNotif(recipients,subject,message,html){
       .catch(e=>{console.error('📧 שגיאת מייל:',e);showToast('❌ שגיאה בשליחת מייל: '+(e?.text||e?.message||JSON.stringify(e)));});
   },i*600));
 }
-function sendFundUpdateEmail(famId,changeAmt,desc){
+function sendFundUpdateEmail(famId,changeAmt,desc,note){
   const f=getFam(famId);
   if(!f||(!f.email&&!f.email2)){showToast('⚠️ לא הוגדר מייל למשפחה זו');return;}
   const key=localStorage.getItem('ejsPublicKey');
@@ -606,8 +606,11 @@ function sendFundUpdateEmail(famId,changeAmt,desc){
   if(!key||!svc||!tpl){showToast('⚠️ הגדרות מייל חסרות — כנס להגדרות משפחות');return;}
   const name=f.name.replace('משפחת','').trim();
   const newBal=Math.round(fund.famBalances[String(famId)]||0);
-  const msg=`${desc}: ₪${Math.round(changeAmt).toLocaleString()}\n\nיתרתך החדשה בארנק: ₪${newBal.toLocaleString()}`;
-  const html=_emailWrap(_eCard([[desc,`₪${Math.round(changeAmt).toLocaleString()}`],['💰 יתרה חדשה בקופה',`₪${newBal.toLocaleString()}`,true]]),'עדכון ארנק','🏦',_ejsUrl()+'#fund');
+  const msg=`${desc}: ₪${Math.round(changeAmt).toLocaleString()}${note?`\n📝 ${note}`:''}\n\nיתרתך החדשה בארנק: ₪${newBal.toLocaleString()}`;
+  const rows=[[desc,`₪${Math.round(changeAmt).toLocaleString()}`]];
+  if(note)rows.push(['📝 הערה',_esc(note)]);
+  rows.push(['💰 יתרה חדשה בקופה',`₪${newBal.toLocaleString()}`,true]);
+  const html=_emailWrap(_eCard(rows),'עדכון ארנק','🏦',_ejsUrl()+'#fund');
   sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏦 עדכון ארנק · ינקלביץ',msg,html);
 }
 
@@ -6436,7 +6439,7 @@ function renderFund(){
     const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
     return`<div class="fund-tx-row">
       <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
-      <span class="fund-tx-desc"><span>${esc(tx.desc)}</span>${tx.date?`<span class="fund-tx-date">${esc(tx.date)}</span>`:''}</span>
+      <span class="fund-tx-desc"><span>${esc(tx.desc)}</span>${tx.note?`<span class="fund-tx-note">📝 ${esc(tx.note)}</span>`:''}${tx.date?`<span class="fund-tx-date">${esc(tx.date)}</span>`:''}</span>
       <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
     </div>`;
   }).join('')}</div>`;
@@ -6470,7 +6473,7 @@ function toggleFundTx(){
         const isDeposit=tx.type==='deposit';const isWithdraw=tx.type==='withdraw';
         return`<div class="fund-tx-row">
           <span class="fund-tx-type ${isDeposit?'fund-tx-dep':isWithdraw?'fund-tx-with':'fund-tx-pay'}">${isDeposit?'הפקדה':isWithdraw?'משיכה':'תשלום'}</span>
-          <span class="fund-tx-desc"><span>${esc(tx.desc)}</span>${tx.date?`<span class="fund-tx-date">${esc(tx.date)}</span>`:''}</span>
+          <span class="fund-tx-desc"><span>${esc(tx.desc)}</span>${tx.note?`<span class="fund-tx-note">📝 ${esc(tx.note)}</span>`:''}${tx.date?`<span class="fund-tx-date">${esc(tx.date)}</span>`:''}</span>
           <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
         </div>`;
       }).join('')}</div>`;
@@ -6848,6 +6851,8 @@ function openDepositSheet(mode){
   document.getElementById('depositFields').innerHTML=`
     <input type="number" min="0" inputmode="numeric" id="depositAmt" placeholder="${isDeposit?'סכום להפקדה':'סכום למשיכה'} (₪)"
       style="width:100%;border:1.5px solid ${acc};border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;margin-bottom:14px;box-sizing:border-box">
+    <textarea id="depositNote" rows="2" placeholder="הערה (אופציונלי — תופיע גם במייל שיישלח)"
+      style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:14px;box-sizing:border-box;resize:vertical"></textarea>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">${isDeposit?'מי מפקיד?':'מי מושך?'}</div>
     ${families.map(f=>{
       const cl=col(f.id);
@@ -6893,6 +6898,7 @@ function confirmDeposit(){
   if(!_depositFamId){ alert('נא לבחור משפחה'); return; }
   const amt=parseFloat(document.getElementById('depositAmt')?.value)||0;
   if(amt<=0){ alert('נא להזין סכום'); return; }
+  const note=(document.getElementById('depositNote')?.value||'').trim();
   const f=getFam(_depositFamId);
   const key=String(_depositFamId);
   const name=f.name.replace('משפחת','').trim();
@@ -6908,12 +6914,13 @@ function confirmDeposit(){
     type:isDeposit?'deposit':'withdraw',
     famId:_depositFamId,amount:amt,
     desc:isDeposit?name+' הפקיד לארנק':name+' משך מהארנק',
+    note:note||undefined,
     date:new Date().toLocaleDateString('he-IL')});
   const _notifyFamId=_depositFamId;
   closeDepositSheet();
   save();render();
   addNotif(isDeposit?'💰':'💸',name+(isDeposit?' הפקיד/ה ₪':' משך/ה ₪')+amt.toLocaleString()+(isDeposit?' לארנק':' מהארנק'),undefined,undefined,'important',[_notifyFamId]);
-  sendFundUpdateEmail(_notifyFamId,amt,isDeposit?'הפקדה לארנק':'משיכה מהארנק');
+  sendFundUpdateEmail(_notifyFamId,amt,isDeposit?'הפקדה לארנק':'משיכה מהארנק',note);
 }
 
 

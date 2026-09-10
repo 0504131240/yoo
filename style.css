@@ -177,6 +177,7 @@ body:not(.edit-mode) .exp-tag-clickable { pointer-events: none; cursor: default;
 .fund-tx-pay { background: var(--blue-bg); color: var(--blue); }
 .fund-tx-desc { flex: 1; color: var(--text); display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .fund-tx-date { font-size: 10px; color: var(--text3); }
+.fund-tx-note { font-size: 11px; color: var(--text2); font-style: italic; }
 .fund-tx-amt { font-weight: 700; color: var(--green-mid); }
 .fund-tx-amt.neg { color: var(--red-mid); }
 .fund-done-btn { padding: 6px 12px; border-radius: var(--r2); border: none; background: var(--blue-mid); color: #fff; font-size: 12px; font-weight: 700; font-family: var(--font); cursor: pointer; white-space: nowrap; }
