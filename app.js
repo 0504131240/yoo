@@ -6599,15 +6599,18 @@ function toggleGoalClosed(goalId){
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
   g.closed=!g.closed;
   save();render();
+  if(_goalPayGoalId===goalId)renderGoalPayModal();
 }
 function delGoalFund(goalId){
   if(!confirm('למחוק את הקופה? כל ההפקדות יימחקו'))return;
   goalFunds=goalFunds.filter(g=>g.id!==goalId);
+  if(_goalPayGoalId===goalId)closeGoalPayModal();
   save();render();
 }
 function archiveGoalFund(goalId){
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
   g.archived=true;
+  if(_goalPayGoalId===goalId)closeGoalPayModal();
   save();render();
   goTab('archive',null);
 }
@@ -6633,43 +6636,22 @@ function renderGoalFunds(){
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
-    const eligibleCount=_goalPayers(g).length;
-    const perFamily=g.target>0&&eligibleCount?Math.ceil(g.target/eligibleCount):0;
-    const contributors=families.filter(f=>(g.contributions[f.id]||0)>0);
-    const contribHtml=contributors.length?`
-      <div style="border-top:1px solid rgba(255,255,255,0.15);padding-top:9px;margin-top:10px">
-        ${contributors.map(f=>{
-          const cl=col(f.id);
-          const c=g.contributions[f.id]||0;
-          return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-            ${famAva(f, 24, 'flex-shrink:0')}
-            <div style="flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,0.8)">${esc(f.name.replace('משפחת','').trim())}</div>
-            <div style="font-size:12px;font-weight:700;color:#6ee7b7">₪${c.toLocaleString()}</div>
-          </div>`;
-        }).join('')}
-      </div>`:'';
-    return`<div class="fund-settle-card" id="gfund-${g.id}" onclick="openGoalPayModal(${g.id})" style="margin-bottom:14px;cursor:pointer;${g.closed?'opacity:.6':''}">
-      <div style="background:var(--text);border-radius:var(--r) var(--r) 0 0;padding:16px 16px 13px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
-          <div style="font-size:15px;font-weight:800;color:#fff">🎯 ${esc(g.name)}</div>
-          ${reached?'<span class="badge badge-green" style="margin-top:2px">✅ הושלם</span>':g.closed?'<span class="badge badge-gray" style="margin-top:2px">סגור</span>':''}
+    const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()} · ${pct}%`:`נאסף ₪${total.toLocaleString()}`;
+    // Small summary row (same shape as the home page's event/goal rows) —
+    // the full "who paid" breakdown and the admin menu used to sit always
+    // open on this card; they now live inside openGoalPayModal, opened by
+    // tapping the row, so the funds list itself stays scannable.
+    return`<div class="fund-settle-card" id="gfund-${g.id}" style="margin-bottom:10px;${g.closed?'opacity:.6':''}">
+      <div class="home-row home-row-col" onclick="openGoalPayModal(${g.id})">
+        <div class="home-goal-top">
+          <div class="home-row-icon" style="background:var(--amber-bg);color:var(--amber)">🎯</div>
+          <div class="home-row-body">
+            <div class="home-row-title">${esc(g.name)}</div>
+            <div class="home-row-sub">${subText}</div>
+          </div>
+          ${reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:3px">נאסף עד כה</div>
-        <div style="font-size:30px;font-weight:800;color:#fff;letter-spacing:-0.5px">${total>0?'₪'+total.toLocaleString():'₪0'}</div>
-        ${g.target>0?`
-          <div class="pbar" style="margin:8px 0 3px;background:rgba(255,255,255,0.2)"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.55)">מתוך ₪${g.target.toLocaleString()} · ${pct}%</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:4px">💳 כל משפחה: ₪${perFamily.toLocaleString()} (חלוקה שווה בין ${eligibleCount} משפחות)</div>`:''}
-        ${contribHtml}
-      </div>
-      <div style="padding:10px 12px" onclick="event.stopPropagation()">
-        ${!g.closed?`<button class="edit-only" onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:''}
-        <div class="card-actions edit-only" style="margin:0">
-          <button class="action-btn" onclick="openGoalPayersModal(${g.id})">👥 השתתפות</button>
-          <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
-          <button class="action-btn blue" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
-          <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
-        </div>
+        ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -6720,6 +6702,35 @@ function renderGoalPayModal(){
       <div style="font-size:13px;font-weight:700;color:${paid?'var(--green-mid)':'var(--text2)'}">₪${perFamily.toLocaleString()}</div>
     </div>`;
   }).join('');
+  // Real (possibly custom/partial) deposit amounts — visible to everyone,
+  // like the checklist above, unlike the admin-only menu below.
+  const contribEl=document.getElementById('goalPayContrib');
+  if(contribEl){
+    const contributors=families.filter(f=>(g.contributions[f.id]||0)>0);
+    contribEl.innerHTML=contributors.length?`<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:7px">💳 הפקדות בפועל</div>
+      ${contributors.map(f=>{
+        const c=g.contributions[f.id]||0;
+        return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          ${famAva(f, 24, 'flex-shrink:0')}
+          <div style="flex:1;font-size:12px;font-weight:600">${esc(f.name.replace('משפחת','').trim())}</div>
+          <div style="font-size:12px;font-weight:700;color:var(--green-mid)">₪${c.toLocaleString()}</div>
+        </div>`;
+      }).join('')}
+    </div>`:'';
+  }
+  // Admin menu — used to sit always-open on the funds-list card; now it
+  // only renders once this specific fund's modal is open.
+  const menuEl=document.getElementById('goalPayMenu');
+  if(menuEl){
+    menuEl.innerHTML=(!g.closed?`<button onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:'')+
+      `<div class="card-actions" style="margin:0">
+        <button class="action-btn" onclick="openGoalPayersModal(${g.id})">👥 השתתפות</button>
+        <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
+        <button class="action-btn blue" onclick="archiveGoalFund(${g.id})">🗂 לארכיון</button>
+        <button class="action-btn red" onclick="delGoalFund(${g.id})">🗑 מחק</button>
+      </div>`;
+  }
 }
 function toggleGoalPaid(famId){
   if(!editMode)return;
