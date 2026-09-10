@@ -6482,9 +6482,12 @@ function toggleFundTx(){
 }
 
 let _goalHideFamIds=new Set();
+let _goalNonPayFamIds=new Set();
 function openGoalForm(){
   _goalHideFamIds=new Set();
+  _goalNonPayFamIds=new Set();
   renderGoalHideChips();
+  renderGoalNonPayChips();
   document.getElementById('goalFormOverlay').style.display='flex';
 }
 function renderGoalHideChips(){
@@ -6497,6 +6500,20 @@ function toggleGoalHideFam(fid){
   if(_goalHideFamIds.has(fid))_goalHideFamIds.delete(fid);else _goalHideFamIds.add(fid);
   renderGoalHideChips();
 }
+// Same chip picker as goalHideChips, but for "sees the fund, doesn't pay a
+// share" instead of "doesn't see it at all" — set directly at creation time
+// so it doesn't have to be set up separately afterward via the
+// openGoalPayersModal popup (that popup still works for changing it later).
+function renderGoalNonPayChips(){
+  const el=document.getElementById('goalNonPayChips');if(!el)return;
+  el.innerHTML=families.map(f=>
+    `<button type="button" class="chip ${_goalNonPayFamIds.has(f.id)?'on':''}" onclick="toggleGoalNonPayFam(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
+  ).join('');
+}
+function toggleGoalNonPayFam(fid){
+  if(_goalNonPayFamIds.has(fid))_goalNonPayFamIds.delete(fid);else _goalNonPayFamIds.add(fid);
+  renderGoalNonPayChips();
+}
 function closeGoalForm(){
   document.getElementById('goalFormOverlay').style.display='none';
   document.getElementById('goalName').value='';
@@ -6506,7 +6523,7 @@ function addGoalFund(){
   const name=document.getElementById('goalName').value.trim();
   if(!name){ alert('נא להזין שם לקופה'); return; }
   const target=Math.max(0,parseFloat(document.getElementById('goalTarget').value)||0);
-  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds]});
+  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds],nonPayers:[..._goalNonPayFamIds]});
   addNotif('🎯','נוצרה קופה חדשה: '+name,'all',[..._goalHideFamIds],'important',families.filter(f=>!_goalHideFamIds.has(f.id)).map(f=>f.id));
   closeGoalForm();
   save();render();
