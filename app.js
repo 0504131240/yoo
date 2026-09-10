@@ -846,7 +846,7 @@ function render(){
   const debt=calcDebt();
   const open=events.filter(e=>e.open).length;
   const sub=document.getElementById('topSub');
-  if(sub)sub.textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופות: ₪'+(fundTotal()+savingsPotBal()).toLocaleString();
+  if(sub)sub.textContent=open+' פתוחים · חוב: ₪'+debt.toLocaleString()+' · קופות: ₪'+fundTotal().toLocaleString();
 }
 function calcDebt(){
   let t=0;
@@ -3558,7 +3558,9 @@ function renderHome(){
   const goalBal=_visibleGoalFunds(goalFunds.filter(g=>!g.archived)).reduce((s,g)=>s+goalTotal(g),0);
   const evPotsBal=open.reduce((s,ev)=>s+evNetPotBal(ev),0);
   const savBal=savingsPotBal();
-  const allBal=mainBal+goalBal+evPotsBal+savBal;
+  // Savings still shows as its own stat below, just left out of the total —
+  // it's money already set aside for something specific, not spare balance.
+  const allBal=mainBal+goalBal+evPotsBal;
   const bannerStats=[
     {label:'ארנק',amt:mainBal},
     ...(goalBal>0?[{label:'קופות מטרה',amt:goalBal}]:[]),
