@@ -3356,8 +3356,8 @@ function renderCalEvList(hebDays,bdayByDate,yahrByDate,annivByDate){
           <div class="fh-cal-ev-name">🕯️ ${esc(item.name)} — יארצייט${years!=null&&years>0?' ('+years+' שנים)':''}</div>
           <div class="fh-cal-ev-date">${lbl}</div>
         </div>
-        <button onclick="openYahrzeitModal(${item.id})" class="edit-only" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>
-        <button onclick="deleteYahrzeit(${item.id})" class="edit-only" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>
+        <button onclick="openYahrzeitModal(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>
+        <button onclick="deleteYahrzeit(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>
       </div>`;
     }
     if(type==='anniversary'){
