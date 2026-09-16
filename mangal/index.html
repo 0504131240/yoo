@@ -1,0 +1,436 @@
+<!--
+  אתר עסק המנגלים - חלק ציבורי.
+  התאמה אישית מהירה:
+   - שם העסק/טלפון/וואטסאפ: חפשו "TODO-EDIT" בקובץ הזה.
+   - תמונות גלריה: הוסיפו קבצים לתיקייה mangal/images/ ועדכנו את מערך GALLERY למטה.
+   - תפריטים: ערכו את שלושת הבלוקים בתוך MENUS למטה.
+   - סיסמת הניהול נקבעת בפעם הראשונה שנכנסים ל-admin.html.
+-->
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>מנגל בלהבות · אירועי מנגל</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Varela+Round&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#FBF3EC;--surface:#fff;--surface2:#F3E7DA;--border:#EDE0D4;
+  --text:#241712;--text2:#7A6A5E;--text3:#B0A296;
+  --flame:#D8481B;--flame-dark:#9C2E0E;--flame-bg:#FCE9DF;
+  --gold:#B9832A;--gold-bg:#FBF1DE;
+  --char:#20140E;
+  --ok:#1D9E75;--bad:#A32D2D;
+  --r:18px;--r2:12px;
+  --font:'Rubik',-apple-system,'Segoe UI',Arial,sans-serif;
+  --font-head:'Varela Round','Rubik',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;min-height:100vh}
+img{max-width:100%;display:block}
+a{color:inherit}
+.wrap{max-width:920px;margin:0 auto;padding:0 16px}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:40;background:rgba(251,243,236,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav-in{max-width:920px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--font-head);font-weight:700;font-size:17px}
+.brand-flame{font-size:20px}
+.nav-links{display:flex;gap:6px;flex-wrap:wrap}
+.nav-links a{font-size:13px;font-weight:600;color:var(--text2);text-decoration:none;padding:7px 10px;border-radius:20px;transition:.15s}
+.nav-links a:hover{background:var(--surface2);color:var(--text)}
+.nav-cta{background:var(--flame);color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:0 6px 16px rgba(216,72,27,.3)}
+
+/* hero */
+.hero{background:radial-gradient(120% 140% at 50% -10%,#40261A 0%,var(--char) 55%,#150C08 100%);color:#fff;padding:56px 16px 70px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 100%,rgba(216,72,27,.35),transparent 55%),radial-gradient(circle at 85% 90%,rgba(185,131,42,.25),transparent 50%);pointer-events:none}
+.hero-in{position:relative;max-width:680px;margin:0 auto}
+.hero-eyebrow{font-size:13px;font-weight:700;color:#F3C08A;letter-spacing:.5px;margin-bottom:10px}
+.hero h1{font-family:var(--font-head);font-size:clamp(28px,6vw,44px);line-height:1.2;font-weight:700}
+.hero p{margin-top:14px;font-size:16px;color:rgba(255,255,255,.8);line-height:1.7;max-width:520px;margin-left:auto;margin-right:auto}
+.hero-actions{margin-top:26px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{border:none;border-radius:14px;font-family:var(--font);font-weight:700;font-size:14.5px;cursor:pointer;padding:13px 22px;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-flame{background:var(--flame);color:#fff;box-shadow:0 10px 26px rgba(216,72,27,.4)}
+.btn-ghost{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.35)}
+.hero-stats{margin-top:38px;display:flex;gap:22px;justify-content:center;flex-wrap:wrap}
+.hstat{text-align:center}
+.hstat b{display:block;font-family:var(--font-head);font-size:22px;color:#F3C08A}
+.hstat span{font-size:11.5px;color:rgba(255,255,255,.65)}
+
+/* sections */
+section{padding:52px 0}
+.sect-head{text-align:center;max-width:560px;margin:0 auto 30px}
+.eyebrow{font-size:12.5px;font-weight:700;color:var(--flame);letter-spacing:.4px;margin-bottom:8px}
+.sect-head h2{font-family:var(--font-head);font-size:clamp(22px,4vw,30px)}
+.sect-head p{margin-top:10px;color:var(--text2);font-size:14.5px;line-height:1.7}
+
+/* gallery */
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.gtile{aspect-ratio:1/1;border-radius:16px;overflow:hidden;position:relative;cursor:pointer;border:1px solid var(--border)}
+.gtile img{width:100%;height:100%;object-fit:cover}
+.gtile-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:34px}
+.gtile-cap{position:absolute;inset-inline:0;bottom:0;padding:8px 10px 7px;background:linear-gradient(0deg,rgba(0,0,0,.55),transparent);color:#fff;font-size:11.5px;font-weight:600}
+.lightbox{position:fixed;inset:0;background:rgba(15,9,6,.92);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px}
+.lightbox img,.lightbox .lb-ph{max-width:min(92vw,560px);max-height:80vh;border-radius:14px}
+.lb-ph{width:min(92vw,420px);height:60vh;display:flex;align-items:center;justify-content:center;font-size:70px;background:var(--surface2);color:var(--text3)}
+.lb-close{position:absolute;top:18px;left:18px;background:rgba(255,255,255,.15);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:18px;cursor:pointer}
+
+/* menus */
+.menu-tabs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:22px}
+.menu-tab{border:1.5px solid var(--border);background:var(--surface);color:var(--text2);padding:10px 18px;border-radius:24px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:var(--font)}
+.menu-tab.on{background:var(--char);color:#fff;border-color:var(--char)}
+.menu-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:26px 22px;display:none}
+.menu-card.on{display:block}
+.menu-card.premium{background:linear-gradient(160deg,#231409,#3A2113);color:#fff;border-color:#3A2113}
+.menu-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.menu-title{font-family:var(--font-head);font-size:19px;font-weight:700}
+.menu-badge{font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;background:var(--flame-bg);color:var(--flame-dark)}
+.menu-card.premium .menu-badge{background:rgba(255,255,255,.12);color:var(--gold)}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.menu-grp b{display:block;font-size:12.5px;color:var(--flame);margin-bottom:6px;font-weight:700}
+.menu-card.premium .menu-grp b{color:#F3C08A}
+.menu-grp ul{list-style:none;font-size:13.5px;line-height:2;color:var(--text2)}
+.menu-card.premium .menu-grp ul{color:rgba(255,255,255,.8)}
+.menu-note{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);font-size:12.5px;color:var(--text3);text-align:center}
+.menu-card.premium .menu-note{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.5)}
+
+/* booking form */
+.book-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:26px 22px;max-width:640px;margin:0 auto}
+.lvl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px}
+.lvl-opt{border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 8px;text-align:center;cursor:pointer;font-weight:700;font-size:12.5px;transition:.15s}
+.lvl-opt small{display:block;font-weight:500;color:var(--text3);font-size:10.5px;margin-top:3px}
+.lvl-opt.sel{border-color:var(--flame);background:var(--flame-bg);color:var(--flame-dark)}
+.fld{margin-top:14px}
+.fld:first-of-type{margin-top:0}
+.fld label{display:block;font-size:12.5px;font-weight:700;color:var(--text2);margin-bottom:6px}
+.fld input,.fld textarea,.fld select{width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 13px;font-size:15px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl}
+.fld textarea{resize:vertical;min-height:70px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn-send{width:100%;padding:14px;border-radius:var(--r2);background:var(--flame);color:#fff;margin-top:20px;box-shadow:0 10px 24px rgba(216,72,27,.32)}
+.btn-send:disabled{opacity:.5;cursor:default;box-shadow:none}
+.form-err{color:var(--bad);font-size:13px;font-weight:600;text-align:center;margin-top:10px;display:none}
+.form-done{text-align:center;padding:30px 10px}
+.form-done-ico{font-size:52px}
+.form-done h3{font-family:var(--font-head);font-size:20px;margin-top:10px}
+.form-done p{color:var(--text2);font-size:13.5px;margin-top:8px;line-height:1.7}
+
+/* contact/footer */
+.contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;max-width:640px;margin:0 auto}
+.contact-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:18px;text-align:center;text-decoration:none;color:var(--text)}
+.contact-card .ico{font-size:26px;margin-bottom:8px}
+.contact-card b{display:block;font-size:14px}
+.contact-card span{font-size:12px;color:var(--text2)}
+footer{background:var(--char);color:rgba(255,255,255,.6);text-align:center;padding:26px 16px;font-size:12px}
+footer a{color:#F3C08A;text-decoration:none;font-weight:600}
+.admin-link{display:block;margin-top:8px;opacity:.5;font-size:11px}
+@media(max-width:520px){.lvl-grid{grid-template-columns:1fr}.two-col{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <div class="brand"><span class="brand-flame">🔥</span>מנגל בלהבות</div>
+    <div class="nav-links" style="display:none" id="navLinksWide">
+      <a href="#gallery">גלריה</a>
+      <a href="#menus">תפריטים</a>
+      <a href="#contact">יצירת קשר</a>
+    </div>
+    <a href="#book" class="nav-cta">הזמינו אירוע</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-in">
+    <div class="hero-eyebrow">מנגלים מקצועיים לכל אירוע</div>
+    <h1>האש שלכם, האוכל שלנו</h1>
+    <p>מגישים חוויית מנגל מלאה לאירועים פרטיים, ימי הולדת, אירועי חברה וכל הזדמנות שמצדיקה קצת עשן וריח טוב באוויר.</p>
+    <div class="hero-actions">
+      <a href="#book" class="btn btn-flame">📅 הזמינו תאריך</a>
+      <a href="#menus" class="btn btn-ghost">🍖 לתפריטים</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat"><b>3</b><span>רמות אירוע</span></div>
+      <div class="hstat"><b>100%</b><span>טרי על האש</span></div>
+      <div class="hstat"><b>24/7</b><span>מענה להזמנות</span></div>
+    </div>
+  </div>
+</div>
+
+<section id="gallery">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="eyebrow">קצת ממה שהיה</div>
+      <h2>תמונות מאירועים קודמים</h2>
+      <p>כדי להתרשם מהאווירה, הבשר והעשן — הנה כמה רגעים מאירועים שעשינו.</p>
+    </div>
+    <div class="gallery" id="galleryGrid"></div>
+  </div>
+</section>
+
+<section id="menus" style="background:var(--surface2)">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="eyebrow">מה אוכלים</div>
+      <h2>תפריטי האירועים</h2>
+      <p>שלוש רמות אירוע, כל אחת עם היקף שונה של סלטים, בשרים ותוספות. בוחרים בטופס ההזמנה למטה.</p>
+    </div>
+    <div class="menu-tabs" id="menuTabs"></div>
+    <div id="menuCards"></div>
+  </div>
+</section>
+
+<section id="book">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="eyebrow">שריינו תאריך</div>
+      <h2>טופס הזמנת אירוע</h2>
+      <p>ממלאים פרטים, אנחנו בודקים זמינות וחוזרים אליכם לאישור סופי.</p>
+    </div>
+    <div class="book-wrap" id="bookWrap">
+      <form id="bookForm">
+        <div class="fld">
+          <label>שם מלא *</label>
+          <input type="text" id="fName" required autocomplete="name">
+        </div>
+        <div class="two-col">
+          <div class="fld">
+            <label>טלפון *</label>
+            <input type="tel" id="fPhone" required autocomplete="tel" placeholder="050-1234567">
+          </div>
+          <div class="fld">
+            <label>אימייל</label>
+            <input type="email" id="fEmail" autocomplete="email">
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="fld">
+            <label>תאריך האירוע *</label>
+            <input type="date" id="fDate" required>
+          </div>
+          <div class="fld">
+            <label>כמות משתתפים *</label>
+            <input type="number" id="fGuests" required min="1" placeholder="לדוגמה: 30">
+          </div>
+        </div>
+        <div class="fld">
+          <label>רמת אירוע *</label>
+          <div class="lvl-grid" id="lvlGrid"></div>
+        </div>
+        <div class="fld">
+          <label>מיקום / אזור משוער</label>
+          <input type="text" id="fLocation" placeholder="עיר / אזור / כתובת">
+        </div>
+        <div class="fld">
+          <label>הערות נוספות</label>
+          <textarea id="fNotes" placeholder="אלרגיות, בקשות מיוחדות, שעה משוערת..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-send" id="sendBtn">שליחת בקשת הזמנה 🔥</button>
+        <div class="form-err" id="formErr"></div>
+      </form>
+      <div class="form-done" id="formDone" style="display:none">
+        <div class="form-done-ico">✅</div>
+        <h3>הבקשה התקבלה!</h3>
+        <p>תודה <span id="doneName"></span>, קיבלנו את הבקשה שלכם לתאריך <span id="doneDate"></span>.<br>ניצור קשר בהקדם לאישור סופי ותיאום פרטים.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact" style="background:var(--surface2)">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="eyebrow">יצירת קשר</div>
+      <h2>יש שאלה לפני שמזמינים?</h2>
+    </div>
+    <div class="contact-grid">
+      <a class="contact-card" href="tel:0500000000"><div class="ico">📞</div><b>התקשרו אלינו</b><span>050-000-0000</span></a>
+      <a class="contact-card" href="https://wa.me/972500000000" target="_blank"><div class="ico">💬</div><b>וואטסאפ</b><span>מענה מהיר</span></a>
+      <a class="contact-card" href="mailto:info@mangal-belahavot.co.il"><div class="ico">✉️</div><b>מייל</b><span>info@mangal-belahavot.co.il</span></a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>🔥 מנגל בלהבות · אירועי מנגל מקצועיים</div>
+  <a class="admin-link" href="admin.html">כניסת מנהל</a>
+</footer>
+
+<div id="lightboxRoot"></div>
+
+<script>
+/* ===== TODO-EDIT: פרטי עסק ===== */
+const BUSINESS = { name:'מנגל בלהבות', phone:'0500000000', whatsapp:'972500000000', email:'info@mangal-belahavot.co.il' };
+
+/* גלריה - TODO-EDIT: אפשר להוסיף תמונות אמיתיות: {img:'images/1.jpg', cap:'...'} */
+const GALLERY = [
+  {icon:'🍖',cap:'בשרים על האש'},
+  {icon:'🔥',cap:'גריל פתוח'},
+  {icon:'🥗',cap:'שולחן סלטים'},
+  {icon:'🎉',cap:'אירוע חברה'},
+  {icon:'🍢',cap:'שיפודים טריים'},
+  {icon:'👨‍🍳',cap:'שף על המנגל'},
+  {icon:'🌭',cap:'תחנת נקניקיות'},
+  {icon:'🥂',cap:'חגיגה משפחתית'},
+];
+
+const LEVELS = [
+  { id:'רגיל', label:'רגיל', sub:'בסיסי ומושלם' },
+  { id:'רגיל+', label:'רגיל+', sub:'עוד קצת מכל טוב' },
+  { id:'פרימיום', label:'פרימיום', sub:'חוויה מלאה' },
+];
+
+const MENUS = {
+  'רגיל': {
+    badge:'רמה 1', premium:false,
+    groups:[
+      {t:'סלטים', items:['סלט חסה','סלט כרוב','טחינה גולמית']},
+      {t:'לחמים', items:['פיתות טריות','לחמניות']},
+      {t:'בשרים', items:['קבב','נקניקיות מרגז','פרגית עוף']},
+      {t:'תוספות', items:['אורז לבן','תפוחי אדמה בתנור']},
+    ],
+    note:'כולל שתייה קלה ואד לב חופשי 🔥'
+  },
+  'רגיל+': {
+    badge:'רמה 2', premium:false,
+    groups:[
+      {t:'סלטים', items:['5 סלטים טריים','חמוצים ומטבלים']},
+      {t:'לחמים', items:['פיתות טריות','לחם שום']},
+      {t:'בשרים', items:['קבב','נקניקיות מרגז','כנפיים','אנטריקוט פרוס']},
+      {t:'תוספות', items:['אורז לבן','בטטה בתנור','פטריות ברוטב']},
+    ],
+    note:'כולל שתייה קלה, קינוח קל ואד לב חופשי 🔥'
+  },
+  'פרימיום': {
+    badge:'רמה 3 · VIP', premium:true,
+    groups:[
+      {t:'סלטים', items:['8 סלטים ומטבלים','בר חמוצים']},
+      {t:'לחמים', items:['פיתות טריות','לחם שום','פוקאצ׳ה']},
+      {t:'בשרים פרימיום', items:['אנטריקוט שלם','סינטה','כבש','סטייק אונקל']},
+      {t:'תוספות גורמה', items:['בטטה בתנור','פטריות ברוטב יין','ירקות גריל']},
+    ],
+    note:'כולל שף מנגל צמוד, הגשה וסידור מלא וקינוח מפנק 👑'
+  }
+};
+
+function renderGallery(){
+  const grid=document.getElementById('galleryGrid');
+  grid.innerHTML=GALLERY.map((g,i)=>`
+    <div class="gtile" onclick="openLightbox(${i})">
+      ${g.img?`<img src="${g.img}" alt="${g.cap||''}">`:`<div class="gtile-ph" style="background:linear-gradient(135deg,#FCE9DF,#F3C08A33)">${g.icon||'📷'}</div>`}
+      ${g.cap?`<div class="gtile-cap">${g.cap}</div>`:''}
+    </div>`).join('');
+}
+function openLightbox(i){
+  const g=GALLERY[i];
+  const root=document.getElementById('lightboxRoot');
+  root.innerHTML=`<div class="lightbox" onclick="if(event.target===this)closeLightbox()">
+    <button class="lb-close" onclick="closeLightbox()">✕</button>
+    ${g.img?`<img src="${g.img}" alt="${g.cap||''}">`:`<div class="lb-ph">${g.icon||'📷'}</div>`}
+  </div>`;
+}
+function closeLightbox(){document.getElementById('lightboxRoot').innerHTML='';}
+
+let selectedLevel=null;
+function renderLevels(){
+  const wrap=document.getElementById('lvlGrid');
+  wrap.innerHTML=LEVELS.map(l=>`<div class="lvl-opt" data-lvl="${l.id}" onclick="selectLevel('${l.id}')">${l.label}<small>${l.sub}</small></div>`).join('');
+}
+function selectLevel(id){
+  selectedLevel=id;
+  document.querySelectorAll('.lvl-opt').forEach(el=>el.classList.toggle('sel',el.dataset.lvl===id));
+}
+
+let activeMenuTab=LEVELS[0].id;
+function renderMenus(){
+  const tabs=document.getElementById('menuTabs');
+  tabs.innerHTML=LEVELS.map(l=>`<button class="menu-tab ${l.id===activeMenuTab?'on':''}" onclick="setMenuTab('${l.id}')">${l.label}</button>`).join('');
+  const cards=document.getElementById('menuCards');
+  cards.innerHTML=LEVELS.map(l=>{
+    const m=MENUS[l.id];
+    return `<div class="menu-card ${m.premium?'premium':''} ${l.id===activeMenuTab?'on':''}" data-lvl="${l.id}">
+      <div class="menu-top">
+        <div class="menu-title">תפריט ${l.label}</div>
+        <div class="menu-badge">${m.badge}</div>
+      </div>
+      <div class="menu-grid">
+        ${m.groups.map(g=>`<div class="menu-grp"><b>${g.t}</b><ul>${g.items.map(it=>`<li>${it}</li>`).join('')}</ul></div>`).join('')}
+      </div>
+      <div class="menu-note">${m.note}</div>
+    </div>`;
+  }).join('');
+}
+function setMenuTab(id){activeMenuTab=id;renderMenus();}
+
+/* ===== Firebase ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyA0MZMuGBBIXckhdiOZRZXRC_NPEte7pMA",
+  authDomain: "yossi20361.firebaseapp.com",
+  projectId: "yossi20361",
+  storageBucket: "yossi20361.firebasestorage.app",
+  messagingSenderId: "789621490367",
+  appId: "1:789621490367:web:e62376e9d46a86903f7c0a"
+};
+let _fb=null;
+async function fbInit(){
+  if(_fb)return _fb;
+  const appMod=await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js");
+  const fsMod=await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js");
+  const app=appMod.initializeApp(firebaseConfig);
+  const db=fsMod.getFirestore(app);
+  _fb={db,collection:fsMod.collection,addDoc:fsMod.addDoc,serverTimestamp:fsMod.serverTimestamp};
+  return _fb;
+}
+
+document.getElementById('fDate').min=new Date().toISOString().slice(0,10);
+
+document.getElementById('bookForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl=document.getElementById('formErr');
+  errEl.style.display='none';
+  const name=document.getElementById('fName').value.trim();
+  const phone=document.getElementById('fPhone').value.trim();
+  const email=document.getElementById('fEmail').value.trim();
+  const date=document.getElementById('fDate').value;
+  const guests=parseInt(document.getElementById('fGuests').value,10);
+  const location=document.getElementById('fLocation').value.trim();
+  const notes=document.getElementById('fNotes').value.trim();
+
+  if(!name||!phone||!date||!guests||guests<1){errEl.textContent='נא למלא את כל השדות המסומנים בכוכבית';errEl.style.display='block';return;}
+  if(!selectedLevel){errEl.textContent='נא לבחור רמת אירוע';errEl.style.display='block';return;}
+
+  const btn=document.getElementById('sendBtn');
+  btn.disabled=true;btn.textContent='שולח...';
+  try{
+    const {db,collection,addDoc,serverTimestamp}=await fbInit();
+    await addDoc(collection(db,'mangalBookings'),{
+      name,phone,email:email||null,date,guests,level:selectedLevel,location:location||null,notes:notes||null,
+      status:'pending', totalPrice:0, paidAmount:0,
+      createdAt:serverTimestamp(), createdAtMs:Date.now()
+    });
+    document.getElementById('bookForm').style.display='none';
+    document.getElementById('doneName').textContent=name;
+    document.getElementById('doneDate').textContent=new Date(date).toLocaleDateString('he-IL');
+    document.getElementById('formDone').style.display='block';
+  }catch(err){
+    console.error(err);
+    errEl.textContent='אירעה שגיאה בשליחה, נסו שוב או צרו קשר טלפוני';
+    errEl.style.display='block';
+    btn.disabled=false;btn.textContent='שליחת בקשת הזמנה 🔥';
+  }
+});
+
+function applyMediaNav(){
+  document.getElementById('navLinksWide').style.display = window.innerWidth>640 ? 'flex':'none';
+}
+window.addEventListener('resize',applyMediaNav);
+applyMediaNav();
+
+renderGallery();renderLevels();renderMenus();
+</script>
+</body>
+</html>
