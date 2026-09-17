@@ -360,6 +360,24 @@ function sendBroadcastEmail(){
   closeBroadcastModal();
   showToast('📧 ההודעה נשלחה לכולם');
 }
+function openSiteUpdateModal(){
+  const inp=document.getElementById('siteUpdateText');if(inp)inp.value='';
+  const err=document.getElementById('siteUpdateErr');if(err)err.style.display='none';
+  document.getElementById('siteUpdateModal').style.display='flex';
+}
+function closeSiteUpdateModal(){
+  document.getElementById('siteUpdateModal').style.display='none';
+}
+function sendSiteUpdate(){
+  const text=(document.getElementById('siteUpdateText')?.value||'').trim();
+  const err=document.getElementById('siteUpdateErr');
+  if(!text){if(err){err.textContent='נא לתאר את העדכון';err.style.display='block';}return;}
+  if(err)err.style.display='none';
+  addNotif('🆕',text,undefined,undefined,'siteUpdate');
+  save();
+  closeSiteUpdateModal();
+  showToast('🆕 העדכון נשלח');
+}
 function getPaymentSettings(){
   return{
     name:localStorage.getItem('payTreasurerName')||'',
@@ -2935,26 +2953,39 @@ const NOTIF_EMAIL_CATS=[
   {id:'deposit',ico:'💰',label:'הפקדה חדשה'},
   {id:'familyEdit',ico:'👪',label:'עריכת פרטי משפחה'},
   {id:'goalFund',ico:'🎯',label:'קופה חדשה למטרה'},
+  {id:'siteUpdate',ico:'🆕',label:'עדכון או תכונה חדשה באתר'},
 ];
 // Only these kinds are ever scoped to a specific family (relatedFamIds) —
 // a poll, a birthday, a family-edit or a new goal fund aren't "about" any
 // one family the way an event/expense/deposit is, so there's no sensible
 // "רק שלי" to offer them; they're always broadcast to every opted-in family.
 const NOTIF_EMAIL_SCOPED_CATS=new Set(['expense','event','deposit']);
+// The email-instead-of-push preference is per REGISTERED EMAIL, not per
+// family — a family with two parent emails might have one on push and one
+// on email, or each on a different category set. deviceEmailSlot3 (set in
+// submitEmailGate) already identifies which of the two slots this specific
+// device logged in as, exactly like fcmTokens' own famId+slot pairing.
+function _myEmailSlot(){
+  if(_isAdminPage())return null;
+  return parseInt(localStorage.getItem('deviceEmailSlot3')||'1');
+}
 function renderNotifEmailSection(){
   const el=document.getElementById('notifEmailSection');if(!el)return;
   const fid=_myFamId();
   const f=fid!=null?getFam(fid):null;
-  if(!f){el.innerHTML='';return;}
-  const on=!!f.notifEmailPref;
-  const cats=f.notifEmailPref?.cats||{};
-  const scopes=f.notifEmailPref?.scopes||{};
+  const slot=_myEmailSlot();
+  if(!f||!slot){el.innerHTML='';return;}
+  const myEmail=slot===2?f.email2:f.email;
+  const pref=f.notifEmailPref?.[slot];
+  const on=!!pref;
+  const cats=pref?.cats||{};
+  const scopes=pref?.scopes||{};
   el.innerHTML=`<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" ${on?'checked':''} onchange="toggleNotifEmailMode(this.checked)">
-      <span style="font-size:13px;font-weight:700;color:var(--text)">📧 קבל התראות למייל במקום פוש</span>
+      <span style="font-size:13px;font-weight:700;color:var(--text)">📧 קבל התראות למייל במקום פוש${myEmail?' — '+esc(myEmail):''}</span>
     </label>
-    <div style="font-size:11px;color:var(--text2);margin:4px 0 10px;line-height:1.5">כשזה פעיל, המכשיר מפסיק לקבל פושים — ותקבלו במייל רק את מה שמסומן למטה (מה שלא מסומן, לא יגיע בכלל). ליד קטגוריות שקשורות לאירוע ספציפי אפשר גם לבחור "הכל" או "רק שלי".</div>
+    <div style="font-size:11px;color:var(--text2);margin:4px 0 10px;line-height:1.5">כשזה פעיל, המכשיר הזה מפסיק לקבל פושים — ותקבלו במייל רק את מה שמסומן למטה (מה שלא מסומן, לא יגיע בכלל). ליד קטגוריות שקשורות לאירוע ספציפי אפשר גם לבחור "הכל" או "רק שלי". ההגדרה הזו חלה רק על הכתובת שלכם${myEmail?' ('+esc(myEmail)+')':''} — לא על שאר בני המשפחה.</div>
     <div style="display:${on?'flex':'none'};flex-direction:column;gap:8px">
       ${NOTIF_EMAIL_CATS.map(c=>{
         const scoped=NOTIF_EMAIL_SCOPED_CATS.has(c.id);
@@ -2969,23 +3000,34 @@ function renderNotifEmailSection(){
   </div>`;
 }
 function toggleNotifEmailMode(on){
-  const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f)return;
-  if(on&&!f.notifEmailPref)f.notifEmailPref={cats:Object.fromEntries(NOTIF_EMAIL_CATS.map(c=>[c.id,true])),scopes:{}};
-  else if(!on)f.notifEmailPref=null;
+  const fid=_myFamId();const f=fid!=null?getFam(fid):null;
+  const slot=_myEmailSlot();
+  if(!f||!slot)return;
+  if(on){
+    if(!f.notifEmailPref)f.notifEmailPref={};
+    if(!f.notifEmailPref[slot])f.notifEmailPref[slot]={cats:Object.fromEntries(NOTIF_EMAIL_CATS.map(c=>[c.id,true])),scopes:{}};
+  }else if(f.notifEmailPref){
+    delete f.notifEmailPref[slot];
+    if(!Object.keys(f.notifEmailPref).length)f.notifEmailPref=null;
+  }
   save();renderNotifEmailSection();
   showToast('✓ ההעדפה נשמרה',2000);
 }
 function toggleNotifEmailCat(catId,on){
-  const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f||!f.notifEmailPref)return;
-  f.notifEmailPref.cats[catId]=on;
+  const fid=_myFamId();const f=fid!=null?getFam(fid):null;
+  const slot=_myEmailSlot();
+  const pref=(f&&slot)?f.notifEmailPref?.[slot]:null;if(!pref)return;
+  pref.cats[catId]=on;
   save();
   showToast('✓ ההעדפה נשמרה',1500);
 }
 function toggleNotifEmailScope(catId){
-  const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f||!f.notifEmailPref)return;
-  if(!f.notifEmailPref.scopes)f.notifEmailPref.scopes={};
-  const cur=f.notifEmailPref.scopes[catId]==='mine'?'mine':'all';
-  f.notifEmailPref.scopes[catId]=cur==='mine'?'all':'mine';
+  const fid=_myFamId();const f=fid!=null?getFam(fid):null;
+  const slot=_myEmailSlot();
+  const pref=(f&&slot)?f.notifEmailPref?.[slot]:null;if(!pref)return;
+  if(!pref.scopes)pref.scopes={};
+  const cur=pref.scopes[catId]==='mine'?'mine':'all';
+  pref.scopes[catId]=cur==='mine'?'all':'mine';
   save();renderNotifEmailSection();
   showToast('✓ ההעדפה נשמרה',1500);
 }
@@ -3042,23 +3084,32 @@ async function renderNotifDevicesModal(){
         <button onclick="deleteNotifDevice('${r.id}')" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0" title="מחק רישום">🗑</button>
       </div>`;
     }).join(''):'<div class="empty" style="padding:20px 0"><span class="empty-ico">📱</span>אין מכשירים רשומים לפוש</div>';
-    // Email is a per-FAMILY choice (notifEmailPref on the family record —
-    // see notifEmailSection), not a per-device fcmTokens doc like the push
-    // list above, so it's listed separately here rather than mixed in.
-    const emailFams=families.filter(f=>f.notifEmailPref);
-    const emailHtml=emailFams.length?`
+    // Email is a per-REGISTERED-EMAIL choice (notifEmailPref on the family
+    // record, keyed by slot 1/2 — see notifEmailSection), not a per-family
+    // or per-device fcmTokens doc like the push list above, so it's listed
+    // separately here, one row per opted-in email address rather than one
+    // per family.
+    const emailRows=[];
+    families.forEach(f=>{
+      if(!f.notifEmailPref)return;
+      [1,2].forEach(slot=>{
+        const pref=f.notifEmailPref[slot];if(!pref)return;
+        emailRows.push({f,slot,pref});
+      });
+    });
+    const emailHtml=emailRows.length?`
       <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
         <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">📧 רשומים למייל במקום פוש</div>
-        ${emailFams.map(f=>{
-          const name=f.name.replace('משפחת','').trim();
-          const addrs=[f.email,f.email2].filter(Boolean).join(', ')||'אין כתובת מייל';
-          const catLabels=NOTIF_EMAIL_CATS.filter(c=>f.notifEmailPref.cats[c.id]!==false).map(c=>{
-            const scope=NOTIF_EMAIL_SCOPED_CATS.has(c.id)&&f.notifEmailPref.scopes?.[c.id]==='mine'?' (רק שלי)':'';
+        ${emailRows.map(({f,slot,pref})=>{
+          const who=_regDisplayName(f,slot);
+          const email=(slot===2?f.email2:f.email)||'אין כתובת מייל';
+          const catLabels=NOTIF_EMAIL_CATS.filter(c=>pref.cats[c.id]!==false).map(c=>{
+            const scope=NOTIF_EMAIL_SCOPED_CATS.has(c.id)&&pref.scopes?.[c.id]==='mine'?' (רק שלי)':'';
             return c.ico+' '+c.label+scope;
           });
           return`<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-            <div style="font-size:13px;font-weight:700">${esc(name)}</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:2px">${esc(addrs)}</div>
+            <div style="font-size:13px;font-weight:700">${esc(who)}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">${esc(email)}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.6">${catLabels.length?esc(catLabels.join(' · ')):'לא סימנו אף קטגוריה'}</div>
           </div>`;
         }).join('')}
@@ -6231,36 +6282,43 @@ function addNotif(icon,text,pushTarget,hiddenFromFamIds,kind,relatedFamIds){
   notifications.unshift({id:nxtNotif++,icon,text,ts:Date.now(),hiddenFrom:hiddenFromFamIds&&hiddenFromFamIds.length?hiddenFromFamIds:undefined});
   if(notifications.length>200)notifications.length=200;
   renderNotifCenterBadge();
-  const emailOptedFamIds=_sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds);
-  _sendPush(icon+' ינקלביץ',text,pushTarget,[...(hiddenFromFamIds||[]),...emailOptedFamIds],kind,relatedFamIds);
+  const emailOptedSlots=_sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds);
+  _sendPush(icon+' ינקלביץ',text,pushTarget,hiddenFromFamIds,kind,relatedFamIds,emailOptedSlots);
 }
-// Families with the 📧 "email instead of push" toggle on (see
-// notifEmailSection in the notifPrefModal) are fully out of push from here
-// on — regardless of whether THIS notification's kind is one they picked —
-// so their ids are returned for addNotif to fold into the push exclusion
-// list. Among those, only the ones who actually checked this specific kind
-// get an email for it; an unrecognized/missing kind (calls that don't pass
-// one) never emails anyone, same as an unchecked category. For the kinds in
-// NOTIF_EMAIL_SCOPED_CATS a family can further narrow that to "רק שלי" —
-// only when they're in this notification's own relatedFamIds — same
-// relatedFamIds the push side's 'mine' tier already filters by.
+// Each registered email (family+slot) with the 📧 "email instead of push"
+// toggle on (see notifEmailSection in the notifPrefModal) is fully out of
+// push from here on — regardless of whether THIS notification's kind is one
+// they picked — so "famId:slot" strings for those are returned for addNotif
+// to pass along as a separate excludeSlots list (kept apart from the
+// family-wide excludeFamIds/hiddenFromFamIds mechanism, which still needs to
+// exclude a whole family regardless of which slot). Among those, only the
+// slots that actually checked this specific kind get an email for it; an
+// unrecognized/missing kind (calls that don't pass one) never emails anyone,
+// same as an unchecked category. For the kinds in NOTIF_EMAIL_SCOPED_CATS a
+// slot can further narrow that to "רק שלי" — only when their family is in
+// this notification's own relatedFamIds — same relatedFamIds the push
+// side's 'mine' tier already filters by.
 function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds){
   const hidden=new Set(hiddenFromFamIds||[]);
-  const optedOutOfPush=[];
+  const optedOutSlots=[];
   families.forEach(f=>{
     if(!f.notifEmailPref)return;
-    optedOutOfPush.push(f.id);
-    if(hidden.has(f.id))return;
-    if(!kind||!f.notifEmailPref.cats[kind])return;
-    if(NOTIF_EMAIL_SCOPED_CATS.has(kind)&&f.notifEmailPref.scopes?.[kind]==='mine'){
-      if(!Array.isArray(relatedFamIds)||!relatedFamIds.includes(f.id))return;
-    }
-    if(!f.email&&!f.email2)return;
-    const name=f.name.replace('משפחת','').trim();
-    const html=_emailWrap(`<p style="margin:0;font-size:14px">${_esc(text)}</p>`,text,icon);
-    sendEmailNotif([{email:f.email,email2:f.email2,name}],icon+' '+text+' · ינקלביץ',text,html);
+    [1,2].forEach(slot=>{
+      const pref=f.notifEmailPref[slot];if(!pref)return;
+      optedOutSlots.push(f.id+':'+slot);
+      if(hidden.has(f.id))return;
+      if(!kind||!pref.cats[kind])return;
+      if(NOTIF_EMAIL_SCOPED_CATS.has(kind)&&pref.scopes?.[kind]==='mine'){
+        if(!Array.isArray(relatedFamIds)||!relatedFamIds.includes(f.id))return;
+      }
+      const email=slot===2?f.email2:f.email;
+      if(!email)return;
+      const name=f.name.replace('משפחת','').trim();
+      const html=_emailWrap(`<p style="margin:0;font-size:14px">${_esc(text)}</p>`,text,icon);
+      sendEmailNotif([{email,name}],icon+' '+text+' · ינקלביץ',text,html);
+    });
   });
-  return optedOutOfPush;
+  return optedOutSlots;
 }
 const _visibleNotifs=()=>{
   if(editMode)return notifications;
@@ -6271,8 +6329,8 @@ const _visibleNotifs=()=>{
 // every in-app notification-center event, so family members get it even
 // when the app is closed — not just the in-app bell. Best-effort: silently
 // ignored if it fails (e.g. offline, or the API route isn't deployed yet).
-function _sendPush(title,body,target,excludeFamIds,kind,relatedFamIds){
-  fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,title,body,target:target||'all',excludeFamIds,kind,relatedFamIds})}).catch(()=>{});
+function _sendPush(title,body,target,excludeFamIds,kind,relatedFamIds,excludeSlots){
+  fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminPass,title,body,target:target||'all',excludeFamIds,kind,relatedFamIds,excludeSlots})}).catch(()=>{});
 }
 function _notifLastSeen(){return parseInt(localStorage.getItem('notifLastSeen')||'0');}
 function renderNotifCenterBadge(){

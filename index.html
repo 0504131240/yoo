@@ -678,6 +678,28 @@
   </div>
 </div>
 
+<!-- Site-update announcement — unlike the broadcast modal above, this goes
+     through the normal push/email pipeline and respects each family's own
+     preference instead of always emailing everyone. -->
+<div id="siteUpdateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2700;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeSiteUpdateModal()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:15px;font-weight:700">🆕 עדכון על תכונה חדשה</span>
+      <button onclick="closeSiteUpdateModal();openSettingsHubModal()" style="background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;color:var(--blue-mid);font-family:var(--font);padding:0">↩ הגדרות</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">נשלח כמו כל התראה אחרת — פוש למי שלא עבר למייל, ומייל רק למי שסימן "עדכון או תכונה חדשה באתר" בהעדפות שלו.</div>
+    <div class="field">
+      <label class="field-lbl">תיאור העדכון</label>
+      <textarea id="siteUpdateText" rows="3" placeholder="לדוגמה: נוסף אילן יוחסין למשפחה! אפשר למצוא אותו בדף הבית" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:rtl;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+    <div id="siteUpdateErr" style="display:none;font-size:12px;color:var(--red);margin-top:8px;text-align:center"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="sendSiteUpdate()" style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">🆕 שלח עדכון</button>
+      <button onclick="closeSiteUpdateModal()" style="padding:12px 16px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <!-- Shown instead of letting a non-admin change through, while the tree is locked -->
 
 <!-- Notification preference picker -->
@@ -718,6 +740,11 @@
       <div style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
         <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">שולח מייל לכל המשפחות שיש להן כתובת מייל שמורה.</div>
         <button onclick="closeSettingsHubModal();openBroadcastModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✏️ נסח ושלח הודעה</button>
+      </div>
+      <div class="sec-ttl">🆕 עדכון על תכונה חדשה</div>
+      <div style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">שולח התראה על עדכון או תכונה חדשה באתר — פוש/מייל, לפי מה שכל משפחה בחרה.</div>
+        <button onclick="closeSettingsHubModal();openSiteUpdateModal()" style="width:100%;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🆕 שלח עדכון</button>
       </div>
       <div class="sec-ttl">👥 מי נכנס לאפליקציה</div>
       <div style="background:var(--surface2);border-radius:var(--r2);padding:14px;margin-bottom:12px">

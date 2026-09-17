@@ -10,7 +10,7 @@ const { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, i
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-  const { adminPass, title, body, target, excludeFamIds, kind, relatedFamIds } = req.body || {};
+  const { adminPass, title, body, target, excludeFamIds, kind, relatedFamIds, excludeSlots } = req.body || {};
   if (!title || !body) { res.status(400).json({ error: 'title and body required' }); return; }
 
   // No pushes during Shabbat or Yom Tov, regardless of who triggered this or why.
@@ -38,13 +38,18 @@ module.exports = async (req, res) => {
   // additionally drops specific families' own devices regardless of target
   // — e.g. a surprise-gift goal fund announced to everyone except the
   // family it's for (admin-registered devices have no famId, so they're
-  // never affected by this).
+  // never affected by this). excludeSlots is the finer-grained sibling of
+  // that — "famId:slot" strings for the specific registered emails that
+  // opted into email-instead-of-push (see app.js's notifEmailSection),
+  // dropping only that one parent's devices rather than the whole family's.
+  const excludeSlotSet = new Set(Array.isArray(excludeSlots) ? excludeSlots : []);
   const groups = { admin: [], index: [] };
   tokenDocs.forEach(d => {
     const data = d.data();
     const page = data.page === 'admin' ? 'admin' : 'index';
     if (target === 'admin' && page !== 'admin') return;
     if (Array.isArray(excludeFamIds) && excludeFamIds.includes(data.famId)) return;
+    if (data.famId != null && data.slot != null && excludeSlotSet.has(data.famId + ':' + data.slot)) return;
     // A family device's own notifPref only ever filters family-page pushes —
     // the admin device always gets everything.
     if (page === 'index' && !notifPrefAllows(data.notifPref, kind, relatedFamIds, data.famId)) return;
