@@ -2899,11 +2899,15 @@ function closeNotifPrefModal(){
 function renderNotifPrefModal(){
   const el=document.getElementById('notifPrefModalContent');if(!el)return;
   const cur=localStorage.getItem('notifPref')||'all';
+  // The email section is rebuilt as part of the same innerHTML write (not a
+  // pre-existing child) — a separate write would wipe out a static child
+  // element with an id, since this replaces the whole container each time.
   el.innerHTML=NOTIF_PREFS.map(p=>`
     <button onclick="saveNotifPref('${p.id}')" style="width:100%;text-align:right;display:block;padding:12px 14px;margin-bottom:10px;border-radius:var(--r2);border:1.5px solid ${p.id===cur?'var(--blue-mid)':'var(--border)'};background:var(--surface2);cursor:pointer;font-family:var(--font)">
       <div style="font-size:14px;font-weight:700;color:var(--text)">${p.ico} ${p.title}${p.id===cur?' ✓':''}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">${esc(p.desc)}</div>
-    </button>`).join('');
+    </button>`).join('')+'<div id="notifEmailSection"></div>';
+  renderNotifEmailSection();
 }
 async function saveNotifPref(pref){
   localStorage.setItem('notifPref',pref);
@@ -2914,6 +2918,58 @@ async function saveNotifPref(pref){
   }catch(e){console.warn('saveNotifPref failed:',e);}
   renderNotifPrefModal();
   showToast('✓ ההעדפה נשמרה',2000);
+}
+
+// A family-wide (not per-device, unlike NOTIF_PREFS above) choice to swap
+// push for email on specific notification kinds — for a family that just
+// doesn't want the app pushing to their phone at all, but still wants to
+// know when a poll opens or someone's birthday comes up. Turning it on
+// takes this family's devices OUT of push entirely (see addNotif's
+// exclusion logic) — categories left unchecked below get neither push nor
+// email, which the copy under the toggle spells out.
+const NOTIF_EMAIL_CATS=[
+  {id:'poll',ico:'🗳',label:'סקר חדש'},
+  {id:'birthday',ico:'🎂',label:'ימי הולדת, יארצייט ויום נישואין'},
+  {id:'expense',ico:'💳',label:'הוצאה חדשה'},
+  {id:'event',ico:'📅',label:'אירוע חדש או סגירת אירוע'},
+  {id:'deposit',ico:'💰',label:'הפקדה חדשה'},
+  {id:'familyEdit',ico:'👪',label:'עריכת פרטי משפחה'},
+  {id:'goalFund',ico:'🎯',label:'קופה חדשה למטרה'},
+];
+function renderNotifEmailSection(){
+  const el=document.getElementById('notifEmailSection');if(!el)return;
+  const fid=_myFamId();
+  const f=fid!=null?getFam(fid):null;
+  if(!f){el.innerHTML='';return;}
+  const on=!!f.notifEmailPref;
+  const cats=f.notifEmailPref?.cats||{};
+  el.innerHTML=`<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" ${on?'checked':''} onchange="toggleNotifEmailMode(this.checked)">
+      <span style="font-size:13px;font-weight:700;color:var(--text)">📧 קבל התראות למייל במקום פוש</span>
+    </label>
+    <div style="font-size:11px;color:var(--text2);margin:4px 0 10px;line-height:1.5">כשזה פעיל, המכשיר מפסיק לקבל פושים — ותקבלו במייל רק את מה שמסומן למטה (מה שלא מסומן, לא יגיע בכלל).</div>
+    <div style="display:${on?'flex':'none'};flex-direction:column;gap:8px">
+      ${NOTIF_EMAIL_CATS.map(c=>`
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">
+          <input type="checkbox" ${cats[c.id]!==false?'checked':''} onchange="toggleNotifEmailCat('${c.id}',this.checked)">
+          <span>${c.ico} ${c.label}</span>
+        </label>`).join('')}
+    </div>
+  </div>`;
+}
+function toggleNotifEmailMode(on){
+  const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f)return;
+  if(on&&!f.notifEmailPref)f.notifEmailPref={cats:Object.fromEntries(NOTIF_EMAIL_CATS.map(c=>[c.id,true]))};
+  else if(!on)f.notifEmailPref=null;
+  save();renderNotifEmailSection();
+  showToast('✓ ההעדפה נשמרה',2000);
+}
+function toggleNotifEmailCat(catId,on){
+  const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f||!f.notifEmailPref)return;
+  f.notifEmailPref.cats[catId]=on;
+  save();
+  showToast('✓ ההעדפה נשמרה',1500);
 }
 
 // Admin-only list of every registered fcmTokens doc — mainly for spotting
@@ -3057,7 +3113,7 @@ async function startFormImportSync(){
             _creditItemPayers(ev,item);
             added++;
           });
-          if(added){changed=true;addNotif('📋',`${sub.famName||'משפחה'} שלח/ה ${added} הוצאה${added===1?'':'ות'} דרך הטופס ל"${ev.name}"`,undefined,undefined,'important',ev.participants);}
+          if(added){changed=true;addNotif('📋',`${sub.famName||'משפחה'} שלח/ה ${added} הוצאה${added===1?'':'ות'} דרך הטופס ל"${ev.name}"`,undefined,undefined,'expense',ev.participants);}
           await setDoc(doc(db,'formExpenses',sub._id),{imported:true,importedAt:new Date().toISOString()},{merge:true});
         }
         if(changed){save();render();}
@@ -3463,23 +3519,32 @@ function openPollSheet(){
 function closePollSheet(){
   const s=document.getElementById('pollSheet');if(s)s.classList.remove('open');
 }
-function openNewPollModal(){
-  document.getElementById('pollQ').value='';
+let _pollEditId=null;
+function openNewPollModal(id){
+  _pollEditId=id??null;
+  const p=id!=null?polls.find(x=>x.id===id):null;
+  document.getElementById('pollQ').value=p?p.question:'';
   const wrap=document.getElementById('pollOptsWrap');
   wrap.innerHTML='';
-  addPollOptInput();addPollOptInput();
+  if(p){p.options.forEach(o=>addPollOptInput(o));}
+  else{addPollOptInput();addPollOptInput();}
   document.getElementById('pollErr').style.display='none';
+  const titleEl=document.getElementById('newPollModalTitle');
+  if(titleEl)titleEl.textContent=p?'✏️ עריכת סקר':'🗳 סקר חדש';
+  const btnEl=document.getElementById('pollSaveBtn');
+  if(btnEl)btnEl.textContent=p?'✓ שמור שינויים':'✓ צור סקר';
   document.getElementById('newPollModal').style.display='flex';
 }
 function closeNewPollModal(){
   document.getElementById('newPollModal').style.display='none';
+  _pollEditId=null;
 }
-function addPollOptInput(){
+function addPollOptInput(value){
   const wrap=document.getElementById('pollOptsWrap');if(!wrap)return;
   const i=wrap.children.length+1;
   const row=document.createElement('div');
   row.style.cssText='margin-bottom:8px';
-  row.innerHTML=`<input type="text" placeholder="אפשרות ${i}" class="pollOptInp" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">`;
+  row.innerHTML=`<input type="text" placeholder="אפשרות ${i}" class="pollOptInp" value="${esc(value||'')}" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">`;
   wrap.appendChild(row);
 }
 function saveNewPoll(){
@@ -3488,6 +3553,13 @@ function saveNewPoll(){
   const err=document.getElementById('pollErr');
   if(!q||opts.length<2){err.style.display='block';return;}
   err.style.display='none';
+  if(_pollEditId!=null){
+    const p=polls.find(x=>x.id===_pollEditId);
+    if(p){p.question=q;p.options=opts;}
+    _pollEditId=null;
+    save();closeNewPollModal();renderPollList();
+    return;
+  }
   polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false});
   addNotif('🗳','נוצר סקר חדש: "'+q+'"',undefined,undefined,'poll');
   save();closeNewPollModal();renderPollList();
@@ -3541,8 +3613,9 @@ function renderPollList(){
       ${optsHtml}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
         <div style="font-size:11px;color:var(--text3)">${totalVotes} הצביעו</div>
-        <div class="edit-only" style="display:flex;gap:10px">
-          <button onclick="togglePollClosed(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">${p.closed?'↻ פתח מחדש':'✓ סגור סקר'}</button>
+        <div style="display:flex;gap:10px">
+          <button class="edit-only" onclick="togglePollClosed(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">${p.closed?'↻ פתח מחדש':'✓ סגור סקר'}</button>
+          <button onclick="openNewPollModal(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">✏️ ערוך</button>
           <button onclick="deletePoll(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">🗑 מחק</button>
         </div>
       </div>
@@ -4186,7 +4259,7 @@ function payToPot(evId,famId,amt){
   if(!ev.potPayments)ev.potPayments=[];
   ev.potPayments.push({famId,amt:payment});
   const _pf=getFam(famId);
-  addNotif('💰',(_pf?_pf.name.replace('משפחת','').trim():'')+' הפקיד/ה ₪'+payment.toLocaleString()+' לקופת "'+ev.name+'"',undefined,undefined,'important',ev.participants);
+  addNotif('💰',(_pf?_pf.name.replace('משפחת','').trim():'')+' הפקיד/ה ₪'+payment.toLocaleString()+' לקופת "'+ev.name+'"',undefined,undefined,'deposit',ev.participants);
   save();render();
   if(ev.closed){const nb=evAdjBalance(ev)[famId]||0;if(nb>=-0.5)_sendCloseEvEmailOne(ev,famId);}
 }
@@ -5082,7 +5155,7 @@ function savePerson(){
     f.children=f.kids.length;
   }
   f.namesConfirmed=true;
-  if(!editMode)addNotif('👪',f.name+' עדכנ/ה פרטים אישיים','admin');
+  if(!editMode)addNotif('👪',f.name+' עדכנ/ה פרטים אישיים','admin',undefined,'familyEdit');
   save();renderFamPeopleGrid();render();closePersonModal();
 }
 function deletePerson(){
@@ -5175,7 +5248,7 @@ function saveFamEdit(){
   }
   _famAnniversaryPending=undefined;
   f.namesConfirmed=true;
-  if(!editMode)addNotif('👪',f.name+' עדכנ/ה את פרטי המשפחה','admin');
+  if(!editMode)addNotif('👪',f.name+' עדכנ/ה את פרטי המשפחה','admin',undefined,'familyEdit');
   closeFamEditSheet();
   save();render();
 }
@@ -5565,7 +5638,7 @@ async function doCreate(){
     }
     if(savingsTotal>0)newEv.savingsTotal=savingsTotal;
     events.unshift(newEv);
-    addNotif('📅','נוסף אירוע חדש: "'+newEv.name+'"',undefined,undefined,'important',newEv.participants);
+    addNotif('📅','נוסף אירוע חדש: "'+newEv.name+'"',undefined,undefined,'event',newEv.participants);
     // notify participants only for non-cumulative events (personalized per family)
     (()=>{
       if(newEv.cumulative) return;
@@ -5801,7 +5874,7 @@ function _sendCloseEvEmailOne(ev,fid){
 function archiveEv(evId){
   const ev=events.find(e=>e.id===evId);if(!ev)return;
   ev.open=false;ev.closedOn='היום';
-  addNotif('🔒','האירוע "'+ev.name+'" נסגר',undefined,undefined,'important',ev.participants);
+  addNotif('🔒','האירוע "'+ev.name+'" נסגר',undefined,undefined,'event',ev.participants);
   save();render();
   goTab('archive',null);
 }
@@ -6108,7 +6181,30 @@ function addNotif(icon,text,pushTarget,hiddenFromFamIds,kind,relatedFamIds){
   notifications.unshift({id:nxtNotif++,icon,text,ts:Date.now(),hiddenFrom:hiddenFromFamIds&&hiddenFromFamIds.length?hiddenFromFamIds:undefined});
   if(notifications.length>200)notifications.length=200;
   renderNotifCenterBadge();
-  _sendPush(icon+' ינקלביץ',text,pushTarget,hiddenFromFamIds,kind,relatedFamIds);
+  const emailOptedFamIds=_sendCategoryEmails(icon,text,kind,hiddenFromFamIds);
+  _sendPush(icon+' ינקלביץ',text,pushTarget,[...(hiddenFromFamIds||[]),...emailOptedFamIds],kind,relatedFamIds);
+}
+// Families with the 📧 "email instead of push" toggle on (see
+// notifEmailSection in the notifPrefModal) are fully out of push from here
+// on — regardless of whether THIS notification's kind is one they picked —
+// so their ids are returned for addNotif to fold into the push exclusion
+// list. Among those, only the ones who actually checked this specific kind
+// get an email for it; an unrecognized/missing kind (calls that don't pass
+// one) never emails anyone, same as an unchecked category.
+function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds){
+  const hidden=new Set(hiddenFromFamIds||[]);
+  const optedOutOfPush=[];
+  families.forEach(f=>{
+    if(!f.notifEmailPref)return;
+    optedOutOfPush.push(f.id);
+    if(hidden.has(f.id))return;
+    if(!kind||!f.notifEmailPref.cats[kind])return;
+    if(!f.email&&!f.email2)return;
+    const name=f.name.replace('משפחת','').trim();
+    const html=_emailWrap(`<p style="margin:0;font-size:14px">${_esc(text)}</p>`,text,icon);
+    sendEmailNotif([{email:f.email,email2:f.email2,name}],icon+' '+text+' · ינקלביץ',text,html);
+  });
+  return optedOutOfPush;
 }
 const _visibleNotifs=()=>{
   if(editMode)return notifications;
@@ -6572,7 +6668,7 @@ function addGoalFund(){
   if(!name){ alert('נא להזין שם לקופה'); return; }
   const target=Math.max(0,parseFloat(document.getElementById('goalTarget').value)||0);
   goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds],nonPayers:[..._goalNonPayFamIds]});
-  addNotif('🎯','נוצרה קופה חדשה: '+name,'all',[..._goalHideFamIds],'important',families.filter(f=>!_goalHideFamIds.has(f.id)).map(f=>f.id));
+  addNotif('🎯','נוצרה קופה חדשה: '+name,'all',[..._goalHideFamIds],'goalFund',families.filter(f=>!_goalHideFamIds.has(f.id)).map(f=>f.id));
   closeGoalForm();
   save();render();
 }
@@ -6781,7 +6877,7 @@ function toggleGoalPaid(famId){
     // (e.g. a surprise-gift collection).
     const f=getFam(famId);
     const name=f?f.name.replace('משפחת','').trim():'';
-    addNotif('🎯',name+' סומן/ה כמי ששילם/ה עבור "'+g.name+'"',undefined,g.hiddenFrom,'important',[famId]);
+    addNotif('🎯',name+' סומן/ה כמי ששילם/ה עבור "'+g.name+'"',undefined,g.hiddenFrom,'deposit',[famId]);
   }
 }
 // Popup for picking which families are exempt from paying their share of
@@ -6995,7 +7091,7 @@ function confirmDeposit(){
   const _notifyFamId=_depositFamId;
   closeDepositSheet();
   save();render();
-  addNotif(isDeposit?'💰':'💸',name+(isDeposit?' הפקיד/ה ₪':' משך/ה ₪')+amt.toLocaleString()+(isDeposit?' לארנק':' מהארנק'),undefined,undefined,'important',[_notifyFamId]);
+  addNotif(isDeposit?'💰':'💸',name+(isDeposit?' הפקיד/ה ₪':' משך/ה ₪')+amt.toLocaleString()+(isDeposit?' לארנק':' מהארנק'),undefined,undefined,'deposit',[_notifyFamId]);
   sendFundUpdateEmail(_notifyFamId,amt,isDeposit?'הפקדה לארנק':'משיכה מהארנק',note);
 }
 
@@ -7198,7 +7294,7 @@ async function doAddExpItem(){
       ev.expenseItems.push(item);
       _creditItemPayers(ev,item);
       const _payNames=itemPayerNames(item).join(' + ');
-      addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+total.toLocaleString()+' ל"'+ev.name+'"',undefined,undefined,'important',ev.participants);
+      addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+total.toLocaleString()+' ל"'+ev.name+'"',undefined,undefined,'expense',ev.participants);
     }
     closeAddExpItem();save();render();
     return;
@@ -7237,7 +7333,7 @@ async function doAddExpItem(){
     ev.expenseItems.push(item);
     _creditItemPayers(ev,item);
     const _payNames=itemPayerNames(item).join(' + ');
-    addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+Math.round(amt).toLocaleString()+' ל"'+ev.name+'"',undefined,undefined,'important',ev.participants);
+    addNotif('💳',(_payNames||'')+' הוסיפ/ה הוצאה "'+name+'" ₪'+Math.round(amt).toLocaleString()+' ל"'+ev.name+'"',undefined,undefined,'expense',ev.participants);
   }
   closeAddExpItem();
   save();render();

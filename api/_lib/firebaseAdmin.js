@@ -162,4 +162,49 @@ function isYomTovNow() {
   return false;
 }
 
-module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isYomTovNow };
+function escHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// Shared with weekly-debt-reminder.js and daily-backup.js's birthday-email
+// routing — both need to fire an EmailJS send from a server context with no
+// live browser, using the same publicKey/serviceId/templateId the client
+// already stores (mirrored server-side in the settings/emailjs doc).
+async function sendViaEmailJS(publicKey, serviceId, templateId, toEmail, toName, subject, message, messageHtml) {
+  // EmailJS's "Allow API for non-browser applications" account setting also
+  // requires the account's Private Key (EmailJS dashboard → Account →
+  // General → API Keys) sent as accessToken — set via the EMAILJS_PRIVATE_KEY
+  // env var in Vercel, never stored in Firestore or served to the browser
+  // (unlike the public key, which /api/settings/emailjs.js does expose).
+  const body = {
+    service_id: serviceId,
+    template_id: templateId,
+    user_id: publicKey,
+    template_params: { to_email: toEmail, to_name: toName, subject, message, message_html: messageHtml },
+  };
+  if (process.env.EMAILJS_PRIVATE_KEY) body.accessToken = process.env.EMAILJS_PRIVATE_KEY;
+  const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`EmailJS ${res.status}: ${await res.text()}`);
+}
+// Generic notification-email wrapper — same visual shell as the client's
+// own _emailWrap, kept lightweight since this covers many different
+// notification kinds (birthdays today, more later) rather than one
+// specific email type like the weekly debt reminder's own template.
+function notifEmailHtml(icon, title, body) {
+  return `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"></head><body style="margin:0;padding:12px;background:#eef0f8;font-family:-apple-system,Helvetica,Arial,sans-serif;direction:rtl">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
+    <table role="presentation" style="width:100%;max-width:480px;background:#fff;border-radius:10px;overflow:hidden" cellspacing="0" cellpadding="0">
+    <tr><td style="background:linear-gradient(135deg,#0C447C,#1E88D8);padding:20px;text-align:center">
+      <div style="font-size:28px">${icon}</div><div style="color:#fff;font-size:17px;font-weight:700">${escHtml(title)}</div>
+    </td></tr>
+    <tr><td style="padding:20px;font-size:14px;color:#333">${escHtml(body)}</td></tr>
+    <tr><td style="padding:0 20px 20px;text-align:center">
+      <a href="https://yankeleviz.vercel.app/" style="display:inline-block;background:#1E88D8;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700">פתח באפליקציה ←</a>
+    </td></tr>
+    </table></td></tr></table></body></html>`;
+}
+
+module.exports = { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isYomTovNow, escHtml, sendViaEmailJS, notifEmailHtml };
