@@ -3578,6 +3578,15 @@ const _visibleGoalFunds=list=>{
   const myId=_myFamId();
   return list.filter(g=>!(g.hiddenFrom||[]).includes(myId));
 };
+// A poll created with families picked to stay out of it entirely (mirrors
+// goal funds' hiddenFrom above) — those specific families see nothing about
+// it anywhere, including the home "poll waiting" banner, while everyone
+// else (and always the admin) sees it normally.
+const _visiblePolls=list=>{
+  if(editMode)return list;
+  const myId=_myFamId();
+  return list.filter(p=>!(p.hiddenFrom||[]).includes(myId));
+};
 // Families who owe an equal share of this goal fund: everyone who can see
 // it (not in hiddenFrom) MINUS anyone marked as not participating in the
 // payment (g.nonPayers) — those still see the fund and its progress
@@ -3592,7 +3601,7 @@ function _fundTxForDisplay(){
 }
 function renderPollBanner(){
   const btn=document.getElementById('pollBannerBtn');if(!btn)return;
-  const openPolls=polls.filter(p=>!p.closed);
+  const openPolls=_visiblePolls(polls).filter(p=>!p.closed);
   if(!openPolls.length){btn.style.display='none';return;}
   const fid=_myFamId();
   const poll=openPolls.find(p=>fid==null||p.votes[String(fid)]==null)||openPolls[0];
@@ -3610,6 +3619,7 @@ function closePollSheet(){
   const s=document.getElementById('pollSheet');if(s)s.classList.remove('open');
 }
 let _pollEditId=null;
+let _pollHideFamIds=new Set();
 function openNewPollModal(id){
   _pollEditId=id??null;
   const p=id!=null?polls.find(x=>x.id===id):null;
@@ -3621,6 +3631,8 @@ function openNewPollModal(id){
   document.getElementById('pollErr').style.display='none';
   const anonEl=document.getElementById('pollAnon');
   if(anonEl)anonEl.checked=p?!!p.anonymous:false;
+  _pollHideFamIds=new Set(p?.hiddenFrom||[]);
+  _updatePollHideCount();
   const titleEl=document.getElementById('newPollModalTitle');
   if(titleEl)titleEl.textContent=p?'✏️ עריכת סקר':'🗳 סקר חדש';
   const btnEl=document.getElementById('pollSaveBtn');
@@ -3630,6 +3642,31 @@ function openNewPollModal(id){
 function closeNewPollModal(){
   document.getElementById('newPollModal').style.display='none';
   _pollEditId=null;
+}
+// Picks which families won't see this poll at all (mirrors the goal fund's
+// own hide picker) — a small dedicated chip popup rather than the goal
+// fund's, since that one is scoped to its own two hide/non-payer targets.
+function openPollHidePicker(){
+  _renderPollHideChips();
+  document.getElementById('pollHideFamModal').style.display='flex';
+}
+function closePollHidePicker(){
+  document.getElementById('pollHideFamModal').style.display='none';
+  _updatePollHideCount();
+}
+function _renderPollHideChips(){
+  const el=document.getElementById('pollHideFamChips');if(!el)return;
+  el.innerHTML=families.map(f=>
+    `<button type="button" class="chip ${_pollHideFamIds.has(f.id)?'on':''}" onclick="togglePollHideFam(${f.id})">${esc(f.name.replace('משפחת','').trim())}</button>`
+  ).join('');
+}
+function togglePollHideFam(fid){
+  if(_pollHideFamIds.has(fid))_pollHideFamIds.delete(fid);else _pollHideFamIds.add(fid);
+  _renderPollHideChips();
+}
+function _updatePollHideCount(){
+  const el=document.getElementById('pollHideCount');
+  if(el)el.textContent=_pollHideFamIds.size?` (${_pollHideFamIds.size})`:'';
 }
 function addPollOptInput(value){
   const wrap=document.getElementById('pollOptsWrap');if(!wrap)return;
@@ -3646,15 +3683,16 @@ function saveNewPoll(){
   if(!q||opts.length<2){err.style.display='block';return;}
   err.style.display='none';
   const anonymous=!!document.getElementById('pollAnon')?.checked;
+  const hiddenFrom=[..._pollHideFamIds];
   if(_pollEditId!=null){
     const p=polls.find(x=>x.id===_pollEditId);
-    if(p){p.question=q;p.options=opts;p.anonymous=anonymous;}
+    if(p){p.question=q;p.options=opts;p.anonymous=anonymous;p.hiddenFrom=hiddenFrom;}
     _pollEditId=null;
     save();closeNewPollModal();renderPollList();
     return;
   }
-  polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false,anonymous});
-  addNotif('🗳','נוצר סקר חדש: "'+q+'"',undefined,undefined,'poll');
+  polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false,anonymous,hiddenFrom});
+  addNotif('🗳','נוצר סקר חדש: "'+q+'"',undefined,hiddenFrom,'poll');
   save();closeNewPollModal();renderPollList();
 }
 function votePoll(pollId,optIdx){
@@ -3675,12 +3713,13 @@ function deletePoll(pollId){
 }
 function renderPollList(){
   const el=document.getElementById('pollList');if(!el)return;
-  if(!polls.length){
+  const list=_visiblePolls(polls);
+  if(!list.length){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">עדיין אין סקרים — צור את הראשון 🗳</div>';
     return;
   }
   const myFid=_myFamId();
-  el.innerHTML=polls.map(p=>{
+  el.innerHTML=list.map(p=>{
     const totalVotes=Object.keys(p.votes).length;
     const myVote=myFid!=null?p.votes[String(myFid)]:undefined;
     const showResults=p.closed||myVote!=null;

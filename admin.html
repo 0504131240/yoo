@@ -462,11 +462,21 @@
       <input type="checkbox" id="pollAnon">
       <span style="font-size:13px;font-weight:600;color:var(--text)">🕶️ סקר אנונימי (רק מנהל יראה מי הצביע מה)</span>
     </label>
+    <button type="button" onclick="openPollHidePicker()" style="width:100%;padding:10px 8px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:12px">🙈 מי לא יראה את הסקר?<span id="pollHideCount" style="color:var(--blue-mid)"></span></button>
     <div id="pollErr" style="display:none;color:var(--red-mid,#c33);font-size:12px;margin-bottom:8px">נא למלא שאלה ולפחות 2 אפשרויות</div>
     <div style="display:flex;gap:8px">
       <button onclick="closeNewPollModal()" style="flex:1;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
       <button id="pollSaveBtn" onclick="saveNewPoll()" style="flex:1;padding:10px;border-radius:var(--r2);border:none;background:#7C3AED;color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ צור סקר</button>
     </div>
+  </div>
+</div>
+
+<!-- Family picker popup for which families won't see this poll at all. -->
+<div id="pollHideFamModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2650;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closePollHidePicker()">
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div style="font-size:14px;font-weight:700;margin-bottom:12px">🙈 מי לא יראה את הסקר הזה?</div>
+    <div class="chips" id="pollHideFamChips"></div>
+    <button onclick="closePollHidePicker()" style="width:100%;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-top:14px">✓ סיימתי</button>
   </div>
 </div>
 
