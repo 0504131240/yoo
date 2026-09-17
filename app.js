@@ -2936,6 +2936,11 @@ const NOTIF_EMAIL_CATS=[
   {id:'familyEdit',ico:'👪',label:'עריכת פרטי משפחה'},
   {id:'goalFund',ico:'🎯',label:'קופה חדשה למטרה'},
 ];
+// Only these kinds are ever scoped to a specific family (relatedFamIds) —
+// a poll, a birthday, a family-edit or a new goal fund aren't "about" any
+// one family the way an event/expense/deposit is, so there's no sensible
+// "רק שלי" to offer them; they're always broadcast to every opted-in family.
+const NOTIF_EMAIL_SCOPED_CATS=new Set(['expense','event','deposit']);
 function renderNotifEmailSection(){
   const el=document.getElementById('notifEmailSection');if(!el)return;
   const fid=_myFamId();
@@ -2943,24 +2948,29 @@ function renderNotifEmailSection(){
   if(!f){el.innerHTML='';return;}
   const on=!!f.notifEmailPref;
   const cats=f.notifEmailPref?.cats||{};
+  const scopes=f.notifEmailPref?.scopes||{};
   el.innerHTML=`<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" ${on?'checked':''} onchange="toggleNotifEmailMode(this.checked)">
       <span style="font-size:13px;font-weight:700;color:var(--text)">📧 קבל התראות למייל במקום פוש</span>
     </label>
-    <div style="font-size:11px;color:var(--text2);margin:4px 0 10px;line-height:1.5">כשזה פעיל, המכשיר מפסיק לקבל פושים — ותקבלו במייל רק את מה שמסומן למטה (מה שלא מסומן, לא יגיע בכלל).</div>
+    <div style="font-size:11px;color:var(--text2);margin:4px 0 10px;line-height:1.5">כשזה פעיל, המכשיר מפסיק לקבל פושים — ותקבלו במייל רק את מה שמסומן למטה (מה שלא מסומן, לא יגיע בכלל). ליד קטגוריות שקשורות לאירוע ספציפי אפשר גם לבחור "הכל" או "רק שלי".</div>
     <div style="display:${on?'flex':'none'};flex-direction:column;gap:8px">
-      ${NOTIF_EMAIL_CATS.map(c=>`
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">
+      ${NOTIF_EMAIL_CATS.map(c=>{
+        const scoped=NOTIF_EMAIL_SCOPED_CATS.has(c.id);
+        const scope=scopes[c.id]==='mine'?'mine':'all';
+        return`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">
           <input type="checkbox" ${cats[c.id]!==false?'checked':''} onchange="toggleNotifEmailCat('${c.id}',this.checked)">
-          <span>${c.ico} ${c.label}</span>
-        </label>`).join('')}
+          <span style="flex:1">${c.ico} ${c.label}</span>
+          ${scoped?`<button type="button" onclick="event.preventDefault();event.stopPropagation();toggleNotifEmailScope('${c.id}')" style="border:1.5px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;flex-shrink:0;background:${scope==='mine'?'var(--blue-bg)':'var(--surface2)'};color:${scope==='mine'?'var(--blue)':'var(--text2)'}">${scope==='mine'?'רק שלי':'הכל'}</button>`:''}
+        </label>`;
+      }).join('')}
     </div>
   </div>`;
 }
 function toggleNotifEmailMode(on){
   const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f)return;
-  if(on&&!f.notifEmailPref)f.notifEmailPref={cats:Object.fromEntries(NOTIF_EMAIL_CATS.map(c=>[c.id,true]))};
+  if(on&&!f.notifEmailPref)f.notifEmailPref={cats:Object.fromEntries(NOTIF_EMAIL_CATS.map(c=>[c.id,true])),scopes:{}};
   else if(!on)f.notifEmailPref=null;
   save();renderNotifEmailSection();
   showToast('✓ ההעדפה נשמרה',2000);
@@ -2969,6 +2979,14 @@ function toggleNotifEmailCat(catId,on){
   const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f||!f.notifEmailPref)return;
   f.notifEmailPref.cats[catId]=on;
   save();
+  showToast('✓ ההעדפה נשמרה',1500);
+}
+function toggleNotifEmailScope(catId){
+  const fid=_myFamId();const f=fid!=null?getFam(fid):null;if(!f||!f.notifEmailPref)return;
+  if(!f.notifEmailPref.scopes)f.notifEmailPref.scopes={};
+  const cur=f.notifEmailPref.scopes[catId]==='mine'?'mine':'all';
+  f.notifEmailPref.scopes[catId]=cur==='mine'?'all':'mine';
+  save();renderNotifEmailSection();
   showToast('✓ ההעדפה נשמרה',1500);
 }
 
@@ -6192,7 +6210,7 @@ function addNotif(icon,text,pushTarget,hiddenFromFamIds,kind,relatedFamIds){
   notifications.unshift({id:nxtNotif++,icon,text,ts:Date.now(),hiddenFrom:hiddenFromFamIds&&hiddenFromFamIds.length?hiddenFromFamIds:undefined});
   if(notifications.length>200)notifications.length=200;
   renderNotifCenterBadge();
-  const emailOptedFamIds=_sendCategoryEmails(icon,text,kind,hiddenFromFamIds);
+  const emailOptedFamIds=_sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds);
   _sendPush(icon+' ינקלביץ',text,pushTarget,[...(hiddenFromFamIds||[]),...emailOptedFamIds],kind,relatedFamIds);
 }
 // Families with the 📧 "email instead of push" toggle on (see
@@ -6201,8 +6219,11 @@ function addNotif(icon,text,pushTarget,hiddenFromFamIds,kind,relatedFamIds){
 // so their ids are returned for addNotif to fold into the push exclusion
 // list. Among those, only the ones who actually checked this specific kind
 // get an email for it; an unrecognized/missing kind (calls that don't pass
-// one) never emails anyone, same as an unchecked category.
-function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds){
+// one) never emails anyone, same as an unchecked category. For the kinds in
+// NOTIF_EMAIL_SCOPED_CATS a family can further narrow that to "רק שלי" —
+// only when they're in this notification's own relatedFamIds — same
+// relatedFamIds the push side's 'mine' tier already filters by.
+function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds){
   const hidden=new Set(hiddenFromFamIds||[]);
   const optedOutOfPush=[];
   families.forEach(f=>{
@@ -6210,6 +6231,9 @@ function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds){
     optedOutOfPush.push(f.id);
     if(hidden.has(f.id))return;
     if(!kind||!f.notifEmailPref.cats[kind])return;
+    if(NOTIF_EMAIL_SCOPED_CATS.has(kind)&&f.notifEmailPref.scopes?.[kind]==='mine'){
+      if(!Array.isArray(relatedFamIds)||!relatedFamIds.includes(f.id))return;
+    }
     if(!f.email&&!f.email2)return;
     const name=f.name.replace('משפחת','').trim();
     const html=_emailWrap(`<p style="margin:0;font-size:14px">${_esc(text)}</p>`,text,icon);
