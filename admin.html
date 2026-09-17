@@ -458,6 +458,10 @@
     <input type="text" id="pollQ" placeholder="השאלה שלך" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:10px">
     <div id="pollOptsWrap"></div>
     <button onclick="addPollOptInput()" style="width:100%;padding:7px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;margin-bottom:12px">➕ הוסף אפשרות</button>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px">
+      <input type="checkbox" id="pollAnon">
+      <span style="font-size:13px;font-weight:600;color:var(--text)">🕶️ סקר אנונימי (רק מנהל יראה מי הצביע מה)</span>
+    </label>
     <div id="pollErr" style="display:none;color:var(--red-mid,#c33);font-size:12px;margin-bottom:8px">נא למלא שאלה ולפחות 2 אפשרויות</div>
     <div style="display:flex;gap:8px">
       <button onclick="closeNewPollModal()" style="flex:1;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>

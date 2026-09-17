@@ -3529,6 +3529,8 @@ function openNewPollModal(id){
   if(p){p.options.forEach(o=>addPollOptInput(o));}
   else{addPollOptInput();addPollOptInput();}
   document.getElementById('pollErr').style.display='none';
+  const anonEl=document.getElementById('pollAnon');
+  if(anonEl)anonEl.checked=p?!!p.anonymous:false;
   const titleEl=document.getElementById('newPollModalTitle');
   if(titleEl)titleEl.textContent=p?'✏️ עריכת סקר':'🗳 סקר חדש';
   const btnEl=document.getElementById('pollSaveBtn');
@@ -3553,14 +3555,15 @@ function saveNewPoll(){
   const err=document.getElementById('pollErr');
   if(!q||opts.length<2){err.style.display='block';return;}
   err.style.display='none';
+  const anonymous=!!document.getElementById('pollAnon')?.checked;
   if(_pollEditId!=null){
     const p=polls.find(x=>x.id===_pollEditId);
-    if(p){p.question=q;p.options=opts;}
+    if(p){p.question=q;p.options=opts;p.anonymous=anonymous;}
     _pollEditId=null;
     save();closeNewPollModal();renderPollList();
     return;
   }
-  polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false});
+  polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false,anonymous});
   addNotif('🗳','נוצר סקר חדש: "'+q+'"',undefined,undefined,'poll');
   save();closeNewPollModal();renderPollList();
 }
@@ -3591,24 +3594,32 @@ function renderPollList(){
     const totalVotes=Object.keys(p.votes).length;
     const myVote=myFid!=null?p.votes[String(myFid)]:undefined;
     const showResults=p.closed||myVote!=null;
+    // Anonymous polls hide who-voted-what from everyone except the admin —
+    // regular viewers still see the aggregate counts/percentages, just not
+    // the per-option voter names.
+    const canSeeVoters=!p.anonymous||editMode;
+    const votersFor=i=>Object.entries(p.votes).filter(([,v])=>v===i)
+      .map(([fid])=>{const f=getFam(parseInt(fid));return f?f.name.replace('משפחת','').trim():'?';});
     const optsHtml=p.options.map((opt,i)=>{
       const count=Object.values(p.votes).filter(v=>v===i).length;
       const pct=totalVotes?Math.round(count/totalVotes*100):0;
       if(showResults){
         const mine=myVote===i;
+        const voterNames=canSeeVoters&&count>0?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${votersFor(i).map(esc).join(', ')}</div>`:'';
         return`<div style="margin-bottom:6px">
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
             <span style="font-weight:${mine?'800':'600'};color:${mine?'#7C3AED':'var(--text)'}">${esc(opt)}${mine?' ✓':''}</span>
             <span style="color:var(--text2)">${pct}% (${count})</span>
           </div>
           <div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${mine?'#7C3AED':'#C4B5FD'}"></div></div>
+          ${voterNames}
         </div>`;
       }
       return`<button onclick="votePoll(${p.id},${i})" style="display:block;width:100%;text-align:right;padding:8px 10px;margin-bottom:6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(opt)}</button>`;
     }).join('');
     return`<div style="background:var(--surface2);border-radius:var(--r2);padding:12px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
-        <div style="font-size:14px;font-weight:800;color:var(--text);flex:1">${esc(p.question)}${p.closed?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">סגור</span>':''}</div>
+        <div style="font-size:14px;font-weight:800;color:var(--text);flex:1">${esc(p.question)}${p.anonymous?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">🕶️ אנונימי</span>':''}${p.closed?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">סגור</span>':''}</div>
       </div>
       ${optsHtml}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
