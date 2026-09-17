@@ -3009,7 +3009,6 @@ async function renderNotifDevicesModal(){
     const snap=await getDocs(collection(db,'fcmTokens'));
     const rows=[];
     snap.forEach(d=>rows.push({id:d.id,...d.data()}));
-    if(!rows.length){el.innerHTML='<div class="empty" style="padding:20px 0"><span class="empty-ico">📱</span>אין מכשירים רשומים</div>';return;}
     rows.sort((a,b)=>(b.ts||0)-(a.ts||0));
     // Two docs sharing the exact same push token are a genuine duplicate —
     // the same device registered twice under different device ids. But a
@@ -3024,7 +3023,7 @@ async function renderNotifDevicesModal(){
       if(r.token) tokenCounts[r.token]=(tokenCounts[r.token]||0)+1;
       if(r.famId!=null&&r.slot!=null){ const k=r.famId+':'+r.slot; personCounts[k]=(personCounts[k]||0)+1; }
     });
-    el.innerHTML=rows.map(r=>{
+    const devicesHtml=rows.length?rows.map(r=>{
       const f=r.famId!=null?getFam(r.famId):null;
       const who=(f&&r.slot!=null)?_regDisplayName(f,r.slot):(r.name||(r.page==='admin'?'מנהל':(f?f.name.replace('משפחת','').trim():(r.famId!=null?'משפחה שנמחקה':'לא ידוע'))));
       // Surfacing which email this device logged in with makes it obvious,
@@ -3042,7 +3041,29 @@ async function renderNotifDevicesModal(){
         </div>
         <button onclick="deleteNotifDevice('${r.id}')" style="background:none;border:none;color:var(--red-mid);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0" title="מחק רישום">🗑</button>
       </div>`;
-    }).join('');
+    }).join(''):'<div class="empty" style="padding:20px 0"><span class="empty-ico">📱</span>אין מכשירים רשומים לפוש</div>';
+    // Email is a per-FAMILY choice (notifEmailPref on the family record —
+    // see notifEmailSection), not a per-device fcmTokens doc like the push
+    // list above, so it's listed separately here rather than mixed in.
+    const emailFams=families.filter(f=>f.notifEmailPref);
+    const emailHtml=emailFams.length?`
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">📧 רשומים למייל במקום פוש</div>
+        ${emailFams.map(f=>{
+          const name=f.name.replace('משפחת','').trim();
+          const addrs=[f.email,f.email2].filter(Boolean).join(', ')||'אין כתובת מייל';
+          const catLabels=NOTIF_EMAIL_CATS.filter(c=>f.notifEmailPref.cats[c.id]!==false).map(c=>{
+            const scope=NOTIF_EMAIL_SCOPED_CATS.has(c.id)&&f.notifEmailPref.scopes?.[c.id]==='mine'?' (רק שלי)':'';
+            return c.ico+' '+c.label+scope;
+          });
+          return`<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:700">${esc(name)}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">${esc(addrs)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.6">${catLabels.length?esc(catLabels.join(' · ')):'לא סימנו אף קטגוריה'}</div>
+          </div>`;
+        }).join('')}
+      </div>`:'';
+    el.innerHTML=devicesHtml+emailHtml;
   }catch(e){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--red-mid);font-size:13px">שגיאה בטעינה: '+esc(e.message||'')+'</div>';
   }
