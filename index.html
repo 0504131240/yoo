@@ -453,15 +453,14 @@
 <div id="newPollModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2600;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeNewPollModal()">
   <div style="background:var(--bg);border-radius:var(--r2);max-width:380px;width:100%;max-height:85vh;overflow-y:auto;padding:18px">
     <div id="newPollModalTitle" style="font-size:15px;font-weight:800;margin-bottom:12px">🗳 סקר חדש</div>
-    <input type="text" id="pollQ" placeholder="השאלה שלך" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:9px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:10px">
-    <div id="pollOptsWrap"></div>
-    <button onclick="addPollOptInput()" style="width:100%;padding:7px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;margin-bottom:12px">➕ הוסף אפשרות</button>
+    <div id="pollQuestionsWrap"></div>
+    <button type="button" onclick="addPollFormQuestion()" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:12px">➕ הוסף שאלה</button>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px">
       <input type="checkbox" id="pollAnon">
       <span style="font-size:13px;font-weight:600;color:var(--text)">🕶️ סקר אנונימי (רק מנהל יראה מי הצביע מה)</span>
     </label>
     <button type="button" onclick="openPollHidePicker()" style="width:100%;padding:10px 8px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:12px">🙈 מי לא יראה את הסקר?<span id="pollHideCount" style="color:var(--blue-mid)"></span></button>
-    <div id="pollErr" style="display:none;color:var(--red-mid,#c33);font-size:12px;margin-bottom:8px">נא למלא שאלה ולפחות 2 אפשרויות</div>
+    <div id="pollErr" style="display:none;color:var(--red-mid,#c33);font-size:12px;margin-bottom:8px">נא למלא בכל שאלה טקסט ולפחות 2 אפשרויות</div>
     <div style="display:flex;gap:8px">
       <button onclick="closeNewPollModal()" style="flex:1;padding:10px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
       <button id="pollSaveBtn" onclick="saveNewPoll()" style="flex:1;padding:10px;border-radius:var(--r2);border:none;background:#7C3AED;color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">✓ צור סקר</button>

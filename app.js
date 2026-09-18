@@ -656,6 +656,21 @@ function saveLocal(){
   }catch(e){}
 }
 
+// Older polls stored a single flat {question, options, votes:{famId:optIdx}}.
+// Multi-question polls with conditional follow-up questions need votes keyed
+// by question id instead, so every poll is normalized to {questions:[{id,
+// text,options,showIf}], votes:{famId:{qId:optIdx}}} the first time it's
+// seen — everything downstream (rendering, voting, notifications) only ever
+// deals with the new shape. Returns true if it actually converted anything.
+function _migratePoll(p){
+  if(p.questions)return false;
+  p.questions=[{id:1,text:p.question||'',options:p.options||[],showIf:null}];
+  const oldVotes=p.votes||{};
+  p.votes={};
+  Object.entries(oldVotes).forEach(([fid,optIdx])=>{p.votes[fid]={1:optIdx};});
+  delete p.question;delete p.options;
+  return true;
+}
 // Restores every locally-cached field (see saveLocal()) into the live
 // variables. Used both when a save failed outright (network error) and when
 // a save was left pending across a refresh — those two paths used to only
@@ -813,7 +828,9 @@ async function load(){
       if(p.surname===undefined){p.surname='';_treeMigrated=true;}
       if(p.maidenName===undefined){p.maidenName='';_treeMigrated=true;}
     });
-    if(_savAmtMigrated||_kidsMigrated||_bdaysCleared||_treeMigrated)save();
+    let _pollsMigrated=false;
+    polls.forEach(p=>{if(_migratePoll(p))_pollsMigrated=true;});
+    if(_savAmtMigrated||_kidsMigrated||_bdaysCleared||_treeMigrated||_pollsMigrated)save();
     render();setTimeout(handleHash,100);
     if(!_isAdminPage()){
       const savedFamId=localStorage.getItem('deviceFamId3');
@@ -3587,6 +3604,13 @@ const _visiblePolls=list=>{
   const myId=_myFamId();
   return list.filter(p=>!(p.hiddenFrom||[]).includes(myId));
 };
+// A question with a showIf only appears for a given family once they've
+// answered its condition question with the matching option — everyone else
+// (and a question with no showIf at all) just sees it normally.
+function _pollVisibleQuestions(p,famId){
+  const myVotes=(famId!=null&&p.votes[String(famId)])||{};
+  return p.questions.filter(q=>!q.showIf||myVotes[q.showIf.qId]===q.showIf.optIdx);
+}
 // Families who owe an equal share of this goal fund: everyone who can see
 // it (not in hiddenFrom) MINUS anyone marked as not participating in the
 // payment (g.nonPayers) — those still see the fund and its progress
@@ -3604,8 +3628,12 @@ function renderPollBanner(){
   const openPolls=_visiblePolls(polls).filter(p=>!p.closed);
   if(!openPolls.length){btn.style.display='none';return;}
   const fid=_myFamId();
-  const poll=openPolls.find(p=>fid==null||p.votes[String(fid)]==null)||openPolls[0];
-  const voted=fid!=null&&poll.votes[String(fid)]!=null;
+  // "Waiting to be filled" if any currently-visible question (including one
+  // just revealed by an earlier answer) hasn't been answered yet.
+  const myVotes=v=>(fid!=null&&v.votes[String(fid)])||{};
+  const unanswered=p=>fid==null||_pollVisibleQuestions(p,fid).some(q=>myVotes(p)[q.id]==null);
+  const poll=openPolls.find(unanswered)||openPolls[0];
+  const voted=fid!=null&&!unanswered(poll);
   const lbl=document.getElementById('pollBannerLbl');
   if(lbl)lbl.textContent=voted?'תוצאות הסקר (בינתיים)':'סקר ממתין למילוי';
   btn.style.display='flex';
@@ -3620,14 +3648,22 @@ function closePollSheet(){
 }
 let _pollEditId=null;
 let _pollHideFamIds=new Set();
+// The in-progress question list while the poll form is open — each item is
+// {text, options:[...], showIf:null|{qIdx,optIdx}} where qIdx/optIdx are
+// plain array INDEXES into _pollFormQuestions (not yet the saved question
+// ids), since questions can be reordered/removed while editing. Resolved to
+// real {qId,optIdx} pairs only in saveNewPoll(). Only a question ABOVE a
+// given one in the list can be picked as its condition, so a poll always
+// reads top-to-bottom with no forward/circular references.
+let _pollFormQuestions=[];
 function openNewPollModal(id){
   _pollEditId=id??null;
   const p=id!=null?polls.find(x=>x.id===id):null;
-  document.getElementById('pollQ').value=p?p.question:'';
-  const wrap=document.getElementById('pollOptsWrap');
-  wrap.innerHTML='';
-  if(p){p.options.forEach(o=>addPollOptInput(o));}
-  else{addPollOptInput();addPollOptInput();}
+  _pollFormQuestions=p?p.questions.map(q=>({
+    text:q.text,options:[...q.options],
+    showIf:q.showIf?{qIdx:p.questions.findIndex(x=>x.id===q.showIf.qId),optIdx:q.showIf.optIdx}:null
+  })):[{text:'',options:['',''],showIf:null}];
+  _renderPollFormQuestions();
   document.getElementById('pollErr').style.display='none';
   const anonEl=document.getElementById('pollAnon');
   if(anonEl)anonEl.checked=p?!!p.anonymous:false;
@@ -3642,6 +3678,61 @@ function openNewPollModal(id){
 function closeNewPollModal(){
   document.getElementById('newPollModal').style.display='none';
   _pollEditId=null;
+}
+function _renderPollFormQuestions(){
+  const wrap=document.getElementById('pollQuestionsWrap');if(!wrap)return;
+  wrap.innerHTML=_pollFormQuestions.map((q,qi)=>{
+    const priorQs=_pollFormQuestions.slice(0,qi);
+    const condSection=qi===0?'':`
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:10px;font-size:12px;color:var(--text2)">
+        <input type="checkbox" ${q.showIf?'checked':''} onchange="togglePollFormCond(${qi},this.checked)">
+        <span>הצג שאלה זו רק אם ענו תשובה מסוימת בשאלה קודמת</span>
+      </label>
+      ${q.showIf?`<div style="display:flex;gap:6px;margin-top:6px">
+        <select onchange="setPollFormCondQ(${qi},this.value)" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:6px 8px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
+          ${priorQs.map((pq,pi)=>`<option value="${pi}" ${q.showIf.qIdx===pi?'selected':''}>${esc(pq.text||'שאלה '+(pi+1))}</option>`).join('')}
+        </select>
+        <select onchange="setPollFormCondOpt(${qi},this.value)" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:6px 8px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
+          ${(_pollFormQuestions[q.showIf.qIdx]?.options||[]).map((opt,oi)=>`<option value="${oi}" ${q.showIf.optIdx===oi?'selected':''}>${esc(opt||'אפשרות '+(oi+1))}</option>`).join('')}
+        </select>
+      </div>`:''}`;
+    return`<div style="border:1.5px solid var(--border);border-radius:var(--r2);padding:10px;margin-bottom:10px">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <input type="text" value="${esc(q.text)}" placeholder="שאלה ${qi+1}" oninput="setPollFormQText(${qi},this.value)" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">
+        ${_pollFormQuestions.length>1?`<button type="button" onclick="removePollFormQuestion(${qi})" style="background:none;border:none;color:var(--red-mid,#c33);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0">🗑</button>`:''}
+      </div>
+      ${q.options.map((opt,oi)=>`<input type="text" value="${esc(opt)}" placeholder="אפשרות ${oi+1}" oninput="setPollFormOptText(${qi},${oi},this.value)" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px">`).join('')}
+      <button type="button" onclick="addPollFormOption(${qi})" style="width:100%;padding:7px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">➕ הוסף אפשרות</button>
+      ${condSection}
+    </div>`;
+  }).join('');
+}
+function setPollFormQText(qi,v){_pollFormQuestions[qi].text=v;}
+function setPollFormOptText(qi,oi,v){_pollFormQuestions[qi].options[oi]=v;}
+function addPollFormOption(qi){_pollFormQuestions[qi].options.push('');_renderPollFormQuestions();}
+function addPollFormQuestion(){_pollFormQuestions.push({text:'',options:['',''],showIf:null});_renderPollFormQuestions();}
+function removePollFormQuestion(qi){
+  _pollFormQuestions.splice(qi,1);
+  // Any later question's condition pointing at the removed one (or shifted
+  // by the removal) needs fixing up so indexes stay valid.
+  _pollFormQuestions.forEach(q=>{
+    if(!q.showIf)return;
+    if(q.showIf.qIdx===qi)q.showIf=null;
+    else if(q.showIf.qIdx>qi)q.showIf.qIdx--;
+  });
+  _renderPollFormQuestions();
+}
+function togglePollFormCond(qi,on){
+  _pollFormQuestions[qi].showIf=on?{qIdx:0,optIdx:0}:null;
+  _renderPollFormQuestions();
+}
+function setPollFormCondQ(qi,val){
+  _pollFormQuestions[qi].showIf.qIdx=parseInt(val);
+  _pollFormQuestions[qi].showIf.optIdx=0;
+  _renderPollFormQuestions();
+}
+function setPollFormCondOpt(qi,val){
+  _pollFormQuestions[qi].showIf.optIdx=parseInt(val);
 }
 // Picks which families won't see this poll at all (mirrors the goal fund's
 // own hide picker) — a small dedicated chip popup rather than the goal
@@ -3668,37 +3759,37 @@ function _updatePollHideCount(){
   const el=document.getElementById('pollHideCount');
   if(el)el.textContent=_pollHideFamIds.size?` (${_pollHideFamIds.size})`:'';
 }
-function addPollOptInput(value){
-  const wrap=document.getElementById('pollOptsWrap');if(!wrap)return;
-  const i=wrap.children.length+1;
-  const row=document.createElement('div');
-  row.style.cssText='margin-bottom:8px';
-  row.innerHTML=`<input type="text" placeholder="אפשרות ${i}" class="pollOptInp" value="${esc(value||'')}" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box">`;
-  wrap.appendChild(row);
-}
 function saveNewPoll(){
-  const q=document.getElementById('pollQ').value.trim();
-  const opts=[...document.querySelectorAll('.pollOptInp')].map(i=>i.value.trim()).filter(Boolean);
   const err=document.getElementById('pollErr');
-  if(!q||opts.length<2){err.style.display='block';return;}
+  const cleaned=_pollFormQuestions.map(q=>({
+    text:q.text.trim(),
+    options:q.options.map(o=>o.trim()).filter(Boolean),
+    showIf:q.showIf
+  }));
+  if(!cleaned.length||cleaned.some(q=>!q.text||q.options.length<2)){err.style.display='block';return;}
   err.style.display='none';
   const anonymous=!!document.getElementById('pollAnon')?.checked;
   const hiddenFrom=[..._pollHideFamIds];
+  // Assign stable sequential ids, then resolve each showIf's array index
+  // into the actual id of the question it points at.
+  const questions=cleaned.map((q,i)=>({id:i+1,text:q.text,options:q.options,showIf:null}));
+  cleaned.forEach((q,i)=>{if(q.showIf)questions[i].showIf={qId:questions[q.showIf.qIdx].id,optIdx:q.showIf.optIdx};});
   if(_pollEditId!=null){
     const p=polls.find(x=>x.id===_pollEditId);
-    if(p){p.question=q;p.options=opts;p.anonymous=anonymous;p.hiddenFrom=hiddenFrom;}
+    if(p){p.questions=questions;p.anonymous=anonymous;p.hiddenFrom=hiddenFrom;}
     _pollEditId=null;
     save();closeNewPollModal();renderPollList();
     return;
   }
-  polls.unshift({id:nxtPoll++,question:q,options:opts,votes:{},createdAt:Date.now(),closed:false,anonymous,hiddenFrom});
-  addNotif('🗳','נוצר סקר חדש: "'+q+'"',undefined,hiddenFrom,'poll');
+  polls.unshift({id:nxtPoll++,questions,votes:{},createdAt:Date.now(),closed:false,anonymous,hiddenFrom});
+  addNotif('🗳','נוצר סקר חדש: "'+questions[0].text+'"',undefined,hiddenFrom,'poll');
   save();closeNewPollModal();renderPollList();
 }
-function votePoll(pollId,optIdx){
+function votePoll(pollId,qId,optIdx){
   const p=polls.find(x=>x.id===pollId);if(!p||p.closed)return;
   const fid=_myFamId();if(fid==null){alert('לא זוהתה משפחה במכשיר זה');return;}
-  p.votes[String(fid)]=optIdx;
+  if(!p.votes[String(fid)])p.votes[String(fid)]={};
+  p.votes[String(fid)][qId]=optIdx;
   save();renderPollList();
 }
 function togglePollClosed(pollId){
@@ -3720,39 +3811,52 @@ function renderPollList(){
   }
   const myFid=_myFamId();
   el.innerHTML=list.map(p=>{
-    const totalVotes=Object.keys(p.votes).length;
-    const myVote=myFid!=null?p.votes[String(myFid)]:undefined;
-    const showResults=p.closed||myVote!=null;
+    const myVotes=(myFid!=null&&p.votes[String(myFid)])||{};
+    const visibleQs=_pollVisibleQuestions(p,myFid);
+    const isMulti=p.questions.length>1;
     // Anonymous polls hide who-voted-what from everyone except the admin —
     // regular viewers still see the aggregate counts/percentages, just not
     // the per-option voter names.
     const canSeeVoters=!p.anonymous||editMode;
-    const votersFor=i=>Object.entries(p.votes).filter(([,v])=>v===i)
-      .map(([fid])=>{const f=getFam(parseInt(fid));return f?f.name.replace('משפחת','').trim():'?';});
-    const optsHtml=p.options.map((opt,i)=>{
-      const count=Object.values(p.votes).filter(v=>v===i).length;
-      const pct=totalVotes?Math.round(count/totalVotes*100):0;
-      if(showResults){
-        const mine=myVote===i;
-        const voterNames=canSeeVoters&&count>0?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${votersFor(i).map(esc).join(', ')}</div>`:'';
-        return`<div style="margin-bottom:6px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
-            <span style="font-weight:${mine?'800':'600'};color:${mine?'#7C3AED':'var(--text)'}">${esc(opt)}${mine?' ✓':''}</span>
-            <span style="color:var(--text2)">${pct}% (${count})</span>
-          </div>
-          <div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${mine?'#7C3AED':'#C4B5FD'}"></div></div>
-          ${voterNames}
-        </div>`;
-      }
-      return`<button onclick="votePoll(${p.id},${i})" style="display:block;width:100%;text-align:right;padding:8px 10px;margin-bottom:6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(opt)}</button>`;
+    // "Respondents" for the footer count is measured against the first
+    // question — every family that got this far answered it, regardless of
+    // how many later (possibly conditional) questions they reached.
+    const respondents=Object.values(p.votes).filter(v=>v[p.questions[0].id]!=null).length;
+    const questionsHtml=visibleQs.map(q=>{
+      const totalVotes=Object.values(p.votes).filter(v=>v[q.id]!=null).length;
+      const myVote=myVotes[q.id];
+      const showResults=p.closed||myVote!=null;
+      const votersFor=i=>Object.entries(p.votes).filter(([,v])=>v[q.id]===i)
+        .map(([fid])=>{const f=getFam(parseInt(fid));return f?f.name.replace('משפחת','').trim():'?';});
+      const optsHtml=q.options.map((opt,i)=>{
+        const count=Object.values(p.votes).filter(v=>v[q.id]===i).length;
+        const pct=totalVotes?Math.round(count/totalVotes*100):0;
+        if(showResults){
+          const mine=myVote===i;
+          const voterNames=canSeeVoters&&count>0?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${votersFor(i).map(esc).join(', ')}</div>`:'';
+          return`<div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+              <span style="font-weight:${mine?'800':'600'};color:${mine?'#7C3AED':'var(--text)'}">${esc(opt)}${mine?' ✓':''}</span>
+              <span style="color:var(--text2)">${pct}% (${count})</span>
+            </div>
+            <div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${mine?'#7C3AED':'#C4B5FD'}"></div></div>
+            ${voterNames}
+          </div>`;
+        }
+        return`<button onclick="votePoll(${p.id},${q.id},${i})" style="display:block;width:100%;text-align:right;padding:8px 10px;margin-bottom:6px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">${esc(opt)}</button>`;
+      }).join('');
+      return`<div style="margin-bottom:12px">
+        ${isMulti?`<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">${esc(q.text)}</div>`:''}
+        ${optsHtml}
+      </div>`;
     }).join('');
     return`<div style="background:var(--surface2);border-radius:var(--r2);padding:12px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
-        <div style="font-size:14px;font-weight:800;color:var(--text);flex:1">${esc(p.question)}${p.anonymous?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">🕶️ אנונימי</span>':''}${p.closed?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">סגור</span>':''}</div>
+        <div style="font-size:14px;font-weight:800;color:var(--text);flex:1">${isMulti?'🗳 סקר':esc(p.questions[0].text)}${isMulti?` <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">${p.questions.length} שאלות</span>`:''}${p.anonymous?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">🕶️ אנונימי</span>':''}${p.closed?' <span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--bg);padding:1px 7px;border-radius:10px">סגור</span>':''}</div>
       </div>
-      ${optsHtml}
+      ${questionsHtml}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
-        <div style="font-size:11px;color:var(--text3)">${totalVotes} הצביעו</div>
+        <div style="font-size:11px;color:var(--text3)">${respondents} הצביעו</div>
         <div style="display:flex;gap:10px">
           <button class="edit-only" onclick="togglePollClosed(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">${p.closed?'↻ פתח מחדש':'✓ סגור סקר'}</button>
           <button onclick="openNewPollModal(${p.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--font)">✏️ ערוך</button>
