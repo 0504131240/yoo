@@ -1163,6 +1163,12 @@
             style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:8px;box-sizing:border-box">
           <input type="number" min="0" inputmode="numeric" id="goalTarget" placeholder="סכום מטרה - אופציונלי (₪)"
             style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+          <input type="text" id="goalRecipient" placeholder="מי מקבל את המתנה? (אופציונלי)"
+            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-top:8px;box-sizing:border-box">
+          <input type="text" id="goalGift" placeholder="מה המתנה? (אופציונלי)"
+            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-top:8px;box-sizing:border-box">
+          <textarea id="goalNotes" rows="2" placeholder="הערות (אופציונלי)"
+            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);margin-top:8px;box-sizing:border-box;resize:vertical"></textarea>
           <div style="display:flex;gap:8px;margin-top:12px">
             <button type="button" onclick="openGoalFamPick('hide')" style="flex:1;padding:10px 8px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🙈 מי לא יראה<span id="goalHideCount" style="color:var(--blue-mid)"></span></button>
             <button type="button" onclick="openGoalFamPick('pay')" style="flex:1;padding:10px 8px;border-radius:var(--r2);border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">🚫 מי לא משתתף<span id="goalNonPayCount" style="color:var(--blue-mid)"></span></button>
@@ -1220,6 +1226,7 @@
       <button onclick="closeGoalPayModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
     </div>
     <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0">
+      <div id="goalPayGiftInfo"></div>
       <div id="goalPayProgress" style="margin-bottom:12px"></div>
       <div id="goalPayNote" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
       <button class="edit-only" onclick="openGoalReminderModal(_goalPayGoalId)" style="width:100%;padding:10px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:12px">📧 שלח תזכורת תשלום לכל מי שלא שילם</button>

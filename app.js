@@ -6919,27 +6919,38 @@ function closeGoalForm(){
   document.getElementById('goalFormOverlay').style.display='none';
   document.getElementById('goalName').value='';
   document.getElementById('goalTarget').value='';
+  document.getElementById('goalRecipient').value='';
+  document.getElementById('goalGift').value='';
+  document.getElementById('goalNotes').value='';
 }
 function addGoalFund(){
   const name=document.getElementById('goalName').value.trim();
   if(!name){ alert('נא להזין שם לקופה'); return; }
   const target=Math.max(0,parseFloat(document.getElementById('goalTarget').value)||0);
-  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds],nonPayers:[..._goalNonPayFamIds]});
+  const recipient=document.getElementById('goalRecipient').value.trim();
+  const gift=document.getElementById('goalGift').value.trim();
+  const notes=document.getElementById('goalNotes').value.trim();
+  goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds],nonPayers:[..._goalNonPayFamIds],recipient:recipient||undefined,gift:gift||undefined,notes:notes||undefined});
   addNotif('🎯','נוצרה קופה חדשה: '+name,'all',[..._goalHideFamIds],'goalFund',families.filter(f=>!_goalHideFamIds.has(f.id)).map(f=>f.id));
   closeGoalForm();
   save();render();
 }
 let _goalDepositGoalId=null;
 let _goalDepositFamId=null;
+let _goalDepositFromFund=false;
 function openGoalDepositSheet(goalId){
   _goalDepositGoalId=goalId;
   _goalDepositFamId=null;
+  _goalDepositFromFund=false;
   const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
   const titleEl=document.getElementById('goalDepositTitle');
   if(titleEl) titleEl.textContent='הפקדה ל"'+g.name+'"';
   document.getElementById('goalDepositFields').innerHTML=`
     <input type="number" min="0" inputmode="numeric" id="goalDepositAmt" placeholder="סכום להפקדה (₪)"
-      style="width:100%;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;margin-bottom:14px;box-sizing:border-box">
+      style="width:100%;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;margin-bottom:8px;box-sizing:border-box">
+    <div id="goalDepFundLine" style="display:none;align-items:center;background:var(--blue-bg);border-radius:var(--r2);padding:8px 12px;margin-bottom:14px;cursor:pointer" onclick="useFundForGoalDeposit()">
+      <span id="goalDepFundText" style="font-size:12px;font-weight:700;color:var(--blue-mid)"></span>
+    </div>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">מי מפקיד?</div>
     ${families.map(f=>{
       const cl=col(f.id);
@@ -6958,6 +6969,7 @@ function openGoalDepositSheet(goalId){
 }
 function selectGoalDepFam(famId){
   _goalDepositFamId=famId;
+  _goalDepositFromFund=false;
   families.forEach(f=>{
     const el=document.getElementById('gdepfam-'+f.id);
     if(el){
@@ -6966,10 +6978,36 @@ function selectGoalDepFam(famId){
       el.style.background=sel?'var(--blue-bg)':'transparent';
     }
   });
+  const fundBal=Math.round(famFundBal(famId));
+  const fundLine=document.getElementById('goalDepFundLine');
+  const fundText=document.getElementById('goalDepFundText');
+  if(fundLine&&fundText){
+    if(fundBal>0){
+      fundText.textContent=`🏦 יועבר מהארנק: ₪${fundBal.toLocaleString()}`;
+      fundLine.style.display='flex';
+    }else{
+      fundLine.style.display='none';
+    }
+  }
+}
+// Pre-fills the deposit amount from the family's own wallet balance and
+// marks this deposit as wallet-sourced — mirrors useFundForCumPot() for
+// event pots. The amount can still be edited afterward (e.g. to deposit
+// less than the full balance); confirmGoalDeposit() re-validates against
+// the live balance either way.
+function useFundForGoalDeposit(){
+  if(_goalDepositFamId==null)return;
+  const fundBal=Math.round(famFundBal(_goalDepositFamId));
+  if(fundBal<=0)return;
+  const el=document.getElementById('goalDepositAmt');
+  if(el)el.value=fundBal;
+  _goalDepositFromFund=true;
+  const fundText=document.getElementById('goalDepFundText');
+  if(fundText)fundText.textContent=`🏦 יועבר מהארנק: ₪${fundBal.toLocaleString()} ✓`;
 }
 function closeGoalDepositSheet(){
   document.getElementById('goalDepositOverlay').style.display='none';
-  _goalDepositGoalId=null;_goalDepositFamId=null;
+  _goalDepositGoalId=null;_goalDepositFamId=null;_goalDepositFromFund=false;
 }
 function confirmGoalDeposit(){
   if(_goalDepositGoalId==null){ return; }
@@ -6977,6 +7015,16 @@ function confirmGoalDeposit(){
   const amt=parseFloat(document.getElementById('goalDepositAmt')?.value)||0;
   if(amt<=0){ alert('נא להזין סכום'); return; }
   const g=goalFunds.find(x=>x.id===_goalDepositGoalId);if(!g)return;
+  if(_goalDepositFromFund){
+    const key=String(_goalDepositFamId);
+    const bal=fund.famBalances[key]||0;
+    if(bal<amt){alert('אין מספיק יתרה בארנק (₪'+Math.round(bal).toLocaleString()+')');return;}
+    fund.famBalances[key]=bal-amt;
+    const name=(getFam(_goalDepositFamId)||{}).name?.replace('משפחת','').trim()||'';
+    fund.transactions.push({id:nxtTx++,type:'payout',famId:_goalDepositFamId,amount:amt,
+      desc:'העברה לקופת מטרה · '+g.name+' → '+name,
+      date:new Date().toLocaleDateString('he-IL')});
+  }
   g.contributions[_goalDepositFamId]=(g.contributions[_goalDepositFamId]||0)+amt;
   closeGoalDepositSheet();
   save();render();
@@ -7070,6 +7118,17 @@ function renderGoalPayModal(){
     progEl.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:3px">נאסף עד כה</div>
       <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪${total.toLocaleString()}${g.target>0?` <span style="font-size:13px;font-weight:600;color:var(--text2)">מתוך ₪${g.target.toLocaleString()}</span>`:''}</div>
       ${g.target>0?`<div class="pbar" style="margin:8px 0 2px"><div class="pfill ${pct>=100?'full':'part'}" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text2)">${pct}%</div>`:''}`;
+  }
+  const giftEl=document.getElementById('goalPayGiftInfo');
+  if(giftEl){
+    const rows=[
+      g.recipient?['🎁 מי מקבל',g.recipient]:null,
+      g.gift?['🎀 מה המתנה',g.gift]:null,
+      g.notes?['📝 הערות',g.notes]:null,
+    ].filter(Boolean);
+    giftEl.innerHTML=rows.length?`<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px;margin-bottom:12px">
+      ${rows.map(([lbl,val])=>`<div style="font-size:12px;margin-bottom:4px"><span style="color:var(--text2);font-weight:700">${lbl}:</span> <span style="color:var(--text)">${esc(val)}</span></div>`).join('')}
+    </div>`:'';
   }
   const noteEl=document.getElementById('goalPayNote');
   if(noteEl)noteEl.textContent=perFamily>0?'חלוקה שווה: ₪'+perFamily.toLocaleString()+' למשפחה':'לא הוגדר סכום מטרה לקופה הזו — אין לפי מה לחשב חלק שווה';
