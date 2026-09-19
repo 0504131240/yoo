@@ -7383,11 +7383,15 @@ function sendSelectedGoalReminders(){
       const name=f.name.replace('משפחת','').trim();
       const paidSoFar=Math.round(g.contributions[fid]||0);
       const owe=Math.round(perFamily-paidSoFar);
-      const msg=`תזכורת תשלום: ${g.name}\n\nסכום המטרה הכולל: ₪${g.target.toLocaleString()}\nהחלק שלך: ₪${perFamily.toLocaleString()}${paidSoFar>0?`\nשילמת עד כה: ₪${paidSoFar.toLocaleString()}`:''}\n\n⚠️ יתרה לתשלום: ₪${owe.toLocaleString()}`;
+      const giftLines=[g.recipient?'🎁 עבור: '+g.recipient:null,g.gift?'🎀 מתנה: '+g.gift:null,g.notes?'📝 '+g.notes:null].filter(Boolean);
+      const msg=`תזכורת תשלום: ${g.name}\n\nסכום המטרה הכולל: ₪${g.target.toLocaleString()}\nהחלק שלך: ₪${perFamily.toLocaleString()}${paidSoFar>0?`\nשילמת עד כה: ₪${paidSoFar.toLocaleString()}`:''}${giftLines.length?'\n'+giftLines.join('\n'):''}\n\n⚠️ יתרה לתשלום: ₪${owe.toLocaleString()}`;
       const cardRows=[['סכום המטרה הכולל',`₪${g.target.toLocaleString()}`],['החלק שלך',`₪${perFamily.toLocaleString()}`,true]];
       if(paidSoFar>0)cardRows.push(['שילמת עד כה',`₪${paidSoFar.toLocaleString()}`]);
+      if(g.recipient)cardRows.push(['🎁 עבור',_esc(g.recipient)]);
+      if(g.gift)cardRows.push(['🎀 מתנה',_esc(g.gift)]);
       let bodyHtml=_eCard(cardRows);
       bodyHtml+=`<div style="text-align:center;margin-top:4px">${_eBadge('⚠️ יתרה לתשלום ₪'+owe.toLocaleString(),'#ef4444')}</div>`;
+      if(g.notes)bodyHtml+=`<div style="margin-top:10px;padding:8px 12px;background:#F9FAFB;border-radius:8px;font-size:12px;color:#555">📝 ${_esc(g.notes)}</div>`;
       bodyHtml+=_paymentBlock(owe,g.name,null,null);
       const html=_emailWrap(bodyHtml,g.name,'🎯','',name);
       const recipient={name};
