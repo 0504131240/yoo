@@ -3648,6 +3648,17 @@ function _pollVisibleQuestions(p,famId){
 // normally, they're just left out of the split and the "who paid"/reminder
 // flows, unlike hiddenFrom which hides the fund's existence entirely.
 const _goalPayers=g=>families.filter(f=>!(g.hiddenFrom||[]).includes(f.id)&&!(g.nonPayers||[]).includes(f.id));
+// How much a family still owes toward its equal share of a goal fund (0 if
+// the fund has no target, the family isn't a payer, or it already covered
+// its share) — used to cap the deposit sheet's wallet-transfer suggestion
+// so it doesn't default to the family's ENTIRE wallet balance regardless
+// of what the fund actually still needs from them.
+function _goalOwedAmt(g,famId){
+  const eligible=_goalPayers(g);
+  const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
+  if(perFamily<=0)return 0;
+  return Math.max(0,perFamily-(g.contributions[famId]||0));
+}
 // Shared by the goal fund's own detail view (goalPayGiftInfo) and its
 // deposit sheet — a small card of whichever gift-detail fields were filled
 // in when the fund was created (all optional), or nothing at all.
@@ -7027,12 +7038,16 @@ function selectGoalDepFam(famId){
       el.style.background=sel?'var(--blue-bg)':'transparent';
     }
   });
+  const g=goalFunds.find(x=>x.id===_goalDepositGoalId);
+  const owed=g?_goalOwedAmt(g,famId):0;
   const fundBal=Math.round(famFundBal(famId));
   const fundLine=document.getElementById('goalDepFundLine');
   const fundText=document.getElementById('goalDepFundText');
   if(fundLine&&fundText){
     if(fundBal>0){
-      fundText.textContent=`🏦 יועבר מהארנק: ₪${fundBal.toLocaleString()}`;
+      const suggested=owed>0?Math.min(fundBal,owed):fundBal;
+      const extra=fundBal>suggested?` (יתרה: ₪${fundBal.toLocaleString()})`:'';
+      fundText.textContent=`🏦 יועבר מהארנק: ₪${suggested.toLocaleString()}${extra}`;
       fundLine.style.display='flex';
     }else{
       fundLine.style.display='none';
@@ -7041,18 +7056,24 @@ function selectGoalDepFam(famId){
 }
 // Pre-fills the deposit amount from the family's own wallet balance and
 // marks this deposit as wallet-sourced — mirrors useFundForCumPot() for
-// event pots. The amount can still be edited afterward (e.g. to deposit
-// less than the full balance); confirmGoalDeposit() re-validates against
-// the live balance either way.
+// event pots. Suggests only what the family still owes toward its equal
+// share (g.target split evenly among _goalPayers), capped at the wallet
+// balance — not the full balance regardless of what's actually owed, which
+// would silently drain the wallet by more than the family needs to give.
+// The amount can still be edited afterward; confirmGoalDeposit() re-
+// validates against the live balance either way.
 function useFundForGoalDeposit(){
   if(_goalDepositFamId==null)return;
   const fundBal=Math.round(famFundBal(_goalDepositFamId));
   if(fundBal<=0)return;
+  const g=goalFunds.find(x=>x.id===_goalDepositGoalId);
+  const owed=g?_goalOwedAmt(g,_goalDepositFamId):0;
+  const suggested=owed>0?Math.min(fundBal,owed):fundBal;
   const el=document.getElementById('goalDepositAmt');
-  if(el)el.value=fundBal;
+  if(el)el.value=suggested;
   _goalDepositFromFund=true;
   const fundText=document.getElementById('goalDepFundText');
-  if(fundText)fundText.textContent=`🏦 יועבר מהארנק: ₪${fundBal.toLocaleString()} ✓`;
+  if(fundText)fundText.textContent=`🏦 יועבר מהארנק: ₪${suggested.toLocaleString()} ✓`;
 }
 function closeGoalDepositSheet(){
   document.getElementById('goalDepositOverlay').style.display='none';
