@@ -7255,17 +7255,23 @@ function toggleGoalPaid(famId){
   const eligible=_goalPayers(g);
   const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
   if(perFamily<=0)return;
-  const paid=(g.contributions[famId]||0)>=perFamily;
+  const prevAmt=g.contributions[famId]||0;
+  const paid=prevAmt>=perFamily;
   g.contributions[famId]=paid?0:perFamily;
   save();render();
   renderGoalPayModal();
   if(!paid){
-    // just marked as paid (not un-marking) — let them know, but never leak
-    // that this goal fund exists to anyone it's deliberately hidden from
-    // (e.g. a surprise-gift collection).
+    // Just marked as paid (not un-marking) — treated exactly like a regular
+    // manual deposit of the delta (same notify+email pairing
+    // confirmGoalDeposit uses), never leaking that this fund exists to
+    // anyone it's deliberately hidden from (e.g. a surprise-gift
+    // collection).
+    const addedAmt=perFamily-prevAmt;
     const f=getFam(famId);
     const name=f?f.name.replace('משפחת','').trim():'';
-    addNotif('🎯',name+' סומן/ה כמי ששילם/ה עבור "'+g.name+'"',undefined,g.hiddenFrom,'deposit',[famId]);
+    const giftInfo=g.gift?(' — מתנה: '+g.gift+(g.recipient?' עבור '+g.recipient:'')):'';
+    addNotif('🎯',name+' סומן/ה כמי ששילם/ה עבור "'+g.name+'"'+giftInfo,undefined,g.hiddenFrom,'deposit',[famId]);
+    sendGoalDepositEmail(famId,addedAmt,g,false);
   }
 }
 // Popup for picking which families are exempt from paying their share of
