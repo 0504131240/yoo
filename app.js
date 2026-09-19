@@ -4015,11 +4015,13 @@ function renderHome(){
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
     const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`;
+    const giftLine=[g.gift,g.recipient?'עבור '+g.recipient:null].filter(Boolean).join(' · ');
     return`<div class="home-row home-row-col" onclick="goToGoalFund(${g.id})">
       <div class="home-goal-top">
         <div class="home-row-icon" style="background:var(--amber-bg);color:var(--amber)">🎯</div>
         <div class="home-row-body">
           <div class="home-row-title">${esc(g.name)}</div>
+          ${giftLine?`<div class="home-row-sub">🎁 ${esc(giftLine)}</div>`:''}
           <div class="home-row-sub">${subText}</div>
         </div>
         ${reached?'<span class="badge badge-green">✅ הושלם</span>':''}
@@ -7127,6 +7129,7 @@ function renderGoalFunds(){
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
     const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()} · ${pct}%`:`נאסף ₪${total.toLocaleString()}`;
+    const giftLine=[g.gift,g.recipient?'עבור '+g.recipient:null].filter(Boolean).join(' · ');
     // Small summary row (same shape as the home page's event/goal rows) —
     // the full "who paid" breakdown and the admin menu used to sit always
     // open on this card; they now live inside openGoalPayModal, opened by
@@ -7137,6 +7140,7 @@ function renderGoalFunds(){
           <div class="home-row-icon" style="background:var(--amber-bg);color:var(--amber)">🎯</div>
           <div class="home-row-body">
             <div class="home-row-title">${esc(g.name)}</div>
+            ${giftLine?`<div class="home-row-sub">🎁 ${esc(giftLine)}</div>`:''}
             <div class="home-row-sub">${subText}</div>
           </div>
           ${reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
