@@ -631,6 +631,37 @@ function sendFundUpdateEmail(famId,changeAmt,desc,note){
   const html=_emailWrap(_eCard(rows),'עדכון ארנק','🏦',_ejsUrl()+'#fund');
   sendEmailNotif([{email:f.email,email2:f.email2,name}],'🏦 עדכון ארנק · ינקלביץ',msg,html);
 }
+// Deposit confirmation for a goal fund — sent for EVERY deposit, manual or
+// wallet-sourced, so the depositing family always hears what their money
+// went toward (who the gift is for, what it is, when the fund has those
+// set). fromWallet additionally frames it as a wallet transfer and reports
+// the new wallet balance, mirroring sendFundUpdateEmail's plain wallet
+// deposit/withdraw email; a manual deposit just confirms the amount and
+// gift details, since the wallet itself never moved.
+function sendGoalDepositEmail(famId,amt,g,fromWallet){
+  const f=getFam(famId);
+  if(!f||(!f.email&&!f.email2)){showToast('⚠️ לא הוגדר מייל למשפחה זו');return;}
+  const key=localStorage.getItem('ejsPublicKey');
+  const svc=localStorage.getItem('ejsServiceId');
+  const tpl=localStorage.getItem('ejsTemplateId');
+  if(!key||!svc||!tpl){showToast('⚠️ הגדרות מייל חסרות — כנס להגדרות משפחות');return;}
+  const name=f.name.replace('משפחת','').trim();
+  const desc=fromWallet?`עבר מהארנק לקופת המטרה "${g.name}"`:`הפקדתם לקופת המטרה "${g.name}"`;
+  const msgLines=[`${desc}: ₪${Math.round(amt).toLocaleString()}`];
+  if(g.recipient)msgLines.push('🎁 עבור: '+g.recipient);
+  if(g.gift)msgLines.push('🎀 מתנה: '+g.gift);
+  const rows=[[desc,`₪${Math.round(amt).toLocaleString()}`]];
+  if(g.recipient)rows.push(['🎁 עבור',_esc(g.recipient)]);
+  if(g.gift)rows.push(['🎀 מתנה',_esc(g.gift)]);
+  if(fromWallet){
+    const newBal=Math.round(fund.famBalances[String(famId)]||0);
+    msgLines.push('',`יתרתך החדשה בארנק: ₪${newBal.toLocaleString()}`);
+    rows.push(['💰 יתרה חדשה בארנק',`₪${newBal.toLocaleString()}`,true]);
+  }
+  const msg=msgLines.join('\n');
+  const html=_emailWrap(_eCard(rows),'הפקדה לקופת מטרה','🎯',_ejsUrl()+'#fund');
+  sendEmailNotif([{email:f.email,email2:f.email2,name}],'🎯 הפקדה לקופת מטרה · ינקלביץ',msg,html);
+}
 
 function saveLocal(){
   try{
@@ -3617,6 +3648,20 @@ function _pollVisibleQuestions(p,famId){
 // normally, they're just left out of the split and the "who paid"/reminder
 // flows, unlike hiddenFrom which hides the fund's existence entirely.
 const _goalPayers=g=>families.filter(f=>!(g.hiddenFrom||[]).includes(f.id)&&!(g.nonPayers||[]).includes(f.id));
+// Shared by the goal fund's own detail view (goalPayGiftInfo) and its
+// deposit sheet — a small card of whichever gift-detail fields were filled
+// in when the fund was created (all optional), or nothing at all.
+function _goalGiftInfoHtml(g){
+  const rows=[
+    g.recipient?['🎁 מי מקבל',g.recipient]:null,
+    g.gift?['🎀 מה המתנה',g.gift]:null,
+    g.notes?['📝 הערות',g.notes]:null,
+  ].filter(Boolean);
+  if(!rows.length)return'';
+  return`<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px;margin-bottom:12px">
+    ${rows.map(([lbl,val])=>`<div style="font-size:12px;margin-bottom:4px"><span style="color:var(--text2);font-weight:700">${lbl}:</span> <span style="color:var(--text)">${esc(val)}</span></div>`).join('')}
+  </div>`;
+}
 function _fundTxForDisplay(){
   if(_isAdminPage())return fund.transactions;
   const fid=_myFamId();
@@ -6931,7 +6976,8 @@ function addGoalFund(){
   const gift=document.getElementById('goalGift').value.trim();
   const notes=document.getElementById('goalNotes').value.trim();
   goalFunds.push({id:nxtGoal++,name,target,contributions:{},closed:false,archived:false,hiddenFrom:[..._goalHideFamIds],nonPayers:[..._goalNonPayFamIds],recipient:recipient||undefined,gift:gift||undefined,notes:notes||undefined});
-  addNotif('🎯','נוצרה קופה חדשה: '+name,'all',[..._goalHideFamIds],'goalFund',families.filter(f=>!_goalHideFamIds.has(f.id)).map(f=>f.id));
+  const giftInfo=gift?(' — מתנה: '+gift+(recipient?' עבור '+recipient:'')):'';
+  addNotif('🎯','נוצרה קופה חדשה: '+name+giftInfo,'all',[..._goalHideFamIds],'goalFund',families.filter(f=>!_goalHideFamIds.has(f.id)).map(f=>f.id));
   closeGoalForm();
   save();render();
 }
@@ -6946,6 +6992,7 @@ function openGoalDepositSheet(goalId){
   const titleEl=document.getElementById('goalDepositTitle');
   if(titleEl) titleEl.textContent='הפקדה ל"'+g.name+'"';
   document.getElementById('goalDepositFields').innerHTML=`
+    ${_goalGiftInfoHtml(g)}
     <input type="number" min="0" inputmode="numeric" id="goalDepositAmt" placeholder="סכום להפקדה (₪)"
       style="width:100%;border:1.5px solid var(--blue-mid);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;margin-bottom:8px;box-sizing:border-box">
     <div id="goalDepFundLine" style="display:none;align-items:center;background:var(--blue-bg);border-radius:var(--r2);padding:8px 12px;margin-bottom:14px;cursor:pointer" onclick="useFundForGoalDeposit()">
@@ -7015,17 +7062,26 @@ function confirmGoalDeposit(){
   const amt=parseFloat(document.getElementById('goalDepositAmt')?.value)||0;
   if(amt<=0){ alert('נא להזין סכום'); return; }
   const g=goalFunds.find(x=>x.id===_goalDepositGoalId);if(!g)return;
+  const depName=(getFam(_goalDepositFamId)||{}).name?.replace('משפחת','').trim()||'';
   if(_goalDepositFromFund){
     const key=String(_goalDepositFamId);
     const bal=fund.famBalances[key]||0;
     if(bal<amt){alert('אין מספיק יתרה בארנק (₪'+Math.round(bal).toLocaleString()+')');return;}
     fund.famBalances[key]=bal-amt;
-    const name=(getFam(_goalDepositFamId)||{}).name?.replace('משפחת','').trim()||'';
     fund.transactions.push({id:nxtTx++,type:'payout',famId:_goalDepositFamId,amount:amt,
-      desc:'העברה לקופת מטרה · '+g.name+' → '+name,
+      desc:'העברה לקופת מטרה · '+g.name+' → '+depName,
       date:new Date().toLocaleDateString('he-IL')});
   }
   g.contributions[_goalDepositFamId]=(g.contributions[_goalDepositFamId]||0)+amt;
+  // Same "notify + direct email" pairing confirmDeposit() already uses for
+  // plain wallet deposits — the notification center/bell entry (and any
+  // opted-in "email instead of push" family for the 'deposit' category)
+  // gets the gift's own details baked into the text, on top of the direct
+  // confirmation email sendGoalDepositEmail always sends the depositor.
+  const giftInfo=g.gift?(' — מתנה: '+g.gift+(g.recipient?' עבור '+g.recipient:'')):'';
+  const walletNote=_goalDepositFromFund?' (מהארנק)':'';
+  addNotif('🎯',depName+' הפקיד/ה ₪'+Math.round(amt).toLocaleString()+' לקופת "'+g.name+'"'+walletNote+giftInfo,undefined,g.hiddenFrom,'deposit',[_goalDepositFamId]);
+  sendGoalDepositEmail(_goalDepositFamId,amt,g,_goalDepositFromFund);
   closeGoalDepositSheet();
   save();render();
 }
@@ -7120,16 +7176,7 @@ function renderGoalPayModal(){
       ${g.target>0?`<div class="pbar" style="margin:8px 0 2px"><div class="pfill ${pct>=100?'full':'part'}" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text2)">${pct}%</div>`:''}`;
   }
   const giftEl=document.getElementById('goalPayGiftInfo');
-  if(giftEl){
-    const rows=[
-      g.recipient?['🎁 מי מקבל',g.recipient]:null,
-      g.gift?['🎀 מה המתנה',g.gift]:null,
-      g.notes?['📝 הערות',g.notes]:null,
-    ].filter(Boolean);
-    giftEl.innerHTML=rows.length?`<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px;margin-bottom:12px">
-      ${rows.map(([lbl,val])=>`<div style="font-size:12px;margin-bottom:4px"><span style="color:var(--text2);font-weight:700">${lbl}:</span> <span style="color:var(--text)">${esc(val)}</span></div>`).join('')}
-    </div>`:'';
-  }
+  if(giftEl)giftEl.innerHTML=_goalGiftInfoHtml(g);
   const noteEl=document.getElementById('goalPayNote');
   if(noteEl)noteEl.textContent=perFamily>0?'חלוקה שווה: ₪'+perFamily.toLocaleString()+' למשפחה':'לא הוגדר סכום מטרה לקופה הזו — אין לפי מה לחשב חלק שווה';
   document.getElementById('goalPayList').innerHTML=eligible.map(f=>{
