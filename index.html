@@ -1203,18 +1203,6 @@
 
       <div id="goalFundsList" style="margin-bottom:14px"></div>
 
-      <!-- Goal deposit modal -->
-      <div id="goalDepositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1720;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalDepositSheet()">
-        <div id="goalDepositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
-          <div id="goalDepositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
-          <div id="goalDepositFields"></div>
-          <div style="display:flex;gap:8px;margin-top:14px">
-            <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
-            <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
-          </div>
-        </div>
-      </div>
-
       <div style="margin-top:14px">
         <button onclick="toggleFundTx()" id="fundTxToggle" style="width:100%;padding:11px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;text-align:right;display:flex;align-items:center;justify-content:space-between">
           <span>📋 היסטוריית תנועות</span><span id="fundTxArrow">▼</span>
@@ -1243,6 +1231,23 @@
       <div id="goalPayList"></div>
       <div id="goalPayContrib"></div>
       <div id="goalPayMenu" class="edit-only" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Goal deposit modal — kept outside fundDetailOverlay (and as a sibling of
+     goalPayModal, which opens it) for the same reason goalPayModal itself
+     is: a div nested inside fundDetailOverlay's own stacking context can
+     never visually out-rank a sibling top-level modal like goalPayModal,
+     no matter how high its own z-index is set — it would render (and
+     receive clicks) behind it instead of on top. -->
+<div id="goalDepositOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1720;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeGoalDepositSheet()">
+  <div id="goalDepositSheet" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div id="goalDepositTitle" style="font-size:14px;font-weight:700;margin-bottom:12px">הפקדה לקופת מטרה</div>
+    <div id="goalDepositFields"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="fund-dep-btn" style="flex:1;padding:12px" onclick="confirmGoalDeposit()">✓ אשר הפקדה</button>
+      <button onclick="closeGoalDepositSheet()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
     </div>
   </div>
 </div>
