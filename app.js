@@ -8173,9 +8173,11 @@ function evFamTransfers(ev,famId){
     // A 'treasurer' entry didn't actually involve the debtor transferring
     // anything — the treasurer fronted it on their behalf — so it shouldn't
     // show as a completed "out" transfer for them (see evCard's own
-    // dedicated "טרם הוחזר" line + button for that instead).
+    // dedicated "טרם הוחזר" line + button for that instead). The creditor
+    // really did receive the money, but from the treasurer, not the debtor —
+    // label it that way instead of naming the (still-owing) debtor.
     if(isFrom&&s.method!=='treasurer') out.push({dir:'out',pending:false,amt:Math.round(s.amt),other:nm(s.toFid,s.to)});
-    else if(isTo) out.push({dir:'in',pending:false,amt:Math.round(s.amt),other:nm(s.fromFid,s.from)});
+    else if(isTo) out.push({dir:'in',pending:false,amt:Math.round(s.amt),other:s.method==='treasurer'?'הגזבר':nm(s.fromFid,s.from)});
   });
   return out;
 }
