@@ -8173,7 +8173,7 @@ function evCoverLines(ev,fid){
     if(fromWallet>=potPaid-0.5){
       lines.push({t:`הועבר מהארנק ₪${potPaid.toLocaleString()} לקופת האירוע`,a:potPaid});
     } else {
-      lines.push({t:`שילמתם ₪${potPaid.toLocaleString()} מקופת האירוע`,a:potPaid});
+      lines.push({t:`שילמתם ₪${potPaid.toLocaleString()} לקופת האירוע`,a:potPaid});
       if(fromWallet>0.5)lines.push({t:`מתוכם ₪${fromWallet.toLocaleString()} מהארנק`,a:0});
     }
   }
