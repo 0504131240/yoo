@@ -8131,26 +8131,41 @@ function evCoverLines(ev,fid){
   const lines=[];
   const trim=f=>{const g=getFam(f);return g?g.name.replace('משפחת','').trim():'';};
   const byName=n=>ev.participants.find(pid=>{const f=getFam(pid);return f&&f.name.replace('משפחת','').trim()===n;});
+  // Money routed through the event's own pot is split per creditor/depositor
+  // in ev.settled (one 'pot' entry per pairing), which would otherwise list
+  // every single family that happened to share the pot — not useful to this
+  // family, who only cares that it came from the pot. Collapse all of those
+  // into one line each; a genuinely direct (non-pot) transfer still gets its
+  // own line naming the specific family, same as before.
+  let potPaid=0,potReceived=0;
   (ev.settled||[]).forEach(s=>{
     const fromFid=byName(s.from),toFid=byName(s.to),amt=Math.round(s.amt);
     if(fromFid===Number(fid)){
-      const to=toFid!=null?trim(toFid):(s.to||'');
-      if(s.method==='treasurer'){
-        // Only the creditor's side actually resolved — the family itself
-        // hasn't paid anything yet, so this doesn't count toward "covered".
-        lines.push({t:`הגזבר שילם ₪${amt.toLocaleString()}${to?' ל'+to:''} במקומכם — טרם הוחזר לו`,a:0});
-      } else if(s.method==='treasurer-repay'){
-        lines.push({t:`החזרתם לגזבר ₪${amt.toLocaleString()}`,a:amt});
-      } else {
-        const via=s.method==='fund'?'מהארנק':s.method==='pot'?'מקופת האירוע':'ישירות';
-        lines.push({t:`שילמתם ₪${amt.toLocaleString()} ${via}${to?` ל${to}`:''}`,a:amt});
+      if(s.method==='pot'){ potPaid+=amt; }
+      else{
+        const to=toFid!=null?trim(toFid):(s.to||'');
+        if(s.method==='treasurer'){
+          // Only the creditor's side actually resolved — the family itself
+          // hasn't paid anything yet, so this doesn't count toward "covered".
+          lines.push({t:`הגזבר שילם ₪${amt.toLocaleString()}${to?' ל'+to:''} במקומכם — טרם הוחזר לו`,a:0});
+        } else if(s.method==='treasurer-repay'){
+          lines.push({t:`החזרתם לגזבר ₪${amt.toLocaleString()}`,a:amt});
+        } else {
+          const via=s.method==='fund'?'מהארנק':'ישירות';
+          lines.push({t:`שילמתם ₪${amt.toLocaleString()} ${via}${to?` ל${to}`:''}`,a:amt});
+        }
       }
     }
     if(toFid===Number(fid)){
-      const from=fromFid!=null?trim(fromFid):(s.from||'');
-      lines.push({t:`קיבלתם ₪${amt.toLocaleString()}${from?` מ${from}`:''} (מתווסף לחוב)`,a:-amt});
+      if(s.method==='pot'){ potReceived+=amt; }
+      else{
+        const from=fromFid!=null?trim(fromFid):(s.from||'');
+        lines.push({t:`קיבלתם ₪${amt.toLocaleString()}${from?` מ${from}`:''} (מתווסף לחוב)`,a:-amt});
+      }
     }
   });
+  if(potPaid>0.5)lines.push({t:`שילמתם ₪${potPaid.toLocaleString()} מקופת האירוע`,a:potPaid});
+  if(potReceived>0.5)lines.push({t:`קיבלתם ₪${potReceived.toLocaleString()} מקופת האירוע (מתווסף לחוב)`,a:-potReceived});
   const pot=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
   if(pot>0.5)lines.push({t:`הפקדתם לקופת האירוע ₪${pot.toLocaleString()}`,a:pot});
   const sav=Math.round((ev.savingsPaid||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
