@@ -4211,6 +4211,31 @@ function markTransferFromFund(evId, from, fromFid, to, toFid, amt){
     date:new Date().toLocaleDateString('he-IL')});
   save();render();
 }
+// The treasurer personally fronts a pending transfer instead of the debtor
+// family paying it (directly or from their own wallet balance) — e.g. the
+// debtor hasn't paid yet but the creditor needs the money now. The
+// creditor's wallet is credited exactly like markTransferFromFund does,
+// but nothing is drawn from any family's balance; instead fund.deficit
+// tracks how much the shared fund now owes the treasurer back. Supports
+// both a specific event (evId given) and the global "העברות איזון" tool
+// (evId null), mirroring markTransferFromFund's own dual handling.
+function markTransferFromTreasurer(evId, from, fromFid, to, toFid, amt){
+  const ev=evId!=null?events.find(e=>e.id===evId):null;
+  if(evId!=null&&!ev)return;
+  if(ev){
+    if(!ev.settled)ev.settled=[];
+    ev.settled.push({from,fromFid,to,toFid,amt,method:'treasurer'});
+  } else {
+    _distributeGlobalSettle(fromFid,toFid,from,to,amt,'treasurer');
+  }
+  const toKey=String(toFid);
+  fund.famBalances[toKey]=(fund.famBalances[toKey]||0)+amt;
+  fund.transactions.push({id:nxtTx++,type:'deposit',famId:toFid,amount:amt,
+    desc:'קיבלת מהגזבר'+(ev?' עבור "'+ev.name+'"':'')+' (מקדמה, במקום '+from+')',
+    date:new Date().toLocaleDateString('he-IL')});
+  fund.deficit=(fund.deficit||0)+amt;
+  save();render();
+}
 function openPartPayModal(evId,from,fromFid,to,toFid,amt,isFund,fromSettle){
   _ppEvId=evId;_ppFrom=from;_ppFromFid=fromFid;_ppTo=to;_ppToFid=toFid;
   _ppMax=amt;_ppFund=isFund||false;_ppSettle=fromSettle||false;_ppPot=false;
@@ -6825,6 +6850,30 @@ function renderFund(){
   // Main fund balance
   document.getElementById('fundBalAmt').textContent='₪'+mainTotal.toLocaleString();
 
+  // Treasurer deficit — how much the shared fund owes back the treasurer
+  // for transfers they fronted personally (see markTransferFromTreasurer),
+  // instead of drawing on any specific family's own wallet balance.
+  const deficitEl=document.getElementById('treasurerDeficitSection');
+  if(deficitEl){
+    const deficit=Math.round(fund.deficit||0);
+    deficitEl.innerHTML=deficit>0?`<div class="edit-only" style="display:flex;align-items:center;gap:10px;background:var(--amber-bg);border-radius:var(--r2);padding:11px 14px;margin-bottom:8px;cursor:pointer" onclick="openTreasurerDeficitModal()">
+      <span style="font-size:18px;flex-shrink:0">💼</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:var(--amber)">מגיע לגזבר</div>
+        <div style="font-size:11px;color:var(--text2)">שולם מהכיס עבור העברות באירועים — הקש לעדכן</div>
+      </div>
+      <div style="font-size:15px;font-weight:800;color:var(--amber)">₪${deficit.toLocaleString()}</div>
+    </div>
+    <div class="view-only" style="display:flex;align-items:center;gap:10px;background:var(--amber-bg);border-radius:var(--r2);padding:11px 14px;margin-bottom:8px">
+      <span style="font-size:18px;flex-shrink:0">💼</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:var(--amber)">מגיע לגזבר</div>
+        <div style="font-size:11px;color:var(--text2)">שולם מהכיס עבור העברות באירועים</div>
+      </div>
+      <div style="font-size:15px;font-weight:800;color:var(--amber)">₪${deficit.toLocaleString()}</div>
+    </div>`:'';
+  }
+
   const famSumEl=document.getElementById('fundFamSummary');
   if(famSumEl){
     const withBal=families.filter(f=>famFundBal(f.id)>0);
@@ -6887,6 +6936,32 @@ function renderFund(){
       <span class="fund-tx-amt ${isDeposit?'':'neg'}">${isDeposit?'+':'-'}₪${tx.amount.toLocaleString()}</span>
     </div>`;
   }).join('')}</div>`;
+}
+// Admin-only way to record that the treasurer got some (or all) of their
+// fronted money back — outside the app, so there's nothing to draw it
+// from automatically. Just lowers fund.deficit and logs the adjustment.
+function openTreasurerDeficitModal(){
+  if(!editMode)return;
+  const el=document.getElementById('treasurerDeficitAmt');
+  if(el)el.value='';
+  const infoEl=document.getElementById('treasurerDeficitInfo');
+  if(infoEl)infoEl.textContent='מגיע לגזבר כרגע: ₪'+Math.round(fund.deficit||0).toLocaleString();
+  document.getElementById('treasurerDeficitModal').style.display='flex';
+}
+function closeTreasurerDeficitModal(){
+  document.getElementById('treasurerDeficitModal').style.display='none';
+}
+function confirmTreasurerRepay(){
+  const amt=Math.round(parseFloat(document.getElementById('treasurerDeficitAmt')?.value)||0);
+  const current=Math.round(fund.deficit||0);
+  if(amt<=0){alert('נא להזין סכום');return;}
+  if(amt>current){alert('הסכום גבוה ממה שמגיע לגזבר (₪'+current.toLocaleString()+')');return;}
+  fund.deficit=current-amt;
+  fund.transactions.push({id:nxtTx++,type:'payout',famId:null,amount:amt,
+    desc:'החזר לגזבר עבור מקדמות שהוא שילם',
+    date:new Date().toLocaleDateString('he-IL')});
+  closeTreasurerDeficitModal();
+  save();render();
 }
 function addSavingsPotExp(){
   const name=document.getElementById('savExpName')?.value.trim();
@@ -7897,17 +7972,24 @@ function renderGlobalSettleModal(){
       <span style="font-size:13px">👈 <b>${esc(t.from)}</b> מעביר ל<b>${esc(t.to)}</b> ₪${t.amt.toLocaleString()}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
         ${_claimBtn}
+        <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:1.5px solid var(--amber);background:transparent;color:var(--amber);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="markTransferFromTreasurer(null,'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt})" title="הגזבר משלם ל${esc(t.to)} מכיסו, במקום ${esc(t.from)}">💼 שילם הגזבר</button>
         <button class="edit-only" style="padding:6px 12px;border-radius:6px;border:none;background:var(--blue-mid);color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="openPartPayModal(null,'${esc(t.from)}',${t.fromFid},'${esc(t.to)}',${t.toFid},${t.amt},false,true)">✓ שולם</button>
       </div>
     </div>`;
   }).join('');
   const _rowHtml=(icon,badge,from,to,amt)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)"><span style="color:var(--green-mid)">${icon}</span><span><b style="color:var(--text)">${esc(from)}</b> העביר ל<b style="color:var(--text)">${esc(to)}</b> ₪${Math.round(amt).toLocaleString()}</span>${badge}</div>`;
-  const _nonPotBadge=method=>method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>':'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';
+  const _nonPotBadge=method=>method==='fund'?'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:10px">קופה</span>'
+    :method==='treasurer'?'<span style="font-size:10px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:10px">גזבר</span>'
+    :'<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:1px 6px;border-radius:10px">ישיר</span>';
   // Combine legacy event-less records with the per-event entries new global
   // settlements are now written into (tagged `global:true` by
   // _distributeGlobalSettle) so this history list still shows them all.
   const _globalDoneEntries=[...(globalSettled||[]),...events.flatMap(ev=>(ev.settled||[]).filter(s=>s.global))];
-  const doneRowsList=_globalDoneEntries.map(s=>_rowHtml(s.method==='fund'?'🏦':'✓',_nonPotBadge(s.method),s.from,s.to,s.amt));
+  const doneRowsList=_globalDoneEntries.map(s=>_rowHtml(
+    s.method==='fund'?'🏦':s.method==='treasurer'?'💼':'✓',
+    _nonPotBadge(s.method),
+    s.method==='treasurer'?'הגזבר':s.from,
+    s.to,s.amt));
   const doneRows=doneRowsList.length?
     `<div style="padding:12px 16px 4px;border-top:2px solid var(--border);margin-top:${transfers.length?'8':'0'}px">
       <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">✅ בוצעו</div>
@@ -7955,9 +8037,11 @@ function evSettleLines(ev,famId){
     const sFrom=(getFam(s.fromFid)||{}).name?(getFam(s.fromFid).name.replace('משפחת','').trim()):s.from;
     if(isFrom){
       if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} שולמו מהארנק ל${sTo}`);
+      else if(s.method==='treasurer') lines.push(`הגזבר שילם ל${sTo} ₪${s.amt.toLocaleString()} במקומכם`);
       else lines.push(`העברה ישירה של ₪${s.amt.toLocaleString()} ל${sTo}`);
     } else if(isTo){
       if(s.method==='fund') lines.push(`₪${s.amt.toLocaleString()} מ${sFrom} – הועברו לארנק`);
+      else if(s.method==='treasurer') lines.push(`קיבלתם ₪${s.amt.toLocaleString()} מהגזבר לארנק שלכם`);
       else lines.push(`קיבלתם ₪${s.amt.toLocaleString()} ישירות מ${sFrom}`);
     }
   });
@@ -7975,9 +8059,13 @@ function evCoverLines(ev,fid){
   (ev.settled||[]).forEach(s=>{
     const fromFid=byName(s.from),toFid=byName(s.to),amt=Math.round(s.amt);
     if(fromFid===Number(fid)){
-      const via=s.method==='fund'?'מהארנק':s.method==='pot'?'מקופת האירוע':'ישירות';
       const to=toFid!=null?trim(toFid):(s.to||'');
-      lines.push({t:`שילמתם ₪${amt.toLocaleString()} ${via}${to?` ל${to}`:''}`,a:amt});
+      if(s.method==='treasurer'){
+        lines.push({t:`הגזבר שילם ₪${amt.toLocaleString()}${to?' ל'+to:''} במקומכם`,a:amt});
+      } else {
+        const via=s.method==='fund'?'מהארנק':s.method==='pot'?'מקופת האירוע':'ישירות';
+        lines.push({t:`שילמתם ₪${amt.toLocaleString()} ${via}${to?` ל${to}`:''}`,a:amt});
+      }
     }
     if(toFid===Number(fid)){
       const from=fromFid!=null?trim(fromFid):(s.from||'');
