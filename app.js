@@ -8164,7 +8164,19 @@ function evCoverLines(ev,fid){
       }
     }
   });
-  if(potPaid>0.5)lines.push({t:`שילמתם ₪${potPaid.toLocaleString()} מקופת האירוע`,a:potPaid});
+  if(potPaid>0.5){
+    // Trace this back to its real origin: if their pot deposit was itself
+    // funded from the wallet, say so — "paid from the pot" is technically
+    // true but hides that no separate cash ever changed hands, just a
+    // wallet-to-pot transfer that then covered their share.
+    const fromWallet=Math.min(evPotFromWallet(ev,fid),potPaid);
+    if(fromWallet>=potPaid-0.5){
+      lines.push({t:`הועבר מהארנק ₪${potPaid.toLocaleString()} לקופת האירוע`,a:potPaid});
+    } else {
+      lines.push({t:`שילמתם ₪${potPaid.toLocaleString()} מקופת האירוע`,a:potPaid});
+      if(fromWallet>0.5)lines.push({t:`מתוכם ₪${fromWallet.toLocaleString()} מהארנק`,a:0});
+    }
+  }
   if(potReceived>0.5)lines.push({t:`קיבלתם ₪${potReceived.toLocaleString()} מקופת האירוע (מתווסף לחוב)`,a:-potReceived});
   const pot=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
   if(pot>0.5)lines.push({t:`הפקדתם לקופת האירוע ₪${pot.toLocaleString()}`,a:pot});
