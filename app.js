@@ -2999,7 +2999,6 @@ const NOTIF_EMAIL_CATS=[
   {id:'expense',ico:'💳',label:'הוצאה חדשה'},
   {id:'event',ico:'📅',label:'אירוע חדש או סגירת אירוע'},
   {id:'deposit',ico:'💰',label:'הפקדה חדשה'},
-  {id:'familyEdit',ico:'👪',label:'עריכת פרטי משפחה'},
   {id:'goalFund',ico:'🎯',label:'קופה חדשה למטרה'},
   {id:'siteUpdate',ico:'🆕',label:'עדכון או תכונה חדשה באתר'},
 ];
@@ -6525,6 +6524,10 @@ function addNotif(icon,text,pushTarget,hiddenFromFamIds,kind,relatedFamIds){
 // this notification's own relatedFamIds — same relatedFamIds the push
 // side's 'mine' tier already filters by.
 function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds){
+  // A family editing their own info is admin-only news (see addNotif's
+  // pushTarget:'admin' calls) — never emailed out to other families, even
+  // for someone who opted into this category back when it was still offered.
+  if(kind==='familyEdit')return[];
   const hidden=new Set(hiddenFromFamIds||[]);
   const optedOutSlots=[];
   families.forEach(f=>{
