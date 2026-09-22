@@ -3549,25 +3549,32 @@ function renderCalEvList(hebDays,bdayByDate,yahrByDate,annivByDate){
     }
     if(type==='yahrzeit'){
       const years=item.hebYear?(_currentHebYear()-item.hebYear):null;
+      // A yahrzeit entry isn't tied to any one family (see allYahrzeits) —
+      // admin-only, same as every other edit/delete action in this list.
+      const canEdit=editMode;
       return`<div class="fh-cal-ev">
         <div class="fh-cal-ev-dot" style="background:#555"></div>
         <div class="fh-cal-ev-info">
           <div class="fh-cal-ev-name">🕯️ ${esc(item.name)} — יארצייט${years!=null&&years>0?' ('+years+' שנים)':''}</div>
           <div class="fh-cal-ev-date">${lbl}</div>
         </div>
-        <button onclick="openYahrzeitModal(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>
-        <button onclick="deleteYahrzeit(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>
+        ${canEdit?`<button onclick="openYahrzeitModal(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>
+        <button onclick="deleteYahrzeit(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5">✕</button>`:''}
       </div>`;
     }
     if(type==='anniversary'){
       const years=item.hebYear?(_currentHebYear()-item.hebYear):null;
+      // item.id is the family's own id (see allAnniversaries) — this button
+      // opens the FULL family edit sheet, not just the anniversary, so it's
+      // admin-or-own-family only, same as everywhere else that link appears.
+      const canEdit=editMode||_myFamId()===item.id;
       return`<div class="fh-cal-ev">
         <div class="fh-cal-ev-dot" style="background:#B8860B"></div>
         <div class="fh-cal-ev-info">
           <div class="fh-cal-ev-name">💍 ${esc(item.name)} — יום נישואין${years!=null&&years>0?' ('+years+' שנים)':''}</div>
           <div class="fh-cal-ev-date">${lbl}</div>
         </div>
-        <button onclick="openFamEditSheet(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>
+        ${canEdit?`<button onclick="openFamEditSheet(${item.id})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px;opacity:.5">✏️</button>`:''}
       </div>`;
     }
     return`<div class="fh-cal-ev">
