@@ -4067,12 +4067,19 @@ function renderHome(){
   });
   // An unpaid goal-fund share is a debt too — fold it in the same way an
   // event debt is, so a family that's "מסודר" on every event but still
-  // owes a goal fund doesn't wrongly show as fully settled.
+  // owes a goal fund doesn't wrongly show as fully settled. An event debt
+  // the treasurer already fronted stays counted here on its own (evAdjBalance
+  // deliberately doesn't credit the debtor for it), but a goal-fund advance
+  // DOES credit g.contributions immediately (so the fund total is real money
+  // for payout) — so without this it would silently disappear from the
+  // family's net the moment the treasurer fronts it. Add it back explicitly.
   const openGoalsForNet=goalFunds.filter(g=>!g.closed&&!g.archived);
   families.forEach(f=>{
     openGoalsForNet.forEach(g=>{
       const owed=_goalOwedAmt(g,f.id);
       if(owed>0.5)famNet[f.id]=(famNet[f.id]||0)-owed;
+      const tOwed=goalTreasurerOwed(g,f.id);
+      if(tOwed>0.5)famNet[f.id]=(famNet[f.id]||0)-tOwed;
     });
   });
   const famStripEl=document.getElementById('homeFamStrip');
