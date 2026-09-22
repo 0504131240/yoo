@@ -5376,7 +5376,7 @@ function setKidGender(g){
 function updateKidDateBtn(){
   const btn=document.getElementById(_dateBtnTargetId);if(!btn)return;
   if(_kidPickedDate)btn.textContent='📅 '+HEB_DAY_NUM[_kidPickedDate.hebDay]+' ב'+_kidPickedDate.hebMonth+' '+toHebrewYear(_kidPickedDate.hebYear);
-  else if(_kidLegacyDate)btn.textContent='📅 '+HEB_DAY_NUM[_kidLegacyDate.hebDay]+' ב'+_kidLegacyDate.hebMonth+' (בחר שוב כדי להוסיף שנה)';
+  else if(_kidLegacyDate)btn.textContent='📅 '+HEB_DAY_NUM[_kidLegacyDate.hebDay]+' ב'+_kidLegacyDate.hebMonth+' (לחצו לבחירת שנה)';
   else btn.textContent=_dateBtnPlaceholder;
 }
 function clearKidDate(){
@@ -5385,8 +5385,25 @@ function clearKidDate(){
   if(_dateBtnTargetId==='famAnniversaryDateBtn'){_famAnniversaryPending=null;renderFamPeopleGrid();}
   updateKidDateBtn();
 }
+// A legacy day+month (no year yet) has no Gregorian date of its own — pick
+// whichever nearby Hebrew year actually has that day/month combo (not every
+// year does, e.g. day 30 of a month that's sometimes 29 days) just to land
+// the picker's calendar view on the right month, so adding the year doesn't
+// also force re-finding the day from scratch.
+function _legacyDateRefDate(legacy){
+  const y0=parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(new Date()));
+  for(let dy=0;dy<=3;dy++){
+    for(const y of dy===0?[y0]:[y0-dy,y0+dy]){
+      const d=hebrewToGregorian(y,legacy.hebMonth,legacy.hebDay);
+      if(d)return d;
+    }
+  }
+  return null;
+}
 function openKidDatePicker(){
-  _kidPickerRefDate=_kidPickedDate?(hebrewToGregorian(_kidPickedDate.hebYear,_kidPickedDate.hebMonth,_kidPickedDate.hebDay)||new Date()):new Date();
+  _kidPickerRefDate=_kidPickedDate?(hebrewToGregorian(_kidPickedDate.hebYear,_kidPickedDate.hebMonth,_kidPickedDate.hebDay)||new Date())
+    :_kidLegacyDate?(_legacyDateRefDate(_kidLegacyDate)||new Date())
+    :new Date();
   closeKidYearList();
   renderKidDatePicker();
   document.getElementById('kidDatePickerModal').style.display='flex';
@@ -5430,6 +5447,19 @@ function renderKidYearList(){
   el.innerHTML=html;
 }
 function jumpKidPickerYear(y){
+  // Picking a year while the day/month is already known (editing an
+  // existing date, or filling in the missing year on a legacy one) really
+  // means "just change the year" — commit that same day/month in the new
+  // year immediately instead of making them re-find and re-click the day
+  // cell they already had. Falls through to a plain navigate when that
+  // day doesn't exist in the target year (e.g. it's the 30th of a month
+  // that isn't always 30 days) so they can pick the nearest valid day.
+  const knownDay=_kidPickedDate?{hebDay:_kidPickedDate.hebDay,hebMonth:_kidPickedDate.hebMonth}
+    :_kidLegacyDate?{hebDay:_kidLegacyDate.hebDay,hebMonth:_kidLegacyDate.hebMonth}:null;
+  if(knownDay&&hebrewToGregorian(y,knownDay.hebMonth,knownDay.hebDay)){
+    selectKidPickerDay(y,knownDay.hebMonth,knownDay.hebDay);
+    return;
+  }
   const days=getHebMonthDays(_kidPickerRefDate);
   const curMonthName=new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{month:'long'}).format(days[0]);
   const target=hebrewToGregorian(y,curMonthName,1)||hebrewToGregorian(y,'תשרי',1);
