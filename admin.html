@@ -1245,16 +1245,23 @@
 </div>
 
 <!-- Treasurer deficit repayment — records money the treasurer got back
-     outside the app for advances they fronted (markTransferFromTreasurer). -->
+     outside the app for advances they fronted (markTransferFromTreasurer /
+     markGoalContribFromTreasurer). Shows the itemized per-family/per-source
+     breakdown first (each with its own repay button), then a manual/general
+     repay for money that isn't tied to any specific line. -->
 <div id="treasurerDeficitModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1720;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeTreasurerDeficitModal()">
-  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:360px;box-sizing:border-box">
-    <div style="font-size:14px;font-weight:700;margin-bottom:6px">💼 החזר לגזבר</div>
+  <div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:380px;max-height:85vh;overflow-y:auto;box-sizing:border-box">
+    <div style="font-size:14px;font-weight:700;margin-bottom:6px">💼 מגיע לגזבר</div>
     <div id="treasurerDeficitInfo" style="font-size:12px;color:var(--text2);margin-bottom:12px"></div>
-    <input type="number" min="0" inputmode="numeric" id="treasurerDeficitAmt" placeholder="כמה הוחזר לגזבר (₪)"
-      style="width:100%;border:1.5px solid var(--amber);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
-    <div style="display:flex;gap:8px;margin-top:14px">
-      <button style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--amber);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="confirmTreasurerRepay()">✓ אשר החזר</button>
-      <button onclick="closeTreasurerDeficitModal()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">ביטול</button>
+    <div id="treasurerDebtsList" style="margin-bottom:12px"></div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">החזר כללי (לא משויך לסעיף מסוים)</div>
+      <input type="number" min="0" inputmode="numeric" id="treasurerDeficitAmt" placeholder="כמה הוחזר לגזבר (₪)"
+        style="width:100%;border:1.5px solid var(--amber);border-radius:var(--r2);padding:12px;font-size:18px;font-family:var(--font);background:var(--bg);color:var(--text);direction:ltr;text-align:center;box-sizing:border-box">
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button style="flex:1;padding:12px;border-radius:var(--r2);border:none;background:var(--amber);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer" onclick="confirmTreasurerRepay()">✓ אשר החזר</button>
+        <button onclick="closeTreasurerDeficitModal()" style="flex:1;padding:12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--text)">סגור</button>
+      </div>
     </div>
   </div>
 </div>

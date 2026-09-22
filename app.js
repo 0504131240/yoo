@@ -670,6 +670,10 @@ function sendGoalDepositEmail(famId,amt,g,fromWallet){
 }
 // The reverse of sendGoalDepositEmail — the fund's collected money is paid
 // OUT to the family who already bought the gift, landing in their wallet.
+// The transferred amount is already net of the recipient's own share (they
+// were exempted from paying it — see _goalOwedAmt) — this spells that out
+// explicitly rather than just showing the raw total, so it doesn't read as
+// if their own contribution was somehow missing from it.
 function sendGoalPayoutEmail(famId,amt,g){
   const f=getFam(famId);
   if(!f||(!f.email&&!f.email2))return;
@@ -678,13 +682,21 @@ function sendGoalPayoutEmail(famId,amt,g){
   const tpl=localStorage.getItem('ejsTemplateId');
   if(!key||!svc||!tpl)return;
   const name=f.name.replace('משפחת','').trim();
-  const desc=`עבר לארנק שלכם מקופת המטרה "${g.name}"`;
+  const eligible=_goalPayers(g);
+  const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
+  const desc=`הועבר לארנק שלכם עבור המתנה שרכשתם`;
   const newBal=Math.round(fund.famBalances[String(famId)]||0);
-  const msgLines=[`${desc}: ₪${Math.round(amt).toLocaleString()}`];
+  const msgLines=[`${desc}: ₪${Math.round(amt).toLocaleString()}`,'🎯 קופה: '+g.name];
   if(g.gift)msgLines.push('🎀 מתנה: '+g.gift);
+  if(g.recipient)msgLines.push('🎁 עבור: '+g.recipient);
+  if(g.notes)msgLines.push('📝 '+g.notes);
+  if(perFamily>0)msgLines.push('💳 בניכוי החלק שלכם במתנה: ₪'+perFamily.toLocaleString());
   msgLines.push('',`יתרתכם החדשה בארנק: ₪${newBal.toLocaleString()}`);
-  const rows=[[desc,`₪${Math.round(amt).toLocaleString()}`]];
+  const rows=[[desc,`₪${Math.round(amt).toLocaleString()}`],['🎯 קופה',_esc(g.name)]];
   if(g.gift)rows.push(['🎀 מתנה',_esc(g.gift)]);
+  if(g.recipient)rows.push(['🎁 עבור',_esc(g.recipient)]);
+  if(g.notes)rows.push(['📝 הערות',_esc(g.notes)]);
+  if(perFamily>0)rows.push(['💳 בניכוי החלק שלכם',`₪${perFamily.toLocaleString()}`]);
   rows.push(['💰 יתרה חדשה בארנק',`₪${newBal.toLocaleString()}`,true]);
   const msg=msgLines.join('\n');
   const html=_emailWrap(_eCard(rows),'העברה מקופת מטרה','💰',_ejsUrl()+'#fund');
@@ -3730,7 +3742,13 @@ const _goalPayers=g=>families.filter(f=>!(g.hiddenFrom||[]).includes(f.id)&&!(g.
 // so it doesn't default to the family's ENTIRE wallet balance regardless
 // of what the fund actually still needs from them.
 function _goalOwedAmt(g,famId){
+  // A family that already bought the gift itself owes nothing further —
+  // and deliberately isn't removed from the payer pool for this (see
+  // renderGoalPayModal), so everyone ELSE's per-family share stays exactly
+  // what it would've been regardless of who bought the gift.
+  if(famId===g.boughtBy)return 0;
   const eligible=_goalPayers(g);
+  if(!eligible.some(f=>f.id===famId))return 0;
   const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
   if(perFamily<=0)return 0;
   return Math.max(0,perFamily-(g.contributions[famId]||0));
@@ -4034,6 +4052,16 @@ function renderHome(){
     const bal=evAdjBalance(ev);
     ev.participants.forEach(fid=>{ const b=bal[fid]||0; if(Math.abs(b)>0.5) famNet[fid]=(famNet[fid]||0)+b; });
   });
+  // An unpaid goal-fund share is a debt too — fold it in the same way an
+  // event debt is, so a family that's "מסודר" on every event but still
+  // owes a goal fund doesn't wrongly show as fully settled.
+  const openGoalsForNet=goalFunds.filter(g=>!g.closed&&!g.archived);
+  families.forEach(f=>{
+    openGoalsForNet.forEach(g=>{
+      const owed=_goalOwedAmt(g,f.id);
+      if(owed>0.5)famNet[f.id]=(famNet[f.id]||0)-owed;
+    });
+  });
   const famStripEl=document.getElementById('homeFamStrip');
   famStripEl.innerHTML=families.length?`
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">👥 משפחות</div>
@@ -4101,6 +4129,7 @@ function renderHome(){
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
+    const remaining=g.target>0?Math.max(0,Math.round(g.target-total)):0;
     const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`;
     const giftLine=[g.gift,g.recipient?'עבור '+g.recipient:null].filter(Boolean).join(' · ');
     return`<div class="home-row home-row-col" onclick="goToGoalFund(${g.id})">
@@ -4111,7 +4140,7 @@ function renderHome(){
           ${giftLine?`<div class="home-row-sub">🎁 ${esc(giftLine)}</div>`:''}
           <div class="home-row-sub">${subText}</div>
         </div>
-        ${reached?'<span class="badge badge-green">✅ הושלם</span>':''}
+        ${reached?'<span class="badge badge-green">✅ הושלם</span>':remaining>0?`<span class="badge badge-amber">חוב ₪${remaining.toLocaleString()}</span>`:''}
       </div>
       ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
     </div>`;
@@ -4363,6 +4392,13 @@ function markTreasurerRepaid(evId,famId){
     date:new Date().toLocaleDateString('he-IL')});
   save();render();
   if(ev.closed){const nb=evAdjBalance(ev)[famId]||0;if(nb>=-0.5)_sendCloseEvEmailOne(ev,famId);}
+  _refreshTreasurerDeficitModalIfOpen();
+}
+// Keeps the itemized deficit list current if the admin repays several
+// lines in a row without closing the modal between clicks.
+function _refreshTreasurerDeficitModalIfOpen(){
+  const modal=document.getElementById('treasurerDeficitModal');
+  if(modal&&modal.style.display==='flex')renderTreasurerDeficitModal();
 }
 function openPartPayModal(evId,from,fromFid,to,toFid,amt,isFund,fromSettle){
   _ppEvId=evId;_ppFrom=from;_ppFromFid=fromFid;_ppTo=to;_ppToFid=toFid;
@@ -7035,7 +7071,7 @@ function renderFund(){
       <span style="font-size:18px;flex-shrink:0">💼</span>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700;color:var(--amber)">מגיע לגזבר</div>
-        <div style="font-size:11px;color:var(--text2)">שולם מהכיס עבור העברות באירועים — הקש לעדכן</div>
+        <div style="font-size:11px;color:var(--text2)">שולם מהכיס עבור אירועים וקופות מטרה — הקש לפירוט</div>
       </div>
       <div style="font-size:15px;font-weight:800;color:var(--amber)">₪${deficit.toLocaleString()}</div>
     </div>
@@ -7043,7 +7079,7 @@ function renderFund(){
       <span style="font-size:18px;flex-shrink:0">💼</span>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700;color:var(--amber)">מגיע לגזבר</div>
-        <div style="font-size:11px;color:var(--text2)">שולם מהכיס עבור העברות באירועים</div>
+        <div style="font-size:11px;color:var(--text2)">שולם מהכיס עבור אירועים וקופות מטרה</div>
       </div>
       <div style="font-size:15px;font-weight:800;color:var(--amber)">₪${deficit.toLocaleString()}</div>
     </div>`:'';
@@ -7112,16 +7148,53 @@ function renderFund(){
     </div>`;
   }).join('')}</div>`;
 }
+// Every outstanding treasurer advance, itemized by who owes it and what for
+// — combines event-side fronts (evTreasurerOwed) and goal-fund-side fronts
+// (goalTreasurerOwed) into one flat list for the deficit modal.
+function allTreasurerDebts(){
+  const list=[];
+  events.forEach(ev=>{
+    families.forEach(f=>{
+      const owed=Math.round(evTreasurerOwed(ev,f.id));
+      if(owed>0.5)list.push({famId:f.id,famName:f.name.replace('משפחת','').trim(),amt:owed,source:'event',sourceId:ev.id,sourceName:ev.name});
+    });
+  });
+  goalFunds.forEach(g=>{
+    families.forEach(f=>{
+      const owed=Math.round(goalTreasurerOwed(g,f.id));
+      if(owed>0.5)list.push({famId:f.id,famName:f.name.replace('משפחת','').trim(),amt:owed,source:'goal',sourceId:g.id,sourceName:g.name});
+    });
+  });
+  return list;
+}
 // Admin-only way to record that the treasurer got some (or all) of their
-// fronted money back — outside the app, so there's nothing to draw it
-// from automatically. Just lowers fund.deficit and logs the adjustment.
+// fronted money back. The itemized list at the top repays a specific
+// family+source line exactly (markTreasurerRepaid/markGoalTreasurerRepaid);
+// the manual amount below is for money that isn't tied to any one of
+// those — outside the app, so there's nothing to draw it from
+// automatically. Either way it just lowers fund.deficit and logs it.
 function openTreasurerDeficitModal(){
   if(!editMode)return;
+  renderTreasurerDeficitModal();
+  document.getElementById('treasurerDeficitModal').style.display='flex';
+}
+function renderTreasurerDeficitModal(){
   const el=document.getElementById('treasurerDeficitAmt');
   if(el)el.value='';
   const infoEl=document.getElementById('treasurerDeficitInfo');
-  if(infoEl)infoEl.textContent='מגיע לגזבר כרגע: ₪'+Math.round(fund.deficit||0).toLocaleString();
-  document.getElementById('treasurerDeficitModal').style.display='flex';
+  if(infoEl)infoEl.textContent='מגיע לגזבר כרגע (סה"כ): ₪'+Math.round(fund.deficit||0).toLocaleString();
+  const listEl=document.getElementById('treasurerDebtsList');
+  if(listEl){
+    const debts=allTreasurerDebts();
+    listEl.innerHTML=debts.length?debts.map(d=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r2);border:1px solid var(--border);margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">${esc(d.famName)}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:1px">${d.source==='event'?'📅':'🎯'} ${esc(d.sourceName)}</div>
+      </div>
+      <div style="font-size:13px;font-weight:800;color:var(--amber);flex-shrink:0">₪${d.amt.toLocaleString()}</div>
+      <button onclick="${d.source==='event'?`markTreasurerRepaid(${d.sourceId},${d.famId})`:`markGoalTreasurerRepaid(${d.sourceId},${d.famId})`}" style="border:1px solid var(--amber);border-radius:8px;background:none;color:var(--amber);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;padding:5px 9px;flex-shrink:0">✓ הוחזר</button>
+    </div>`).join(''):`<div style="font-size:12px;color:var(--text2);text-align:center;padding:8px 0">אין חובות פרטניים רשומים</div>`;
+  }
 }
 function closeTreasurerDeficitModal(){
   document.getElementById('treasurerDeficitModal').style.display='none';
@@ -7399,6 +7472,7 @@ function renderGoalFunds(){
     const total=goalTotal(g);
     const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
     const reached=g.target>0&&total>=g.target;
+    const remaining=g.target>0?Math.max(0,Math.round(g.target-total)):0;
     const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()} · ${pct}%`:`נאסף ₪${total.toLocaleString()}`;
     const giftLine=[g.gift,g.recipient?'עבור '+g.recipient:null].filter(Boolean).join(' · ');
     // Small summary row (same shape as the home page's event/goal rows) —
@@ -7414,7 +7488,7 @@ function renderGoalFunds(){
             ${giftLine?`<div class="home-row-sub">🎁 ${esc(giftLine)}</div>`:''}
             <div class="home-row-sub">${subText}</div>
           </div>
-          ${g.transferred?'<span class="badge badge-green">✅ הועבר</span>':g.boughtBy?'<span class="badge badge-amber">🛍️ נקנה</span>':reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
+          ${g.transferred?'<span class="badge badge-green">✅ הועבר</span>':g.boughtBy?'<span class="badge badge-amber">🛍️ נקנה</span>':reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':remaining>0?`<span class="badge badge-amber">חוב ₪${remaining.toLocaleString()}</span>`:''}
         </div>
         ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
       </div>
@@ -7456,18 +7530,30 @@ function renderGoalPayModal(){
   if(giftEl)giftEl.innerHTML=_goalGiftInfoHtml(g);
   const noteEl=document.getElementById('goalPayNote');
   if(noteEl)noteEl.textContent=perFamily>0?'חלוקה שווה: ₪'+perFamily.toLocaleString()+' למשפחה':'לא הוגדר סכום מטרה לקופה הזו — אין לפי מה לחשב חלק שווה';
-  document.getElementById('goalPayList').innerHTML=eligible.map(f=>{
+  // A family that already bought the gift is excluded from this list (they
+  // owe nothing — see _goalOwedAmt), but NOT from `eligible` itself, so
+  // perFamily above still reflects the original full split.
+  document.getElementById('goalPayList').innerHTML=eligible.filter(f=>f.id!==g.boughtBy).map(f=>{
     const paid=perFamily>0&&(g.contributions[f.id]||0)>=perFamily;
-    return`<div class="edit-only" onclick="toggleGoalPaid(${f.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${paid?'var(--green-mid)':'var(--border)'};margin-bottom:6px;cursor:pointer;box-sizing:border-box;background:${paid?'var(--green-bg)':'transparent'}">
-      <span style="font-size:18px;flex-shrink:0">${paid?'✅':'⬜'}</span>
-      ${famAva(f, 32, 'flex-shrink:0')}
-      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div></div>
+    const name=f.name.replace('משפחת','').trim();
+    // The treasurer can front an unpaid family's share so the fund reaches
+    // its target (and can be paid out to the gift-buyer) without waiting
+    // for everyone to actually pay — same "advance, track as deficit"
+    // mechanism as markTransferFromTreasurer for events.
+    const treasurerBtn=!paid?`<button onclick="event.stopPropagation();markGoalContribFromTreasurer(${g.id},${f.id})" title="הגזבר משלם עבור ${esc(name)}" style="border:1px solid var(--amber);border-radius:8px;background:none;color:var(--amber);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;padding:3px 7px;flex-shrink:0">💼</button>`:'';
+    return`<div class="edit-only" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${paid?'var(--green-mid)':'var(--border)'};margin-bottom:6px;box-sizing:border-box;background:${paid?'var(--green-bg)':'transparent'}">
+      <div onclick="toggleGoalPaid(${f.id})" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer">
+        <span style="font-size:18px;flex-shrink:0">${paid?'✅':'⬜'}</span>
+        ${famAva(f, 32, 'flex-shrink:0')}
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(name)}</div></div>
+      </div>
+      ${treasurerBtn}
       <div style="font-size:13px;font-weight:700;color:${paid?'var(--green-mid)':'var(--text2)'}">₪${perFamily.toLocaleString()}</div>
     </div>
     <div class="view-only" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${paid?'var(--green-mid)':'var(--border)'};margin-bottom:6px;box-sizing:border-box;background:${paid?'var(--green-bg)':'transparent'}">
       <span style="font-size:18px;flex-shrink:0">${paid?'✅':'⬜'}</span>
       ${famAva(f, 32, 'flex-shrink:0')}
-      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(name)}</div></div>
       <div style="font-size:13px;font-weight:700;color:${paid?'var(--green-mid)':'var(--text2)'}">₪${perFamily.toLocaleString()}</div>
     </div>`;
   }).join('');
@@ -7569,6 +7655,9 @@ function markGoalBought(famId){
   if(!editMode)return;
   const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g)return;
   g.boughtBy=famId;
+  // Deliberately NOT added to g.nonPayers — everyone else's equal share
+  // must stay exactly what it was (see _goalOwedAmt/renderGoalPayModal),
+  // not get recalculated over a smaller payer pool.
   _goalBoughtPickerOpen=false;
   save();render();
   renderGoalPayModal();
@@ -7603,6 +7692,61 @@ function confirmGoalPayout(){
   sendGoalPayoutEmail(g.boughtBy,amt,g);
   save();render();
   renderGoalPayModal();
+}
+// How much of THIS family's contribution to THIS goal fund the treasurer
+// fronted and is still outstanding — mirrors evTreasurerOwed's own
+// running-total pattern (a log of 'treasurer'/'treasurer-repay' entries)
+// so the same "itemized debts to the treasurer" view can read both.
+function goalTreasurerOwed(g,famId){
+  let owed=0;
+  (g.treasurerLog||[]).forEach(e=>{
+    if(e.famId!==famId)return;
+    if(e.method==='treasurer')owed+=e.amt;
+    else if(e.method==='treasurer-repay')owed-=e.amt;
+  });
+  return Math.max(0,owed);
+}
+// The treasurer personally covers a family's still-unpaid share so the fund
+// can be paid out to the gift-buyer without waiting for every family to
+// actually pay — the goal-fund equivalent of markTransferFromTreasurer for
+// events. The family's contribution is credited immediately (as if they'd
+// paid), nothing is drawn from any wallet, and fund.deficit tracks the
+// advance the same way an event-side treasurer front does.
+function markGoalContribFromTreasurer(goalId,famId){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
+  const owed=_goalOwedAmt(g,famId);
+  if(owed<=0)return;
+  const f=getFam(famId);if(!f)return;
+  const name=f.name.replace('משפחת','').trim();
+  if(!confirm('הגזבר ישלם ₪'+owed.toLocaleString()+' עבור '+name+' בקופת "'+g.name+'"?'))return;
+  g.contributions[famId]=(g.contributions[famId]||0)+owed;
+  if(!g.treasurerLog)g.treasurerLog=[];
+  g.treasurerLog.push({famId,amt:owed,method:'treasurer',date:new Date().toLocaleDateString('he-IL')});
+  fund.deficit=(fund.deficit||0)+owed;
+  addNotif('💼',name+' — הגזבר שילם ₪'+owed.toLocaleString()+' עבורה בקופת "'+g.name+'" (מקדמה, טרם הוחזר)',undefined,g.hiddenFrom,'deposit',[famId]);
+  save();render();
+  renderGoalPayModal();
+}
+// The family actually pays the treasurer back for a goal-fund advance —
+// same idea as markTreasurerRepaid for events, just against g.treasurerLog
+// instead of ev.settled.
+function markGoalTreasurerRepaid(goalId,famId){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===goalId);if(!g)return;
+  const owed=goalTreasurerOwed(g,famId);
+  if(owed<=0)return;
+  const f=getFam(famId);if(!f)return;
+  const name=f.name.replace('משפחת','').trim();
+  if(!confirm(name+' החזירה לגזבר ₪'+owed.toLocaleString()+' עבור קופת "'+g.name+'"?'))return;
+  if(!g.treasurerLog)g.treasurerLog=[];
+  g.treasurerLog.push({famId,amt:owed,method:'treasurer-repay',date:new Date().toLocaleDateString('he-IL')});
+  fund.deficit=Math.max(0,(fund.deficit||0)-owed);
+  fund.transactions.push({id:nxtTx++,type:'payout',famId:null,amount:owed,
+    desc:name+' החזירה לגזבר עבור קופת מטרה "'+g.name+'"',
+    date:new Date().toLocaleDateString('he-IL')});
+  save();render();
+  _refreshTreasurerDeficitModalIfOpen();
 }
 // Popup for picking which families are exempt from paying their share of
 // this goal fund while still seeing it normally — separate from
