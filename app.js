@@ -3753,6 +3753,19 @@ function _goalOwedAmt(g,famId){
   if(perFamily<=0)return 0;
   return Math.max(0,perFamily-(g.contributions[famId]||0));
 }
+// Once a family is marked as having bought the gift itself, their own equal
+// share is permanently exempted (see _goalOwedAmt) — so the fund can never
+// actually collect g.target itself, only target-minus-their-share. This is
+// purely a DISPLAY figure (progress bar / "collected out of" / reached%),
+// never used for the real perFamily split, which must keep using the full
+// g.target so everyone else's share stays exactly what it always was.
+function _goalDisplayTarget(g){
+  if(!g.boughtBy||!g.target)return g.target;
+  const eligible=_goalPayers(g);
+  if(!eligible.some(f=>f.id===g.boughtBy))return g.target;
+  const perFamily=eligible.length?Math.ceil(g.target/eligible.length):0;
+  return Math.max(0,g.target-perFamily);
+}
 // Shared by the goal fund's own detail view (goalPayGiftInfo) and its
 // deposit sheet — a small card of whichever gift-detail fields were filled
 // in when the fund was created (all optional), or nothing at all.
@@ -4127,10 +4140,11 @@ function renderHome(){
   goalSection.style.display=openGoals.length?'block':'none';
   document.getElementById('homeGoalList').innerHTML=openGoals.map(g=>{
     const total=goalTotal(g);
-    const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
-    const reached=g.target>0&&total>=g.target;
-    const remaining=g.target>0?Math.max(0,Math.round(g.target-total)):0;
-    const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`;
+    const dispTarget=_goalDisplayTarget(g);
+    const pct=dispTarget>0?Math.min(100,Math.round(total/dispTarget*100)):0;
+    const reached=dispTarget>0&&total>=dispTarget;
+    const remaining=dispTarget>0?Math.max(0,Math.round(dispTarget-total)):0;
+    const subText=dispTarget>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${dispTarget.toLocaleString()}`:`נאסף ₪${total.toLocaleString()}`;
     const giftLine=[g.gift,g.recipient?'עבור '+g.recipient:null].filter(Boolean).join(' · ');
     return`<div class="home-row home-row-col" onclick="goToGoalFund(${g.id})">
       <div class="home-goal-top">
@@ -4142,7 +4156,7 @@ function renderHome(){
         </div>
         ${reached?'<span class="badge badge-green">✅ הושלם</span>':remaining>0?`<span class="badge badge-amber">חוב ₪${remaining.toLocaleString()}</span>`:''}
       </div>
-      ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
+      ${dispTarget>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
     </div>`;
   }).join('');
 }
@@ -5431,11 +5445,18 @@ function openFamDetail(famId){
       ${myGoals.map(g=>{
         const contrib=Math.round(g.contributions[famId]||0);
         const owed=Math.round(_goalOwedAmt(g,famId));
+        const tOwed=Math.round(goalTreasurerOwed(g,famId));
         // A fund they still owe money on is worth flagging here (red, like
         // an event debt) even if they've partially contributed — otherwise
-        // it only ever showed up once they'd already paid something.
+        // it only ever showed up once they'd already paid something. And a
+        // contribution the treasurer fronted for them (markGoalContribFromTreasurer)
+        // isn't a real payment either — _goalOwedAmt already reads 0 once
+        // it's credited, so without this it looked fully settled; show it
+        // as still owed, just to the treasurer instead of the fund.
         const amtHtml=owed>0.5
           ?`<span style="font-size:13px;font-weight:700;color:var(--red-mid)">חוב ₪${owed.toLocaleString()}</span>`
+          :tOwed>0.5
+          ?`<span style="font-size:13px;font-weight:700;color:var(--amber)">💼 חוב לגזבר ₪${tOwed.toLocaleString()}</span>`
           :`<span style="font-size:13px;font-weight:700;color:var(--green-mid)">₪${contrib.toLocaleString()}</span>`;
         return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
           <span style="font-size:13px;color:var(--text)">${esc(g.name)}</span>
@@ -7477,10 +7498,11 @@ function renderGoalFunds(){
   }
   el.innerHTML=activeGoals.map(g=>{
     const total=goalTotal(g);
-    const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
-    const reached=g.target>0&&total>=g.target;
-    const remaining=g.target>0?Math.max(0,Math.round(g.target-total)):0;
-    const subText=g.target>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${g.target.toLocaleString()} · ${pct}%`:`נאסף ₪${total.toLocaleString()}`;
+    const dispTarget=_goalDisplayTarget(g);
+    const pct=dispTarget>0?Math.min(100,Math.round(total/dispTarget*100)):0;
+    const reached=dispTarget>0&&total>=dispTarget;
+    const remaining=dispTarget>0?Math.max(0,Math.round(dispTarget-total)):0;
+    const subText=dispTarget>0?`נאסף ₪${total.toLocaleString()} מתוך ₪${dispTarget.toLocaleString()} · ${pct}%`:`נאסף ₪${total.toLocaleString()}`;
     const giftLine=[g.gift,g.recipient?'עבור '+g.recipient:null].filter(Boolean).join(' · ');
     // Small summary row (same shape as the home page's event/goal rows) —
     // the full "who paid" breakdown and the admin menu used to sit always
@@ -7497,7 +7519,7 @@ function renderGoalFunds(){
           </div>
           ${g.transferred?'<span class="badge badge-green">✅ הועבר</span>':g.boughtBy?'<span class="badge badge-amber">🛍️ נקנה</span>':reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':remaining>0?`<span class="badge badge-amber">חוב ₪${remaining.toLocaleString()}</span>`:''}
         </div>
-        ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
+        ${dispTarget>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -7526,12 +7548,13 @@ function renderGoalPayModal(){
   const eligible=_goalPayers(g);
   const perFamily=g.target>0&&eligible.length?Math.ceil(g.target/eligible.length):0;
   const total=goalTotal(g);
+  const dispTarget=_goalDisplayTarget(g);
   const progEl=document.getElementById('goalPayProgress');
   if(progEl){
-    const pct=g.target>0?Math.min(100,Math.round(total/g.target*100)):0;
+    const pct=dispTarget>0?Math.min(100,Math.round(total/dispTarget*100)):0;
     progEl.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:3px">נאסף עד כה</div>
-      <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪${total.toLocaleString()}${g.target>0?` <span style="font-size:13px;font-weight:600;color:var(--text2)">מתוך ₪${g.target.toLocaleString()}</span>`:''}</div>
-      ${g.target>0?`<div class="pbar" style="margin:8px 0 2px"><div class="pfill ${pct>=100?'full':'part'}" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text2)">${pct}%</div>`:''}`;
+      <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-0.5px">₪${total.toLocaleString()}${dispTarget>0?` <span style="font-size:13px;font-weight:600;color:var(--text2)">מתוך ₪${dispTarget.toLocaleString()}</span>`:''}</div>
+      ${dispTarget>0?`<div class="pbar" style="margin:8px 0 2px"><div class="pfill ${pct>=100?'full':'part'}" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text2)">${pct}%</div>`:''}`;
   }
   const giftEl=document.getElementById('goalPayGiftInfo');
   if(giftEl)giftEl.innerHTML=_goalGiftInfoHtml(g);
@@ -7548,11 +7571,21 @@ function renderGoalPayModal(){
     // for everyone to actually pay — same "advance, track as deficit"
     // mechanism as markTransferFromTreasurer for events.
     const treasurerBtn=!paid?`<button onclick="event.stopPropagation();markGoalContribFromTreasurer(${g.id},${f.id})" title="הגזבר משלם עבור ${esc(name)}" style="border:1px solid var(--amber);border-radius:8px;background:none;color:var(--amber);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;padding:3px 7px;flex-shrink:0">💼</button>`:'';
+    // A family shown ✅ here may only be "paid" because the treasurer
+    // fronted their share (markGoalContribFromTreasurer) — their
+    // contribution is credited immediately so the fund total is real money
+    // that can be paid out to the buyer, but THEY still owe that amount
+    // back to the treasurer, not the fund. Flag it here too, not only in
+    // the separate "מגיע לגזבר" modal, so it isn't mistaken for a real
+    // payment (mirrors the event card's own treasurerOwedLine).
+    const tOwed=goalTreasurerOwed(g,f.id);
+    const treasurerOwedLine=tOwed>0.5?`<div class="edit-only" style="font-size:11px;color:var(--amber);margin-top:2px;display:flex;align-items:center;gap:6px">💼 הגזבר שילם על חשבונכם — טרם הוחזר<button onclick="event.stopPropagation();markGoalTreasurerRepaid(${g.id},${f.id})" style="border:1px solid var(--amber);border-radius:10px;background:none;color:var(--amber);font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;padding:1px 7px">✓ הוחזר</button></div>`:'';
+    const viewTreasurerOwedLine=tOwed>0.5?`<div class="view-only" style="font-size:11px;color:var(--amber);margin-top:2px">💼 הגזבר שילם על חשבונכם — טרם הוחזר</div>`:'';
     return`<div class="edit-only" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${paid?'var(--green-mid)':'var(--border)'};margin-bottom:6px;box-sizing:border-box;background:${paid?'var(--green-bg)':'transparent'}">
       <div onclick="toggleGoalPaid(${f.id})" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer">
         <span style="font-size:18px;flex-shrink:0">${paid?'✅':'⬜'}</span>
         ${famAva(f, 32, 'flex-shrink:0')}
-        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(name)}</div></div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(name)}</div>${treasurerOwedLine}</div>
       </div>
       ${treasurerBtn}
       <div style="font-size:13px;font-weight:700;color:${paid?'var(--green-mid)':'var(--text2)'}">₪${perFamily.toLocaleString()}</div>
@@ -7560,7 +7593,7 @@ function renderGoalPayModal(){
     <div class="view-only" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid ${paid?'var(--green-mid)':'var(--border)'};margin-bottom:6px;box-sizing:border-box;background:${paid?'var(--green-bg)':'transparent'}">
       <span style="font-size:18px;flex-shrink:0">${paid?'✅':'⬜'}</span>
       ${famAva(f, 32, 'flex-shrink:0')}
-      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(name)}</div></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(name)}</div>${viewTreasurerOwedLine}</div>
       <div style="font-size:13px;font-weight:700;color:${paid?'var(--green-mid)':'var(--text2)'}">₪${perFamily.toLocaleString()}</div>
     </div>`;
   }).join('');
