@@ -6773,6 +6773,13 @@ function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds){
   if(kind==='familyEdit')return[];
   const hidden=new Set(hiddenFromFamIds||[]);
   const optedOutSlots=[];
+  // The header banner used to repeat the full notification text as its
+  // title (same text as the body paragraph right below it) — for a short
+  // one-liner that read fine, but for a longer message (e.g. a site-update
+  // broadcast) the whole thing visibly appeared twice in the same email.
+  // Use the category's own short label as the header instead, so the
+  // actual text only shows once, in the body.
+  const catLabel=(NOTIF_EMAIL_CATS.find(c=>c.id===kind)||{}).label||'התראה חדשה';
   families.forEach(f=>{
     if(!f.notifEmailPref)return;
     [1,2].forEach(slot=>{
@@ -6786,7 +6793,7 @@ function _sendCategoryEmails(icon,text,kind,hiddenFromFamIds,relatedFamIds){
       const email=slot===2?f.email2:f.email;
       if(!email)return;
       const name=f.name.replace('משפחת','').trim();
-      const html=_emailWrap(`<p style="margin:0;font-size:14px">${_esc(text)}</p>`,text,icon);
+      const html=_emailWrap(`<p style="margin:0;font-size:14px">${_esc(text)}</p>`,catLabel,icon);
       sendEmailNotif([{email,name}],icon+' '+text+' · ינקלביץ',text,html);
     });
   });
