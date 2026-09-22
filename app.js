@@ -5376,7 +5376,7 @@ function openFamDetail(famId){
   const name=f.name.replace('משפחת','').trim();
   const openEvs=events.filter(e=>e.open&&e.participants.includes(famId));
   const mainBal=Math.round(famFundBal(famId));
-  const myGoals=_visibleGoalFunds(goalFunds.filter(g=>!g.archived&&(g.contributions[famId]||0)>0));
+  const myGoals=_visibleGoalFunds(goalFunds.filter(g=>!g.archived&&((g.contributions[famId]||0)>0||_goalOwedAmt(g,famId)>0.5)));
 
   let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
     ${famAva(f,52)}
@@ -5430,9 +5430,16 @@ function openFamDetail(famId){
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">🎯 קופות מטרה</div>
       ${myGoals.map(g=>{
         const contrib=Math.round(g.contributions[famId]||0);
+        const owed=Math.round(_goalOwedAmt(g,famId));
+        // A fund they still owe money on is worth flagging here (red, like
+        // an event debt) even if they've partially contributed — otherwise
+        // it only ever showed up once they'd already paid something.
+        const amtHtml=owed>0.5
+          ?`<span style="font-size:13px;font-weight:700;color:var(--red-mid)">חוב ₪${owed.toLocaleString()}</span>`
+          :`<span style="font-size:13px;font-weight:700;color:var(--green-mid)">₪${contrib.toLocaleString()}</span>`;
         return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
           <span style="font-size:13px;color:var(--text)">${esc(g.name)}</span>
-          <span style="font-size:13px;font-weight:700;color:var(--green-mid)">₪${contrib.toLocaleString()}</span>
+          ${amtHtml}
         </div>`;
       }).join('')}
     </div>`;
