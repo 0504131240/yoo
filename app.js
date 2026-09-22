@@ -668,6 +668,28 @@ function sendGoalDepositEmail(famId,amt,g,fromWallet){
   const html=_emailWrap(_eCard(rows),'הפקדה לקופת מטרה','🎯',_ejsUrl()+'#fund');
   sendEmailNotif([{email:f.email,email2:f.email2,name}],'🎯 הפקדה לקופת מטרה · ינקלביץ',msg,html);
 }
+// The reverse of sendGoalDepositEmail — the fund's collected money is paid
+// OUT to the family who already bought the gift, landing in their wallet.
+function sendGoalPayoutEmail(famId,amt,g){
+  const f=getFam(famId);
+  if(!f||(!f.email&&!f.email2))return;
+  const key=localStorage.getItem('ejsPublicKey');
+  const svc=localStorage.getItem('ejsServiceId');
+  const tpl=localStorage.getItem('ejsTemplateId');
+  if(!key||!svc||!tpl)return;
+  const name=f.name.replace('משפחת','').trim();
+  const desc=`עבר לארנק שלכם מקופת המטרה "${g.name}"`;
+  const newBal=Math.round(fund.famBalances[String(famId)]||0);
+  const msgLines=[`${desc}: ₪${Math.round(amt).toLocaleString()}`];
+  if(g.gift)msgLines.push('🎀 מתנה: '+g.gift);
+  msgLines.push('',`יתרתכם החדשה בארנק: ₪${newBal.toLocaleString()}`);
+  const rows=[[desc,`₪${Math.round(amt).toLocaleString()}`]];
+  if(g.gift)rows.push(['🎀 מתנה',_esc(g.gift)]);
+  rows.push(['💰 יתרה חדשה בארנק',`₪${newBal.toLocaleString()}`,true]);
+  const msg=msgLines.join('\n');
+  const html=_emailWrap(_eCard(rows),'העברה מקופת מטרה','💰',_ejsUrl()+'#fund');
+  sendEmailNotif([{email:f.email,email2:f.email2,name}],'💰 העברה מקופת מטרה · ינקלביץ',msg,html);
+}
 
 function saveLocal(){
   try{
@@ -7392,7 +7414,7 @@ function renderGoalFunds(){
             ${giftLine?`<div class="home-row-sub">🎁 ${esc(giftLine)}</div>`:''}
             <div class="home-row-sub">${subText}</div>
           </div>
-          ${reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
+          ${g.transferred?'<span class="badge badge-green">✅ הועבר</span>':g.boughtBy?'<span class="badge badge-amber">🛍️ נקנה</span>':reached?'<span class="badge badge-green">✅ הושלם</span>':g.closed?'<span class="badge badge-gray">סגור</span>':''}
         </div>
         ${g.target>0?`<div class="pbar" style="margin-top:10px"><div class="pfill ${reached?'full':'part'}" style="width:${pct}%"></div></div>`:''}
       </div>
@@ -7405,8 +7427,10 @@ function renderGoalFunds(){
 // of typing an amount every time. The manual "↓ הפקדה" sheet still exists
 // for custom/partial amounts; this is the fast path for the common case.
 let _goalPayGoalId=null;
+let _goalBoughtPickerOpen=false;
 function openGoalPayModal(goalId){
   _goalPayGoalId=goalId;
+  _goalBoughtPickerOpen=false;
   renderGoalPayModal();
   document.getElementById('goalPayModal').style.display='flex';
 }
@@ -7464,11 +7488,41 @@ function renderGoalPayModal(){
       }).join('')}
     </div>`:'';
   }
+  // "Already bought it" — lets the admin record which family fronted the
+  // actual purchase (outside the app) so the fund's collected money can be
+  // paid out to them afterward, instead of the fund just sitting there once
+  // its purpose is done. Separate from the regular per-family deposit flow:
+  // this pays money OUT to one family, not in from one.
+  const boughtF=g.boughtBy?getFam(g.boughtBy):null;
+  const boughtName=boughtF?boughtF.name.replace('משפחת','').trim():'';
+  const totalNow=Math.round(goalTotal(g));
+  const boughtSection=g.transferred?
+    `<div class="edit-only" style="display:flex;align-items:center;gap:8px;background:var(--green-bg);border-radius:var(--r2);padding:10px 12px;margin-bottom:8px">
+      <span style="font-size:16px">✅</span>
+      <div style="flex:1;font-size:12px;font-weight:700;color:var(--green-mid)">הועברו ₪${Math.round(g.transferredAmt||0).toLocaleString()} ל${esc(boughtName)}</div>
+    </div>`
+    :(_goalBoughtPickerOpen&&!g.boughtBy)?
+    `<div class="edit-only" style="margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">מי קנה את המתנה?</div>
+      ${families.map(f=>`<div onclick="markGoalBought(${f.id})" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:5px;cursor:pointer;box-sizing:border-box">${famAva(f,28,'flex-shrink:0')}<div style="flex:1;font-size:13px;font-weight:700">${esc(f.name.replace('משפחת','').trim())}</div></div>`).join('')}
+      <button onclick="closeGoalBoughtPicker()" style="width:100%;padding:8px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+    </div>`
+    :g.boughtBy?
+    `<div class="edit-only" style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;background:var(--amber-bg);border-radius:var(--r2);padding:10px 12px;margin-bottom:6px">
+        <span style="font-size:16px">🛍️</span>
+        <div style="flex:1;font-size:12px;font-weight:700;color:var(--amber)">המתנה נקנתה ע"י ${esc(boughtName)}</div>
+        <button onclick="unmarkGoalBought()" style="border:none;background:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 4px">✕</button>
+      </div>
+      ${totalNow>0?`<button onclick="confirmGoalPayout()" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--amber);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">💰 העבירו ₪${totalNow.toLocaleString()} ל${esc(boughtName)}</button>`:''}
+    </div>`
+    :`<button class="edit-only" onclick="openGoalBoughtPicker()" style="width:100%;padding:10px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:transparent;color:var(--amber);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">🛍️ סמנו שהמתנה כבר נקנתה</button>`;
   // Admin menu — used to sit always-open on the funds-list card; now it
   // only renders once this specific fund's modal is open.
   const menuEl=document.getElementById('goalPayMenu');
   if(menuEl){
     menuEl.innerHTML=(!g.closed?`<button onclick="openGoalDepositSheet(${g.id})" style="width:100%;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;margin-bottom:8px">↓ הפקדה</button>`:'')+
+      boughtSection+
       `<div class="card-actions" style="margin:0">
         <button class="action-btn" onclick="openGoalPayersModal(${g.id})">👥 השתתפות</button>
         <button class="action-btn" onclick="toggleGoalClosed(${g.id})">${g.closed?'↩️ פתח מחדש':'✓ סגור קופה'}</button>
@@ -7501,6 +7555,54 @@ function toggleGoalPaid(famId){
     addNotif('🎯',name+' סומן/ה כמי ששילם/ה עבור "'+g.name+'"'+giftInfo,undefined,g.hiddenFrom,'deposit',[famId]);
     sendGoalDepositEmail(famId,addedAmt,g,false);
   }
+}
+function openGoalBoughtPicker(){
+  if(!editMode)return;
+  _goalBoughtPickerOpen=true;
+  renderGoalPayModal();
+}
+function closeGoalBoughtPicker(){
+  _goalBoughtPickerOpen=false;
+  renderGoalPayModal();
+}
+function markGoalBought(famId){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g)return;
+  g.boughtBy=famId;
+  _goalBoughtPickerOpen=false;
+  save();render();
+  renderGoalPayModal();
+}
+function unmarkGoalBought(){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g||g.transferred)return;
+  delete g.boughtBy;
+  save();render();
+  renderGoalPayModal();
+}
+// Pays the fund's entire collected balance out to whichever family already
+// bought the gift (outside the app) — the reverse of a normal deposit:
+// money leaves the fund and lands in their wallet, once, tracked by
+// g.transferred so it can't be paid out twice.
+function confirmGoalPayout(){
+  if(!editMode)return;
+  const g=goalFunds.find(x=>x.id===_goalPayGoalId);if(!g||!g.boughtBy||g.transferred)return;
+  const amt=Math.round(goalTotal(g));
+  if(amt<=0){alert('אין כסף בקופה להעברה');return;}
+  const f=getFam(g.boughtBy);if(!f)return;
+  const name=f.name.replace('משפחת','').trim();
+  if(!confirm('להעביר ₪'+amt.toLocaleString()+' מ"'+g.name+'" לארנק של '+name+'?'))return;
+  const key=String(g.boughtBy);
+  fund.famBalances[key]=(fund.famBalances[key]||0)+amt;
+  fund.transactions.push({id:nxtTx++,type:'deposit',famId:g.boughtBy,amount:amt,
+    desc:'מקופת מטרה "'+g.name+'"'+(g.gift?' — עבור '+g.gift:''),
+    date:new Date().toLocaleDateString('he-IL')});
+  g.transferred=true;
+  g.transferredAmt=amt;
+  addNotif('💰',name+' קיבל/ה ₪'+amt.toLocaleString()+' לארנק מקופת "'+g.name+'"',undefined,g.hiddenFrom,'deposit',[g.boughtBy]);
+  sendGoalPayoutEmail(g.boughtBy,amt,g);
+  save();render();
+  renderGoalPayModal();
 }
 // Popup for picking which families are exempt from paying their share of
 // this goal fund while still seeing it normally — separate from
