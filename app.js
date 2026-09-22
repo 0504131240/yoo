@@ -8160,7 +8160,7 @@ function evCoverLines(ev,fid){
       if(s.method==='pot'){ potReceived+=amt; }
       else{
         const from=fromFid!=null?trim(fromFid):(s.from||'');
-        lines.push({t:`קיבלתם ₪${amt.toLocaleString()}${from?` מ${from}`:''} (מתווסף לחוב)`,a:-amt});
+        lines.push({t:`קיבלתם ₪${amt.toLocaleString()}${from?` מ${from}`:''} (החזר על מה ששילמתם)`,a:-amt});
       }
     }
   });
@@ -8177,7 +8177,7 @@ function evCoverLines(ev,fid){
       if(fromWallet>0.5)lines.push({t:`מתוכם ₪${fromWallet.toLocaleString()} מהארנק`,a:0});
     }
   }
-  if(potReceived>0.5)lines.push({t:`קיבלתם ₪${potReceived.toLocaleString()} מקופת האירוע (מתווסף לחוב)`,a:-potReceived});
+  if(potReceived>0.5)lines.push({t:`קיבלתם ₪${potReceived.toLocaleString()} מקופת האירוע (החזר על מה ששילמתם)`,a:-potReceived});
   const pot=Math.round((ev.potPayments||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
   if(pot>0.5)lines.push({t:`הפקדתם לקופת האירוע ₪${pot.toLocaleString()}`,a:pot});
   const sav=Math.round((ev.savingsPaid||[]).filter(p=>Number(p.famId)===Number(fid)).reduce((s,p)=>s+p.amt,0));
