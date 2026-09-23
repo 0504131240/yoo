@@ -2924,7 +2924,14 @@ async function registerFCMToken(){
   const {db,doc,setDoc,collection,query,where,getDocs,deleteDoc}=await fbInit();
   let did=localStorage.getItem('fcmDeviceId');
   if(!did){did=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('fcmDeviceId',did);}
-  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',famId:_isAdminPage()?null:_myFamId(),slot:_isAdminPage()?null:parseInt(localStorage.getItem('deviceEmailSlot3')||'1'),name:_fcmRegistrantName(),notifPref:localStorage.getItem('notifPref')||'all'});
+  // isAdmin tracks whether THIS device is currently unlocked into edit mode,
+  // separately from `page` (which only ever reflects the URL it loaded
+  // from). Edit mode is reachable from the plain family link too (the 🔒 on
+  // the home page), not just admin.html — a treasurer who unlocks from
+  // there is exactly as much an admin as one using the dedicated admin.html
+  // icon, so target:'admin' pushes (see _refreshAdminPushFlag) need to
+  // reach them too, not just page==='admin' devices.
+  await setDoc(doc(db,'fcmTokens',did),{token,ts:Date.now(),page:_isAdminPage()?'admin':'index',isAdmin:editMode||_isAdminPage(),famId:_isAdminPage()?null:_myFamId(),slot:_isAdminPage()?null:parseInt(localStorage.getItem('deviceEmailSlot3')||'1'),name:_fcmRegistrantName(),notifPref:localStorage.getItem('notifPref')||'all'});
   // If this exact push token is already registered under a different device
   // id (e.g. site data was cleared so a new fcmDeviceId got generated, but
   // the browser's underlying push subscription — and therefore the token —
@@ -2952,6 +2959,16 @@ async function registerFCMToken(){
       showNotif(d.title||'ינקלביץ',d.body||'',d.title+'|'+d.body);
     });
   }
+}
+// Called right after a device successfully unlocks edit mode (from ANY
+// page, not just admin.html — see registerFCMToken's isAdmin comment), so
+// target:'admin' pushes (e.g. family-edit notifications) start reaching
+// this device without waiting for it to reload. Best-effort and silent:
+// notifications may simply not be granted yet on this device, which is
+// fine — requestNotifPerm()/registerFCMToken() will set isAdmin correctly
+// whenever that happens instead.
+function _refreshAdminPushFlag(){
+  if(_notifOk())registerFCMToken().catch(()=>{});
 }
 
 async function requestNotifPerm(){
@@ -9280,14 +9297,14 @@ function setAdminPass(){
   if(p1!==p2){if(err){err.textContent='הסיסמאות אינן תואמות';err.style.display='block';}return;}
   adminPass=p1;editMode=true;
   if(_isAdminPage())localStorage.setItem('adminRemembered','1');
-  applyEditMode();_checkPendingTransferClaims();save();closeLockModal();
+  applyEditMode();_checkPendingTransferClaims();_refreshAdminPushFlag();save();closeLockModal();
 }
 function submitUnlock(){
   const val=(document.getElementById('unlockInp')||{}).value||'';
   if(val===adminPass){
     editMode=true;
     if(_isAdminPage())localStorage.setItem('adminRemembered','1');
-    applyEditMode();_checkPendingTransferClaims();closeLockModal();
+    applyEditMode();_checkPendingTransferClaims();_refreshAdminPushFlag();closeLockModal();
   } else {
     const err=document.getElementById('passErr');if(err)err.style.display='block';
     const inp=document.getElementById('unlockInp');if(inp){inp.value='';inp.focus();}
@@ -9349,7 +9366,7 @@ async function doBiometricUnlock(){
   const btn=document.getElementById('biometricBtn');
   if(btn){btn.disabled=true;btn.textContent='⏳ מאמת...';}
   const ok=await tryBiometric();
-  if(ok){editMode=true;applyEditMode();_checkPendingTransferClaims();closeLockModal();}
+  if(ok){editMode=true;applyEditMode();_checkPendingTransferClaims();_refreshAdminPushFlag();closeLockModal();}
   else if(btn){btn.disabled=false;btn.textContent='👆 כניסה עם טביעת אצבע';}
 }
 async function autoUnlockAdmin(){

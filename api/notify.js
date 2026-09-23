@@ -31,10 +31,15 @@ module.exports = async (req, res) => {
     admin: 'https://yankeleviz.vercel.app/admin.html',
     index: 'https://yankeleviz.vercel.app/',
   };
-  // target:'admin' restricts delivery to admin-registered devices only —
-  // used for events that matter to the admin (money movement, family
-  // self-edits) but would just be noise on every other family member's
-  // phone. Anything else (the default) reaches everyone. excludeFamIds
+  // target:'admin' restricts delivery to admin devices only — used for
+  // events that matter to the admin (money movement, family self-edits) but
+  // would just be noise on every other family member's phone. Anything else
+  // (the default) reaches everyone. "Admin device" means either page==='admin'
+  // (the dedicated admin.html install) OR isAdmin===true (a device that
+  // unlocked edit mode from the regular family page — that lock icon works
+  // there too, and app.js flags the device the moment it's used, see
+  // _refreshAdminPushFlag) — a treasurer who never installs admin.html
+  // separately is exactly as much an admin as one who does. excludeFamIds
   // additionally drops specific families' own devices regardless of target
   // — e.g. a surprise-gift goal fund announced to everyone except the
   // family it's for (admin-registered devices have no famId, so they're
@@ -46,8 +51,15 @@ module.exports = async (req, res) => {
   const groups = { admin: [], index: [] };
   tokenDocs.forEach(d => {
     const data = d.data();
+    // `page` (which link a tap opens, and whether this device's own
+    // notifPref applies) stays tied to the literal page it registered
+    // from — only the target:'admin' eligibility check below also honors
+    // isAdmin, so an admin who unlocks from the family page still taps
+    // through to their usual link and keeps their own notifPref for
+    // everything else, same as before.
     const page = data.page === 'admin' ? 'admin' : 'index';
-    if (target === 'admin' && page !== 'admin') return;
+    const isAdminDevice = page === 'admin' || data.isAdmin === true;
+    if (target === 'admin' && !isAdminDevice) return;
     if (Array.isArray(excludeFamIds) && excludeFamIds.includes(data.famId)) return;
     if (data.famId != null && data.slot != null && excludeSlotSet.has(data.famId + ':' + data.slot)) return;
     // A family device's own notifPref only ever filters family-page pushes —
