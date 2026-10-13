@@ -16,7 +16,7 @@
 const { getDb } = require('./_lib/firebaseAdmin');
 const { normalizePhone, speakable } = require('./_lib/yemot');
 const { evAdjBalance } = require('./_lib/debtCalc');
-const { allOccasions } = require('./_lib/birthdayCalc');
+const { allOccasions, bmLabel } = require('./_lib/birthdayCalc');
 
 // Yemot reserves . - " ' & | in spoken text, and = , separate read options.
 const clean = t => String(t || '')
@@ -148,16 +148,24 @@ function occasionsInfo(data) {
   const all = allOccasions(data.families || [], data.yahrzeits || []);
   const dayFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', { day: 'numeric', timeZone: 'Asia/Jerusalem' });
   const monthFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { month: 'long', timeZone: 'Asia/Jerusalem' });
+  const yearFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', { year: 'numeric', timeZone: 'Asia/Jerusalem' });
   // Adar in a leap year is "אדר א׳"/"אדר ב׳"; treat every Adar as the same.
   const monthEq = (a, b) => a === b || (!!a && !!b && a.startsWith('אדר') && b.startsWith('אדר'));
   const out = [];
   for (let i = 0; i <= 14; i++) {
     const d = new Date(Date.now() + i * 86400000);
-    const hd = parseInt(dayFmt.format(d), 10), hm = monthFmt.format(d);
+    const hd = parseInt(dayFmt.format(d), 10), hm = monthFmt.format(d), hy = parseInt(yearFmt.format(d), 10);
     const when = i === 0 ? 'היום' : i === 1 ? 'מחר' : 'בעוד ' + i + ' ימים';
     all.filter(b => b.hebDay === hd && monthEq(b.hebMonth, hm)).forEach(b => {
-      const what = b.kind === 'yahrzeit' ? 'יארצייט של ' : b.kind === 'anniversary' ? 'יום נישואין של משפחת ' : 'יום הולדת של ';
-      out.push(when + ' ' + what + b.name);
+      // "בר מצווה של דני כהן", "יום הולדת 7 של שרה לוי", "17 שנות נישואין
+      // למשפחת כהן" — the age only when the Hebrew year was recorded.
+      const n = b.hebYear && hy > b.hebYear ? hy - b.hebYear : 0;
+      const bm = bmLabel(b, hy);
+      const what = bm ? bm + ' של ' + b.name
+        : b.kind === 'yahrzeit' ? (n ? 'היארצייט ה ' + n + ' של ' : 'יארצייט של ') + b.name
+        : b.kind === 'anniversary' ? (n === 1 ? 'שנת הנישואין הראשונה של משפחת ' : n ? n + ' שנות נישואין למשפחת ' : 'יום נישואין של משפחת ') + b.name
+        : (n ? 'יום הולדת ' + n + ' של ' : 'יום הולדת של ') + b.name;
+      out.push(when + ' ' + what);
     });
   }
   return out.length ? ['בשבועיים הקרובים', ...out.slice(0, 8)] : ['אין ימי הולדת ושמחות בשבועיים הקרובים'];
