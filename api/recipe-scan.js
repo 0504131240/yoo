@@ -101,9 +101,12 @@ function parseJson(text) {
 // at all — "limit: 0") won't recover by waiting; per-minute limits do.
 const dailyQuota = data => /per ?day|PerDay|limit: ?0\b/i.test(JSON.stringify((data && data.error) || ''));
 // "High demand" (503) and the free tier's per-minute limit (429) are usually
-// passing: try twice more, a moment apart, then GEMINI_FALLBACK_MODEL if set.
+// passing: try once more, then the fallback model (GEMINI_FALLBACK_MODEL, or
+// gemini-flash-lite-latest).
 async function callGemini(parts, withSchema, multi) {
-  const models = [MODEL, MODEL, MODEL, process.env.GEMINI_FALLBACK_MODEL].filter(Boolean);
+  // The main model is sometimes overloaded (503) for a long while when the
+  // lighter one still answers — fall back to it instead of giving up.
+  const models = [MODEL, MODEL, process.env.GEMINI_FALLBACK_MODEL || 'gemini-flash-lite-latest'];
   let res;
   for (let i = 0; i < models.length; i++) {
     if (i) await new Promise(r => setTimeout(r, i === 1 ? 1500 : 4000));
