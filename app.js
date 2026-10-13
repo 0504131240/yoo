@@ -3751,6 +3751,18 @@ async function deleteNotifDevice(id){
   renderNotifDevicesModal();
 }
 
+// The one birthday a bar/bat mitzvah lands on — a boy turning 13, a girl
+// turning 12 (Hebrew years) — so the calendar calls it that.
+function _bmLabel(item,occHebYear){
+  if(!item.hebYear||!occHebYear||item.kind&&item.kind!=='birthday')return'';
+  const n=occHebYear-item.hebYear;
+  if(item.gender==='boy'&&n===13)return'בר מצווה';
+  if(item.gender==='girl'&&n===12)return'בת מצווה';
+  return'';
+}
+function _hebYearOf(d){return parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(d));}
+// No tefillin emoji exists — a small inline glyph marks a bar/bat mitzvah.
+const TEFILLIN_SVG='<svg viewBox="0 0 20 20" width="1em" height="1em" style="vertical-align:-0.15em;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="1.5" width="15" height="15" rx="2" fill="#2b2b2b"/><text x="12.5" y="12.3" font-size="10.5" fill="#fff" text-anchor="middle" font-family="serif" font-weight="bold">ש</text><path d="M5 12 Q1 12 1 17 Q1 19.5 4 19.5" stroke="#8a6d4a" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>';
 function allBirthdays(){
   const kidBdays=families.flatMap(f=>(f.kids||[]).filter(k=>k.hebDay&&k.hebMonth).map(k=>({
     name:(k.name?k.name:'ילד/ה')+' ('+f.name.replace('משפחת','').trim()+')',
@@ -4077,7 +4089,7 @@ function renderCalendar(){
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
         <span style="font-size:10px;line-height:1">${label}</span>
         ${hasEv?`<span class="fh-cal-day-ev">${evOnDay.map(c=>c.title.slice(0,5)).join(',')}</span>`:''}
-        ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayOnDay.map(b=>b.name.slice(0,4)).join(',')}</span>`:''}
+        ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">${bdayOnDay.map(b=>(_bmLabel(b,_hebYearOf(dayDate))?TEFILLIN_SVG:'🎂')+b.name.slice(0,4)).join(',')}</span>`:''}
         ${!hasEv&&!hasBday&&hasYahr?`<span class="fh-cal-day-ev" style="color:#555">🕯️${yahrOnDay.map(y=>y.name.slice(0,4)).join(',')}</span>`:''}
         ${!hasEv&&!hasBday&&!hasYahr&&hasAnniv?`<span class="fh-cal-day-ev" style="color:#B8860B">💍${annivOnDay.map(a=>a.name.slice(0,4)).join(',')}</span>`:''}
       </div>`;
@@ -4107,7 +4119,7 @@ function renderCalendar(){
       html+=`<div class="${cls}" onclick="selectCalDay('${ds}')">
         <span style="font-size:12px;line-height:1">${d}</span>
         ${hasEv?`<span class="fh-cal-day-ev">${evOnDay.map(c=>c.title.slice(0,5)).join(',')}</span>`:''}
-        ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">🎂${bdayOnDay.map(b=>b.name.slice(0,4)).join(',')}</span>`:''}
+        ${!hasEv&&hasBday?`<span class="fh-cal-day-ev" style="color:#c0392b">${bdayOnDay.map(b=>(_bmLabel(b,_hebYearOf(dayDate))?TEFILLIN_SVG:'🎂')+b.name.slice(0,4)).join(',')}</span>`:''}
         ${!hasEv&&!hasBday&&hasYahr?`<span class="fh-cal-day-ev" style="color:#555">🕯️${yahrOnDay.map(y=>y.name.slice(0,4)).join(',')}</span>`:''}
         ${!hasEv&&!hasBday&&!hasYahr&&hasAnniv?`<span class="fh-cal-day-ev" style="color:#B8860B">💍${annivOnDay.map(a=>a.name.slice(0,4)).join(',')}</span>`:''}
       </div>`;
@@ -4158,10 +4170,11 @@ function renderCalEvList(hebDays,bdayByDate,yahrByDate,annivByDate){
     if(type==='bday'){
       const age=item.hebYear?(hebYNum-item.hebYear):null;
       const balloon=(age!=null&&age>0&&age<=18)?`<span class="bday-balloon">${esc(item.gender==='boy'?'בן '+age:item.gender==='girl'?'בת '+age:String(age))}</span>`:'';
+      const bm=_bmLabel(item,hebYNum);
       return`<div class="fh-cal-ev">
         <div class="fh-cal-ev-dot" style="background:#c0392b"></div>
         <div class="fh-cal-ev-info">
-          <div class="fh-cal-ev-name">🎂 ${esc(item.name)}${balloon} — יום הולדת</div>
+          <div class="fh-cal-ev-name">${bm?TEFILLIN_SVG:'🎂'} ${esc(item.name)}${balloon} — ${bm||'יום הולדת'}</div>
           <div class="fh-cal-ev-date">${lbl}</div>
         </div>
       </div>`;
