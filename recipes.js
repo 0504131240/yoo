@@ -1237,7 +1237,7 @@ async function scanRequest(images){
   const r=await fetch('/api/recipe-scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images})});
   let d={};try{d=await r.json();}catch(e){}
   if(!r.ok){
-    const msg={'no recipe found':'לא מצאנו מתכון בתמונה — נסו צילום ברור יותר','not configured':'סריקת מתכונים עדיין לא הופעלה באתר','image too large':'התמונה גדולה מדי','busy, try again':'השירות עמוס, נסו שוב בעוד רגע'}[d.error];
+    const msg={'no recipe found':'לא מצאנו מתכון בתמונה — נסו צילום ברור יותר','not configured':'סריקת מתכונים עדיין לא הופעלה באתר','image too large':'התמונה גדולה מדי','busy, try again':'השירות עמוס, נסו שוב בעוד רגע','quota':'המכסה היומית של סריקת המתכונים נגמרה — נסו שוב מחר'}[d.error];
     throw new Error(msg||'הסריקה נכשלה ('+(d.error||r.status)+')');
   }
   return d.recipe;
@@ -1315,6 +1315,7 @@ async function scanPage(img){
     const r=await fetch('/api/recipe-scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:[img],multi:true})});
     let d={};try{d=await r.json();}catch(e){}
     if(r.ok)return d.recipes||[];
+    if(d.error==='quota')throw new Error('quota');
     if(r.status===429&&i<4&&!(S.imp&&S.imp.stop)){await new Promise(z=>setTimeout(z,[10,20,40,60][i]*1000));continue;}
     throw new Error(d.error||String(r.status));
   }
@@ -1347,7 +1348,11 @@ window.rcImportPdf=async function(inp){
           const title=x.title||'מתכון מעמוד '+n;
           S.imp.items.push({...x,title,page:n,pageTo:n,img:keepImg,dup:have.has(title),on:!have.has(title)});
         });
-      }catch(err){console.warn('page',n,err);S.imp.failed.push(n);}
+      }catch(err){
+        console.warn('page',n,err);S.imp.failed.push(n);
+        // The day's scanning quota is used up — the remaining pages would all fail too.
+        if(err.message==='quota'){S.imp.error='המכסה היומית של סריקת המתכונים נגמרה — אפשר לשמור את מה שנקרא, ולהמשיך מחר';S.imp.stop=true;}
+      }
       renderImport();
     }
   }catch(err){

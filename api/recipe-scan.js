@@ -97,15 +97,20 @@ function parseJson(text) {
   return JSON.parse(t);
 }
 
-// "High demand" (503) from Gemini is usually a passing spike: try twice
-// more, a moment apart, then GEMINI_FALLBACK_MODEL if one is set.
+// A quota that is used up for the day (or a model the key has no quota on
+// at all — "limit: 0") won't recover by waiting; per-minute limits do.
+const dailyQuota = data => /per ?day|PerDay|limit: ?0\b/i.test(JSON.stringify((data && data.error) || ''));
+// "High demand" (503) and the free tier's per-minute limit (429) are usually
+// passing: try twice more, a moment apart, then GEMINI_FALLBACK_MODEL if set.
 async function callGemini(parts, withSchema, multi) {
   const models = [MODEL, MODEL, MODEL, process.env.GEMINI_FALLBACK_MODEL].filter(Boolean);
   let res;
   for (let i = 0; i < models.length; i++) {
-    if (i) await new Promise(r => setTimeout(r, i === 1 ? 800 : 1600));
+    if (i) await new Promise(r => setTimeout(r, i === 1 ? 1500 : 4000));
     res = await callGeminiOnce(models[i], parts, withSchema, multi);
-    if (res.status !== 503) break;
+    if (res.status !== 503 && res.status !== 429) break;
+    console.warn('recipe-scan: gemini', models[i], res.status, JSON.stringify(res.data && res.data.error || '').slice(0, 300));
+    if (res.status === 429 && dailyQuota(res.data) && i < models.length - 1) i = Math.max(i, models.length - 2); // skip to the fallback
   }
   return res;
 }
@@ -153,6 +158,7 @@ module.exports = async (req, res) => {
     if (status === 400 && /responseJsonSchema|response_json_schema|Unknown name/i.test(JSON.stringify(data))) {
       ({ status, data } = await callGemini(parts, false, multi));
     }
+    if (status === 429 && dailyQuota(data)) { console.error('recipe-scan: quota', JSON.stringify(data.error || '').slice(0, 500)); res.status(429).json({ error: 'quota' }); return; }
     if (status === 429 || status === 503) { res.status(429).json({ error: 'busy, try again' }); return; }
     if (status !== 200) {
       console.error('recipe-scan: gemini', status, JSON.stringify(data).slice(0, 500));
