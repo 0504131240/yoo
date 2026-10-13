@@ -21,6 +21,27 @@ const { flushPhoneQueue } = require('../_lib/yemot');
 
 const BACKUP_RETENTION_DAYS = 30;
 
+// "יוסי", "יוסי ורחל", "יוסי, רחל ודני"
+const joinHe = a => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' ו' + a[a.length - 1];
+// The title and text for one day's occasions (i: 0 today, 1 tomorrow), all
+// names in one message, one line per kind.
+function occasionText(list, i) {
+  const kinds = { birthday: [], anniversary: [], yahrzeit: [] };
+  list.forEach(b => (kinds[b.kind] || kinds.birthday).push(b.name));
+  const lines = [], icons = [];
+  const bd = kinds.birthday, an = kinds.anniversary, yz = kinds.yahrzeit;
+  if (bd.length) { icons.push('🎂'); lines.push(i === 0 ? 'יום הולדת שמח ' + joinHe(bd.map(n => 'ל' + n)) + '!' : 'מחר ' + (bd.length > 1 ? 'ימי ההולדת' : 'יום ההולדת') + ' של ' + joinHe(bd)); }
+  if (an.length) { icons.push('💍'); lines.push(i === 0 ? 'מזל טוב ' + joinHe(an.map(n => 'למשפחת ' + n)) + ' ליום הנישואין!' : 'מחר יום הנישואין של ' + joinHe(an.map(n => 'משפחת ' + n))); }
+  if (yz.length) { icons.push('🕯️'); lines.push((i === 0 ? 'היום ' : 'מחר ') + 'היארצייט של ' + joinHe(yz)); }
+  const when = i === 0 ? 'היום' : 'מחר';
+  let title;
+  if (icons.length > 1) title = '🎉 שמחות ' + when;
+  else if (bd.length) title = '🎂 ' + (bd.length > 1 ? 'ימי הולדת' : 'יום הולדת') + ' ' + when + (i === 0 ? '!' : '');
+  else if (an.length) title = '💍 ' + (an.length > 1 ? 'ימי נישואין' : 'יום נישואין') + ' ' + when + (i === 0 ? '!' : '');
+  else title = '🕯️ יארצייט ' + when;
+  return { title, body: lines.join(' · ') };
+}
+
 async function sendBirthdayReminders(db, data) {
   const all = allOccasions(data.families || [], data.yahrzeits || []);
   if (!all.length) return { occasions: 0, sent: 0 };
@@ -71,65 +92,69 @@ async function sendBirthdayReminders(db, data) {
   // Adar variant as interchangeable (same fix as app.js's calendar matching).
   const hebMonthEq = (a, b) => a === b || (!!a && !!b && a.startsWith('אדר') && b.startsWith('אדר'));
 
+  // One message per day (today / tomorrow) covering every occasion on it —
+  // two birthdays on the same day used to send two emails and two pushes.
+  // Each device gets the names its own "כולם/רק שלנו" choice allows.
   let sent = 0, occasions = 0;
   for (let i = 0; i <= 1; i++) {
     const d = new Date(today); d.setDate(d.getDate() + i);
     const hd = parseInt(dayFmt.format(d)), hm = monthFmt.format(d);
-    for (const b of all.filter(x => x.hebDay === hd && hebMonthEq(x.hebMonth, hm))) {
-      occasions++;
-      const isAnniv = b.kind === 'anniversary';
-      const isYahrzeit = b.kind === 'yahrzeit';
-      const title = isYahrzeit ? (i === 0 ? '🕯️ יארצייט היום' : '🕯️ יארצייט מחר')
-        : isAnniv ? (i === 0 ? '💍 יום נישואין היום!' : '💍 יום נישואין מחר')
-        : (i === 0 ? '🎂 יום הולדת היום!' : '🎂 יום הולדת מחר');
-      const body = isYahrzeit ? (i === 0 ? 'היום היארצייט של ' + b.name : 'מחר היארצייט של ' + b.name)
-        : isAnniv ? (i === 0 ? 'מזל טוב למשפחת ' + b.name + '!' : 'מחר יום הנישואין של משפחת ' + b.name)
-        : (i === 0 ? 'יום הולדת שמח ל' + b.name + '!' : 'מחר יום ההולדת של ' + b.name);
+    const todays = all.filter(x => x.hebDay === hd && hebMonthEq(x.hebMonth, hm));
+    if (!todays.length) continue;
+    occasions += todays.length;
 
-      for (const [page, allDocs] of Object.entries(groups)) {
-        // A family device's own notifPref ('important'/'mine'/'all') only
-        // ever filters family-page pushes — the admin device always gets
-        // everything. Birthdays/anniversaries/yahrzeits are kind
-        // 'birthday'; b.famId (when set — yahrzeits have none) is who a
-        // "רק שלנו" device needs to match to still get it.
-        const docs = page === 'index'
-          ? allDocs.filter(d => notifPrefAllows(d.data().notifPref, 'birthday', b.famId != null ? [b.famId] : undefined, d.data().famId, undefined, { cats: d.data().pushCats, scopes: d.data().pushScopes }))
-          : allDocs;
-        if (!docs.length) continue;
+    for (const [page, allDocs] of Object.entries(groups)) {
+      // A family device's own notifPref only filters family-page pushes — the
+      // admin device always gets everything. b.famId (yahrzeits have none) is
+      // who a "רק שלנו" device needs to match.
+      const byList = new Map();
+      allDocs.forEach(doc => {
+        const t = doc.data();
+        const mine = page === 'index'
+          ? todays.filter(b => notifPrefAllows(t.notifPref, 'birthday', b.famId != null ? [b.famId] : undefined, t.famId, undefined, { cats: t.pushCats, scopes: t.pushScopes }))
+          : todays;
+        if (!mine.length) return;
+        const k = mine.map(b => todays.indexOf(b)).join(',');
+        if (!byList.has(k)) byList.set(k, { list: mine, docs: [] });
+        byList.get(k).docs.push(doc);
+      });
+      for (const { list, docs } of byList.values()) {
+        const { title, body } = occasionText(list, i);
         try {
           // Data-only (no top-level `notification`) — see notify.js for why:
           // a notification payload gets auto-displayed by the browser's push
           // service AND by our own onBackgroundMessage handler, doubling it.
           const resp = await getMessaging().sendEachForMulticast({
-            tokens: docs.map(d => d.data().token),
+            tokens: docs.map(x => x.data().token),
             data: { title, body, icon: 'https://yankeleviz.vercel.app/icon.jpg', link: LINKS[page] },
           });
           sent += resp.successCount;
-          const dead = docs.filter((_, i) => !resp.responses[i]?.success);
+          const dead = docs.filter((_, j) => !resp.responses[j]?.success);
           if (dead.length) {
-            await Promise.all(dead.map(d => d.ref.delete()));
-            groups[page] = groups[page].filter(d => !dead.includes(d));
+            await Promise.all(dead.map(x => x.ref.delete()));
+            groups[page] = groups[page].filter(x => !dead.includes(x));
           }
         } catch (e) {
           console.error(`dailyBackup: birthday push failed [${page}]`, e);
         }
       }
+    }
 
-      if (ejsCreds?.publicKey && ejsCreds?.serviceId && ejsCreds?.templateId) {
-        for (const key of emailSlots) {
-          const [fidStr, slotStr] = key.split(':');
-          const fam = (data.families || []).find(f => f.id === parseInt(fidStr));
-          if (!fam) continue;
-          const email = slotStr === '2' ? fam.email2 : fam.email;
-          if (!email) continue;
-          const famName = fam.name.replace('משפחת', '').trim();
-          const html = notifEmailHtml(title.split(' ')[0], title, body);
-          try {
-            await sendViaEmailJS(ejsCreds.publicKey, ejsCreds.serviceId, ejsCreds.templateId, email, famName, title + ' · ינקלביץ', body, html);
-            sent++;
-          } catch (e) {
-            console.error('dailyBackup: birthday email failed for', email, e);
-          }
+    if (ejsCreds?.publicKey && ejsCreds?.serviceId && ejsCreds?.templateId) {
+      const { title, body } = occasionText(todays, i);
+      for (const key of emailSlots) {
+        const [fidStr, slotStr] = key.split(':');
+        const fam = (data.families || []).find(f => f.id === parseInt(fidStr));
+        if (!fam) continue;
+        const email = slotStr === '2' ? fam.email2 : fam.email;
+        if (!email) continue;
+        const famName = fam.name.replace('משפחת', '').trim();
+        const html = notifEmailHtml(title.split(' ')[0], title, body);
+        try {
+          await sendViaEmailJS(ejsCreds.publicKey, ejsCreds.serviceId, ejsCreds.templateId, email, famName, title + ' · ינקלביץ', body, html);
+          sent++;
+        } catch (e) {
+          console.error('dailyBackup: birthday email failed for', email, e);
         }
       }
     }
