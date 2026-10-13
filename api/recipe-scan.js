@@ -132,6 +132,18 @@ async function callGeminiOnce(model, parts, withSchema, multi) {
 
 module.exports = async (req, res) => {
   const configured = !!process.env.GEMINI_API_KEY;
+  // ?check=<DIAG_KEY>: ask Gemini a one-word question with each model and
+  // report its status and error text (never the key) — for "quota" puzzles.
+  if (req.method === 'GET' && req.query && req.query.check) {
+    if (!process.env.DIAG_KEY || req.query.check !== process.env.DIAG_KEY) { res.status(401).send('unauthorized'); return; }
+    const out = {};
+    for (const m of [MODEL, process.env.GEMINI_FALLBACK_MODEL, 'gemini-flash-latest', 'gemini-flash-lite-latest'].filter(Boolean)) {
+      const r = await callGeminiOnce(m, [{ text: 'Reply with the single word ok.' }], false, false);
+      out[m] = { status: r.status, error: r.data && r.data.error ? { code: r.data.error.code, status: r.data.error.status, message: String(r.data.error.message || '').slice(0, 400) } : null };
+    }
+    res.status(200).json({ configured, model: MODEL, fallback: process.env.GEMINI_FALLBACK_MODEL || null, results: out });
+    return;
+  }
   if (req.method === 'GET') { res.status(200).json({ enabled: configured }); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
   const host = req.headers['x-forwarded-host'] || req.headers.host || '';
