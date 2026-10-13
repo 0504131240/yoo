@@ -15,7 +15,7 @@
 // reminder. Doing all three here, gated by day-of-week where relevant, is
 // the only way that's actually reliable on this plan.
 const { getDb, getMessaging, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isYomTovNow, sendViaEmailJS, notifEmailHtml } = require('../_lib/firebaseAdmin');
-const { allOccasions } = require('../_lib/birthdayCalc');
+const { allOccasions, ageLabel, bmLabel } = require('../_lib/birthdayCalc');
 const { sendWeeklyDebtReminders } = require('../_lib/weeklyDebtReminder');
 const { flushPhoneQueue } = require('../_lib/yemot');
 
@@ -25,17 +25,24 @@ const BACKUP_RETENTION_DAYS = 30;
 const joinHe = a => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' ו' + a[a.length - 1];
 // The title and text for one day's occasions (i: 0 today, 1 tomorrow), all
 // names in one message, one line per kind.
-function occasionText(list, i) {
-  const kinds = { birthday: [], anniversary: [], yahrzeit: [] };
-  list.forEach(b => (kinds[b.kind] || kinds.birthday).push(b.name));
+function occasionText(list, i, occHebYear) {
+  // Each name carries its age ("דני (כהן) (בן 7)"); a bar/bat mitzvah gets its own line.
+  const kinds = { birthday: [], anniversary: [], yahrzeit: [], bm: [] };
+  list.forEach(b => {
+    const bm = bmLabel(b, occHebYear);
+    if (bm) kinds.bm.push({ name: b.name, bm });
+    else (kinds[b.kind] || kinds.birthday).push(b.name + ageLabel(b, occHebYear));
+  });
   const lines = [], icons = [];
-  const bd = kinds.birthday, an = kinds.anniversary, yz = kinds.yahrzeit;
+  const bd = kinds.birthday, an = kinds.anniversary, yz = kinds.yahrzeit, bms = kinds.bm;
+  bms.forEach(x => { icons.push('📜'); lines.push(i === 0 ? 'מזל טוב ל' + x.name + ' ל' + x.bm + '!' : 'מחר ה' + x.bm + ' של ' + x.name); });
   if (bd.length) { icons.push('🎂'); lines.push(i === 0 ? 'יום הולדת שמח ' + joinHe(bd.map(n => 'ל' + n)) + '!' : 'מחר ' + (bd.length > 1 ? 'ימי ההולדת' : 'יום ההולדת') + ' של ' + joinHe(bd)); }
   if (an.length) { icons.push('💍'); lines.push(i === 0 ? 'מזל טוב ' + joinHe(an.map(n => 'למשפחת ' + n)) + ' ליום הנישואין!' : 'מחר יום הנישואין של ' + joinHe(an.map(n => 'משפחת ' + n))); }
   if (yz.length) { icons.push('🕯️'); lines.push((i === 0 ? 'היום ' : 'מחר ') + 'היארצייט של ' + joinHe(yz)); }
   const when = i === 0 ? 'היום' : 'מחר';
   let title;
-  if (icons.length > 1) title = '🎉 שמחות ' + when;
+  if (new Set(icons).size > 1) title = '🎉 שמחות ' + when;
+  else if (bms.length) title = '📜 ' + (bms.length > 1 ? 'שמחות' : bms[0].bm) + ' ' + when + (i === 0 ? '!' : '');
   else if (bd.length) title = '🎂 ' + (bd.length > 1 ? 'ימי הולדת' : 'יום הולדת') + ' ' + when + (i === 0 ? '!' : '');
   else if (an.length) title = '💍 ' + (an.length > 1 ? 'ימי נישואין' : 'יום נישואין') + ' ' + when + (i === 0 ? '!' : '');
   else title = '🕯️ יארצייט ' + when;
@@ -85,6 +92,7 @@ async function sendBirthdayReminders(db, data) {
 
   const dayFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', { day: 'numeric' });
   const monthFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { month: 'long' });
+  const yearFmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', { year: 'numeric' });
   const today = new Date();
   // Intl renders Adar as plain "אדר" in a regular year but "אדר א׳"/"אדר ב׳" in a
   // leap year — an occasion saved in one kind of year never string-equals today's
@@ -99,6 +107,7 @@ async function sendBirthdayReminders(db, data) {
   for (let i = 0; i <= 1; i++) {
     const d = new Date(today); d.setDate(d.getDate() + i);
     const hd = parseInt(dayFmt.format(d)), hm = monthFmt.format(d);
+    const occHebYear = parseInt(yearFmt.format(d));
     const todays = all.filter(x => x.hebDay === hd && hebMonthEq(x.hebMonth, hm));
     if (!todays.length) continue;
     occasions += todays.length;
@@ -119,7 +128,7 @@ async function sendBirthdayReminders(db, data) {
         byList.get(k).docs.push(doc);
       });
       for (const { list, docs } of byList.values()) {
-        const { title, body } = occasionText(list, i);
+        const { title, body } = occasionText(list, i, occHebYear);
         try {
           // Data-only (no top-level `notification`) — see notify.js for why:
           // a notification payload gets auto-displayed by the browser's push
@@ -141,7 +150,7 @@ async function sendBirthdayReminders(db, data) {
     }
 
     if (ejsCreds?.publicKey && ejsCreds?.serviceId && ejsCreds?.templateId) {
-      const { title, body } = occasionText(todays, i);
+      const { title, body } = occasionText(todays, i, occHebYear);
       for (const key of emailSlots) {
         const [fidStr, slotStr] = key.split(':');
         const fam = (data.families || []).find(f => f.id === parseInt(fidStr));
