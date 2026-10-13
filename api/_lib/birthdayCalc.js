@@ -92,7 +92,7 @@ function occasionText(list, i, occHebYear) {
   const when = today ? 'היום' : 'מחר', bang = today ? '!' : '';
   const kinds = [bms, bds, ans, yzs].filter(a => a.length).length;
   const title = kinds > 1 ? '🎉 שמחות ' + when
-    : bms.length ? '📜 ' + (bms.length > 1 ? 'שמחות' : bms[0].bm) + ' ' + when + bang
+    : bms.length ? (bms.length === 1 && bms[0].bm === 'בת מצווה' ? '🎆 ' : '📜 ') + (bms.length > 1 ? 'שמחות' : bms[0].bm) + ' ' + when + bang
     : bds.length ? '🎂 ' + (bds.length > 1 ? 'ימי הולדת' : 'יום הולדת') + ' ' + when + bang
     : ans.length ? '💍 ' + (ans.length > 1 ? 'ימי נישואין' : 'יום נישואין') + ' ' + when + bang
     : '🕯️ יארצייט ' + when;
