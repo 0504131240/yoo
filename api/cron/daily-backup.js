@@ -15,39 +15,11 @@
 // reminder. Doing all three here, gated by day-of-week where relevant, is
 // the only way that's actually reliable on this plan.
 const { getDb, getMessaging, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isYomTovNow, sendViaEmailJS, notifEmailHtml } = require('../_lib/firebaseAdmin');
-const { allOccasions, ageLabel, bmLabel } = require('../_lib/birthdayCalc');
+const { allOccasions, occasionText } = require('../_lib/birthdayCalc');
 const { sendWeeklyDebtReminders } = require('../_lib/weeklyDebtReminder');
 const { flushPhoneQueue } = require('../_lib/yemot');
 
 const BACKUP_RETENTION_DAYS = 30;
-
-// "יוסי", "יוסי ורחל", "יוסי, רחל ודני"
-const joinHe = a => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' ו' + a[a.length - 1];
-// The title and text for one day's occasions (i: 0 today, 1 tomorrow), all
-// names in one message, one line per kind.
-function occasionText(list, i, occHebYear) {
-  // Each name carries its age ("דני (כהן) (בן 7)"); a bar/bat mitzvah gets its own line.
-  const kinds = { birthday: [], anniversary: [], yahrzeit: [], bm: [] };
-  list.forEach(b => {
-    const bm = bmLabel(b, occHebYear);
-    if (bm) kinds.bm.push({ name: b.name, bm });
-    else (kinds[b.kind] || kinds.birthday).push(b.name + ageLabel(b, occHebYear));
-  });
-  const lines = [], icons = [];
-  const bd = kinds.birthday, an = kinds.anniversary, yz = kinds.yahrzeit, bms = kinds.bm;
-  bms.forEach(x => { icons.push('📜'); lines.push(i === 0 ? 'מזל טוב ל' + x.name + ' ל' + x.bm + '!' : 'מחר ה' + x.bm + ' של ' + x.name); });
-  if (bd.length) { icons.push('🎂'); lines.push(i === 0 ? 'יום הולדת שמח ' + joinHe(bd.map(n => 'ל' + n)) + '!' : 'מחר ' + (bd.length > 1 ? 'ימי ההולדת' : 'יום ההולדת') + ' של ' + joinHe(bd)); }
-  if (an.length) { icons.push('💍'); lines.push(i === 0 ? 'מזל טוב ' + joinHe(an.map(n => 'למשפחת ' + n)) + ' ליום הנישואין!' : 'מחר יום הנישואין של ' + joinHe(an.map(n => 'משפחת ' + n))); }
-  if (yz.length) { icons.push('🕯️'); lines.push((i === 0 ? 'היום ' : 'מחר ') + 'היארצייט של ' + joinHe(yz)); }
-  const when = i === 0 ? 'היום' : 'מחר';
-  let title;
-  if (new Set(icons).size > 1) title = '🎉 שמחות ' + when;
-  else if (bms.length) title = '📜 ' + (bms.length > 1 ? 'שמחות' : bms[0].bm) + ' ' + when + (i === 0 ? '!' : '');
-  else if (bd.length) title = '🎂 ' + (bd.length > 1 ? 'ימי הולדת' : 'יום הולדת') + ' ' + when + (i === 0 ? '!' : '');
-  else if (an.length) title = '💍 ' + (an.length > 1 ? 'ימי נישואין' : 'יום נישואין') + ' ' + when + (i === 0 ? '!' : '');
-  else title = '🕯️ יארצייט ' + when;
-  return { title, body: lines.join(' · ') };
-}
 
 async function sendBirthdayReminders(db, data) {
   const all = allOccasions(data.families || [], data.yahrzeits || []);
