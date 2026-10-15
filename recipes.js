@@ -612,7 +612,7 @@ function printData(r,scale){
 const PRINT_CSS=`
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:#8E8A85}
-body{font-family:"Varela Round",Arial,sans-serif;color:#1F1B17;direction:rtl;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:"Varela Round",Arial,"Apple Color Emoji","Noto Color Emoji",sans-serif;color:#1F1B17;direction:rtl;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .sheet{display:flex;justify-content:flex-start;background:#fff;margin:0 auto}
 .page{width:99mm;height:210mm;display:flex;align-items:center;justify-content:center;flex:none;position:relative}
 .card{width:91mm;height:196mm;border-radius:9mm;position:relative;overflow:hidden;
@@ -795,7 +795,7 @@ function openPrint(recipes,o){
   const page=layout==='a4'?'A4 landscape':'99mm 210mm';
   const json=JSON.stringify(data).replace(/</g,'\\u003c');
   w.document.write(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${E(o.docTitle||data.title)}</title><link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap"><style>@page{size:${page};margin:0}${PRINT_CSS.replace("__BG__",new URL("recipe-card-bg.jpg",location.href).href)}${layout==='a4'?'.sheet{width:297mm;height:210mm}':'.sheet{width:99mm;height:210mm}'}</style></head><body>
+<title>${E(o.docTitle||data.title)}</title><link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Noto+Color+Emoji&display=swap"><style>@page{size:${page};margin:0}${PRINT_CSS.replace("__BG__",new URL("recipe-card-bg.jpg",location.href).href)}${layout==='a4'?'.sheet{width:297mm;height:210mm}':'.sheet{width:99mm;height:210mm}'}</style></head><body>
 <div class="bar">${o.imageMode?'<button id="rcImgBtn" onclick="saveCardImages()">🖼 שמירה כתמונה</button><button class="alt" onclick="print()">🖨 הדפסה</button>':'<button onclick="print()">🖨 הדפסה / PDF</button><button class="alt" id="rcImgBtn" onclick="saveCardImages()">🖼 כתמונה</button>'}<span><b id="rcCount"></b>${layout==='a4'?' · נייר A4 לרוחב':''}</span></div>
 <div id="book"></div>
 <script>window.__RC=${json};${saveCardImages.toString()}
