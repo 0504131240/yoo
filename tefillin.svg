@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- strap -->
+  <path d="M38 54 C50 56 58 50 60 38" fill="none" stroke="#111" stroke-width="5" stroke-linecap="round"/>
+  <path d="M26 54 C16 58 8 56 4 62" fill="none" stroke="#111" stroke-width="5" stroke-linecap="round"/>
+  <!-- base (titura) -->
+  <rect x="10" y="44" width="44" height="10" rx="2" fill="#1c1c1c" stroke="#fff" stroke-opacity=".35" stroke-width="1"/>
+  <!-- box (bayit): top face + front face -->
+  <path d="M18 14 L26 6 L54 6 L46 14 Z" fill="#3a3a3a" stroke="#fff" stroke-opacity=".35" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M46 14 L54 6 L54 36 L46 44 Z" fill="#262626" stroke="#fff" stroke-opacity=".35" stroke-width="1" stroke-linejoin="round"/>
+  <rect x="18" y="14" width="28" height="30" rx="1.5" fill="#111" stroke="#fff" stroke-opacity=".35" stroke-width="1"/>
+  <!-- shin -->
+  <path d="M24 21 V31 Q24 37 30 37 H34 Q40 37 40 31 V21 M32 23 V35" fill="none" stroke="#E8C547" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

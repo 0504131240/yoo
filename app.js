@@ -3034,6 +3034,13 @@ function _countdownParts(dateStr,timeStr){
 // Renders the actual card look (gradient bg, emoji, digits, title) shared
 // verbatim between the live home-screen cards and the modal's edit preview,
 // so what you see while editing really is the same markup, not a mockup.
+// Custom icons that have no Unicode emoji (e.g. tefillin) are stored in
+// c.emoji as a key and drawn from an image file instead of as text.
+const _CD_ICONS={tefillin:'tefillin.svg'};
+function _countdownIconHTML(emoji,size){
+  if(_CD_ICONS[emoji])return`<img src="${_CD_ICONS[emoji]}" alt="" style="width:${size}px;height:${size}px;display:inline-block;vertical-align:middle">`;
+  return esc(emoji);
+}
 function _countdownCardHTML(c){
   const p=_countdownParts(c.date,c.time);
   const bg1=c.bg1||'#667eea',bg2=c.bg2||'#764ba2',tc=c.textColor||'#ffffff';
@@ -3041,7 +3048,7 @@ function _countdownCardHTML(c){
     ?`<div style="font-family:var(--font-head);font-size:24px;font-weight:800;line-height:1">${p.days}<span style="font-size:12px;font-weight:600"> ${p.days===1?'יום':'ימים'}</span></div>
       <div style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-top:3px;direction:ltr">${_fmt2(p.hours)}:${_fmt2(p.mins)}:${_fmt2(p.secs)}</div>`
     :`<div style="font-family:var(--font-head);font-size:26px;font-weight:800;line-height:1">🎉</div><div style="font-size:11px;opacity:.9;margin-top:2px">הגיע היום!</div>`;
-  const emojiHtml=c.emoji?`<div style="font-size:${c.emojiSize||32}px;line-height:1;margin-bottom:4px">${esc(c.emoji)}</div>`:'';
+  const emojiHtml=c.emoji?`<div style="font-size:${c.emojiSize||32}px;line-height:1;margin-bottom:4px">${_countdownIconHTML(c.emoji,c.emojiSize||32)}</div>`:'';
   return`<div style="background:linear-gradient(135deg,${bg1},${bg2});border-radius:16px;padding:14px 12px;color:${tc};text-align:center;box-shadow:0 4px 16px rgba(102,126,234,0.3)">
     ${emojiHtml}
     ${body}
@@ -3064,14 +3071,15 @@ function renderCountdowns(){
   el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 14px 6px">${cards}${addBtn}</div>`;
   if(sorted.length)_countdownTickTimer=setInterval(renderCountdowns,1000);
 }
-let _editCountdownId=null,_countdownEmojiSize=32;
+let _editCountdownId=null,_countdownEmojiSize=32,_countdownIcon=null;
 function openCountdownModal(id){
   _editCountdownId=id!=null?id:null;
   const c=id!=null?countdowns.find(x=>x.id===id):null;
   const t=document.getElementById('countdownTitle');if(t)t.value=c?c.title:'';
   const d=document.getElementById('countdownDate');if(d)d.value=c?c.date:'';
   const tm=document.getElementById('countdownTime');if(tm)tm.value=c?(c.time||'00:00'):'00:00';
-  const e=document.getElementById('countdownEmoji');if(e)e.value=c?(c.emoji||''):'';
+  _countdownIcon=c&&_CD_ICONS[c.emoji]?c.emoji:null;
+  const e=document.getElementById('countdownEmoji');if(e)e.value=c&&!_countdownIcon?(c.emoji||''):'';
   const b1=document.getElementById('countdownBg1');if(b1)b1.value=c&&c.bg1?c.bg1:'#667eea';
   const b2=document.getElementById('countdownBg2');if(b2)b2.value=c&&c.bg2?c.bg2:'#764ba2';
   const tc=document.getElementById('countdownTextColor');if(tc)tc.value=c&&c.textColor?c.textColor:'#ffffff';
@@ -3087,7 +3095,8 @@ function closeCountdownModal(){
   _editCountdownId=null;
 }
 function pickCountdownEmoji(e){
-  const inp=document.getElementById('countdownEmoji');if(inp)inp.value=e;
+  _countdownIcon=_CD_ICONS[e]?e:null;
+  const inp=document.getElementById('countdownEmoji');if(inp)inp.value=_countdownIcon?'':e;
   updateCountdownPreview();
 }
 function stepCountdownEmojiSize(delta){
@@ -3100,9 +3109,9 @@ function stepCountdownEmojiSize(delta){
 // immediately, before saving.
 function updateCountdownPreview(){
   const inp=document.getElementById('countdownEmoji');
-  const val=(inp?.value||'').trim();
+  const val=(inp?.value||'').trim()||_countdownIcon||'';
   const prev=document.getElementById('countdownEmojiPreview');
-  if(prev){prev.textContent=val;prev.style.fontSize=_countdownEmojiSize+'px';}
+  if(prev){prev.innerHTML=_countdownIconHTML(val,_countdownEmojiSize);prev.style.fontSize=_countdownEmojiSize+'px';}
   const lbl=document.getElementById('countdownEmojiSizeLbl');if(lbl)lbl.textContent=_countdownEmojiSize+'px';
   const card=document.getElementById('countdownPreviewCard');
   if(card){
@@ -3119,7 +3128,7 @@ function saveCountdown(){
   const title=(document.getElementById('countdownTitle')?.value||'').trim();
   const date=document.getElementById('countdownDate')?.value||'';
   const time=document.getElementById('countdownTime')?.value||'00:00';
-  const emoji=(document.getElementById('countdownEmoji')?.value||'').trim();
+  const emoji=(document.getElementById('countdownEmoji')?.value||'').trim()||_countdownIcon||'';
   const bg1=document.getElementById('countdownBg1')?.value||'#667eea';
   const bg2=document.getElementById('countdownBg2')?.value||'#764ba2';
   const textColor=document.getElementById('countdownTextColor')?.value||'#ffffff';
