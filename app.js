@@ -3092,12 +3092,38 @@ function openCountdownModal(id){
 }
 function closeCountdownModal(){
   document.getElementById('countdownModal').style.display='none';
+  const pw=document.getElementById('countdownEmojiPickerWrap');if(pw)pw.style.display='none';
   _editCountdownId=null;
 }
 function pickCountdownEmoji(e){
   _countdownIcon=_CD_ICONS[e]?e:null;
   const inp=document.getElementById('countdownEmoji');if(inp)inp.value=_countdownIcon?'':e;
   updateCountdownPreview();
+}
+// Full emoji picker (every emoji, with categories + search), loaded from
+// the CDN only the first time it's opened so the page doesn't pay for it.
+let _cdPickerLoading=null;
+function toggleCountdownEmojiPicker(){
+  const wrap=document.getElementById('countdownEmojiPickerWrap');if(!wrap)return;
+  if(wrap.style.display!=='none'){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  if(wrap.firstChild)return;
+  wrap.innerHTML='<div style="text-align:center;font-size:12px;color:var(--text2);padding:10px">טוען אימוג\'ים…</div>';
+  _cdPickerLoading=_cdPickerLoading||import('https://cdn.jsdelivr.net/npm/emoji-picker-element@1.29.1/index.js');
+  _cdPickerLoading.then(()=>{
+    const p=document.createElement('emoji-picker');
+    p.className='light';p.dir='ltr';
+    p.style.cssText="width:100%;height:320px;--emoji-font-family:'Apple Color Emoji','Noto Color Emoji','Segoe UI Emoji',sans-serif";
+    p.addEventListener('emoji-click',ev=>{
+      pickCountdownEmoji(ev.detail.unicode);
+      wrap.style.display='none';
+    });
+    wrap.innerHTML='';wrap.appendChild(p);
+  }).catch(()=>{
+    _cdPickerLoading=null;
+    wrap.innerHTML='<div style="text-align:center;font-size:12px;color:var(--red);padding:10px">טעינת האימוג\'ים נכשלה, נסה שוב</div>';
+    setTimeout(()=>{if(wrap.firstChild&&!wrap.querySelector('emoji-picker'))wrap.innerHTML='';},2500);
+  });
 }
 function stepCountdownEmojiSize(delta){
   _countdownEmojiSize=Math.max(16,Math.min(80,_countdownEmojiSize+delta));
