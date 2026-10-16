@@ -1363,11 +1363,14 @@ function _treeHiddenDescendantCount(p,kids){
   return seen.size;
 }
 // Opening or closing a sub-tree from its card — view only, nothing saved.
+// Only one folded branch (below or above someone) is open at a time —
+// opening one closes whichever was open before.
 function toggleTreeSubtree(id){
-  if(_treeExpanded.has(id))_treeExpanded.delete(id);
-  else _treeExpanded.add(id);
+  const wasOpen=_treeExpanded.has(id);
+  _treeExpanded.clear();_treeExpandedUp.clear();
+  if(!wasOpen)_treeExpanded.add(id);
   renderFamilyTree();
-  _fitTreeWhenReady();
+  _treeCenterOnPerson(id);
 }
 // Making someone a sub-tree (or folding their branch back in) — saved.
 // Un-collapsing is a direct single click. Collapsing, when this person has
@@ -1483,11 +1486,25 @@ function _treeHiddenAncestorIds(){
 }
 // Opening or closing a folded ancestor line from its card — view only,
 // nothing saved.
+// While open, renderFamilyTree lays the whole tree out from this person's
+// couple (_treeLayoutRootId): his line on the right, hers on the left, each
+// one's siblings on their own outer side — instead of squeezing the opened
+// ancestors in among the spouse's relatives.
 function toggleTreeAncestorsPeek(id){
-  if(_treeExpandedUp.has(id))_treeExpandedUp.delete(id);
-  else _treeExpandedUp.add(id);
+  const wasOpen=_treeExpandedUp.has(id);
+  _treeExpanded.clear();_treeExpandedUp.clear();
+  if(!wasOpen)_treeExpandedUp.add(id);
   renderFamilyTree();
-  _fitTreeWhenReady();
+  _treeCenterOnPerson(id);
+}
+// The person (with their spouse, when drawn) in the middle of the screen,
+// at the current zoom — e.g. the couple whose folded line was just opened.
+function _treeCenterOnPerson(id){
+  const p=familyTree.find(x=>x.id===id);if(!p||!_treeLastPos)return;
+  const ps=[id,...(p.spouseIds||[])].map(x=>_treeLastPos[x]).filter(Boolean);
+  if(!ps.length)return;
+  const go=()=>_treeScrollCenterTo((Math.min(...ps.map(q=>q.cx))+Math.max(...ps.map(q=>q.cx)))/2,ps[0].cy);
+  go();requestAnimationFrame(go);
 }
 // Folding a person's ancestors away (or restoring them) — saved. Unlike
 // collapsing descendants, there's no line to choose between: both parents
@@ -1715,6 +1732,7 @@ function openFamilyTreeOverlay(){
   document.getElementById('familyTreeOverlay').style.display='flex';_setHash('tree');
   // Always open in normal (non-stats) mode with a clean selection.
   _treeStatsMode=false;_treeSel.clear();_treeInfoId=null;
+  _treeExpanded.clear();_treeExpandedUp.clear(); // folded branches start closed
   const _ip=document.getElementById('treeInfoPanel');if(_ip)_ip.style.display='none';
   const _sp=document.getElementById('treeStatsPanel');if(_sp)_sp.style.display='none';
   const _sb=document.getElementById('treeStatsBtn');if(_sb){_sb.style.background='var(--surface2)';_sb.style.color='var(--text2)';}
@@ -1830,7 +1848,9 @@ function _fitTreeWhenReady(attempts,onOpen){
 // fit() slides a block only as far as needed so no two cards overlap on any
 // row. Applied recursively, the husband's whole ancestry ends up on the
 // right and the wife's on the left, at every generation.
-function _treeLayout(people){
+// rootId (optional): lay the tree out from this person's couple instead of
+// the automatically picked root.
+function _treeLayout(people,rootId){
   const W=TREE_NODE_W,PG=TREE_COUPLE_GAP,SG=TREE_COUPLE_GAP,FG=TREE_H_GAP,EPS=1e-6;
   const P=new Map(),order=new Map();
   people.forEach((r,i)=>{ order.set(r.id,i); P.set(r.id,{id:r.id,g:r.gender==='girl'?'f':'m',by:parseInt(r.birthYear,10)||null,manual:!!r.siblingOrderManual,parents:[],kids:[],mates:new Set()}); });
@@ -1907,6 +1927,11 @@ function _treeLayout(people){
     roots.push({u:pickRoot(new Set(units.filter(u=>!inC.has(u.id)).map(u=>u.id))),n:mem.reduce((a,u)=>a+u.partners.length,0)});
   });
   roots.sort((a,b)=>b.n-a.n); roots=roots.map(r=>r.u);
+  if(rootId!=null&&unitOf.has(rootId)){
+    const ru=unitOf.get(rootId),i=roots.findIndex(r=>comp.get(r.id)===comp.get(ru.id));
+    if(i>=0)roots.splice(i,1);
+    roots.unshift(ru);
+  }
 
   // A block is a group of cards already placed relative to each other.
   // lv: row -> occupied spans {s0,s1}; pos: person -> {s, l}.
@@ -2057,7 +2082,8 @@ function renderFamilyTree(){
     canvas.innerHTML='<div class="empty" style="padding:40px 0"><span class="empty-ico">🌳</span>אין עדיין אנשים בעץ. לחצו על "+ הוסף אדם" כדי להתחיל.</div>';
     return;
   }
-  const {pos,maxLevel,claimedBy,rootIds}=_treeLayout(people);
+  const _peekUp=[..._treeExpandedUp][0];
+  const {pos,maxLevel,claimedBy,rootIds}=_treeLayout(people,_peekUp);
   _treeLastRootIds=rootIds;
   const maxX=Math.max(...Object.values(pos).map(p=>p.x+TREE_NODE_W))+20;
   const totalH=(maxLevel+1)*TREE_LEVEL_H+20;
