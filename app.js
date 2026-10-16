@@ -1363,11 +1363,14 @@ function _treeHiddenDescendantCount(p,kids){
   return seen.size;
 }
 // Opening or closing a sub-tree from its card — view only, nothing saved.
+// Only one folded branch (below or above someone) is open at a time —
+// opening one closes whichever was open before.
 function toggleTreeSubtree(id){
-  if(_treeExpanded.has(id))_treeExpanded.delete(id);
-  else _treeExpanded.add(id);
+  const wasOpen=_treeExpanded.has(id);
+  _treeExpanded.clear();_treeExpandedUp.clear();
+  if(!wasOpen)_treeExpanded.add(id);
   renderFamilyTree();
-  _fitTreeWhenReady();
+  _treeCenterOnPerson(id);
 }
 // Making someone a sub-tree (or folding their branch back in) — saved.
 // Un-collapsing is a direct single click. Collapsing, when this person has
@@ -1483,11 +1486,25 @@ function _treeHiddenAncestorIds(){
 }
 // Opening or closing a folded ancestor line from its card — view only,
 // nothing saved.
+// While open, renderFamilyTree lays the whole tree out from this person's
+// couple (_treeLayoutRootId): his line on the right, hers on the left, each
+// one's siblings on their own outer side — instead of squeezing the opened
+// ancestors in among the spouse's relatives.
 function toggleTreeAncestorsPeek(id){
-  if(_treeExpandedUp.has(id))_treeExpandedUp.delete(id);
-  else _treeExpandedUp.add(id);
+  const wasOpen=_treeExpandedUp.has(id);
+  _treeExpanded.clear();_treeExpandedUp.clear();
+  if(!wasOpen)_treeExpandedUp.add(id);
   renderFamilyTree();
-  _fitTreeWhenReady();
+  _treeCenterOnPerson(id);
+}
+// The person (with their spouse, when drawn) in the middle of the screen,
+// at the current zoom — e.g. the couple whose folded line was just opened.
+function _treeCenterOnPerson(id){
+  const p=familyTree.find(x=>x.id===id);if(!p||!_treeLastPos)return;
+  const ps=[id,...(p.spouseIds||[])].map(x=>_treeLastPos[x]).filter(Boolean);
+  if(!ps.length)return;
+  const go=()=>_treeScrollCenterTo((Math.min(...ps.map(q=>q.cx))+Math.max(...ps.map(q=>q.cx)))/2,ps[0].cy);
+  go();requestAnimationFrame(go);
 }
 // Folding a person's ancestors away (or restoring them) — saved. Unlike
 // collapsing descendants, there's no line to choose between: both parents
@@ -1715,13 +1732,14 @@ function openFamilyTreeOverlay(){
   document.getElementById('familyTreeOverlay').style.display='flex';_setHash('tree');
   // Always open in normal (non-stats) mode with a clean selection.
   _treeStatsMode=false;_treeSel.clear();_treeInfoId=null;
+  _treeExpanded.clear();_treeExpandedUp.clear(); // folded branches start closed
   const _ip=document.getElementById('treeInfoPanel');if(_ip)_ip.style.display='none';
   const _sp=document.getElementById('treeStatsPanel');if(_sp)_sp.style.display='none';
   const _sb=document.getElementById('treeStatsBtn');if(_sb){_sb.style.background='var(--surface2)';_sb.style.color='var(--text2)';}
   const wrap0=document.getElementById('treeCanvasWrap');
   if(wrap0){wrap0.scrollTop=0;wrap0.scrollLeft=0;} // known state immediately, before the fit even runs
   renderFamilyTree();
-  _fitTreeWhenReady(); // canvas needs a layout pass first for its size to be known
+  _fitTreeWhenReady(0,true); // canvas needs a layout pass first for its size to be known; opens centered on the root couple
 }
 function closeFamilyTreeOverlay(){
   document.getElementById('familyTreeOverlay').style.display='none';_clearHash('tree');
@@ -1734,12 +1752,54 @@ function renderFamilyTreeIfOpen(){
 // untransformed layout size regardless of scale, so "fit to screen" just
 // compares that natural size against the scrollable wrapper's viewport.
 let _treeZoom=1;
+// #treeCanvasPad (between the scroll wrapper and the canvas) has half-a-
+// screen of padding on every side, so any card — even one at the tree's
+// edge — can be scrolled to the exact middle of the screen. It sits inside
+// the wrapper rather than being the wrapper's own padding, which would
+// stretch the wrapper past the bottom of the screen. Scroll math adds this
+// offset to the card's scaled position.
+function _treeWrapPad(){
+  const el=document.getElementById('treeCanvasPad');if(!el)return {l:0,t:0};
+  const cs=getComputedStyle(el);
+  return {l:parseFloat(cs.paddingLeft)||0,t:parseFloat(cs.paddingTop)||0};
+}
+// Scrolls so canvas point (x,y) (unscaled layout coords) is mid-screen.
+function _treeScrollCenterTo(x,y,smooth){
+  const wrap=document.getElementById('treeCanvasWrap');if(!wrap)return;
+  const pad=_treeWrapPad();
+  const left=pad.l+x*_treeZoom-wrap.clientWidth/2,top=pad.t+y*_treeZoom-wrap.clientHeight/2;
+  if(smooth)wrap.scrollTo({left,top,behavior:'smooth'});
+  else{wrap.scrollLeft=left;wrap.scrollTop=top;}
+}
 function applyTreeZoom(){
   const c=document.getElementById('treeCanvas');if(c)c.style.transform='scale('+_treeZoom+')';
 }
+// Zooms around the middle of the screen, so whatever is in the center
+// (e.g. the root couple right after opening) stays there.
 function zoomTree(delta){
-  _treeZoom=Math.max(0.2,Math.min(2,Math.round((_treeZoom+delta)*100)/100));
+  const wrap=document.getElementById('treeCanvasWrap');
+  const old=_treeZoom;
+  _treeZoom=Math.max(0.05,Math.min(2,Math.round((_treeZoom+delta)*100)/100));
+  if(!wrap){applyTreeZoom();return;}
+  const pad=_treeWrapPad();
+  const cx=(wrap.scrollLeft+wrap.clientWidth/2-pad.l)/old,cy=(wrap.scrollTop+wrap.clientHeight/2-pad.t)/old;
   applyTreeZoom();
+  _treeScrollCenterTo(cx,cy);
+}
+// Opening view: the couple the two branches (his ancestry / hers) split
+// from sits in the middle of the screen, at a readable zoom — the fit-all
+// zoom when that's already readable, otherwise a floor of 0.6.
+function _centerTreeOnRoot(){
+  const c=document.getElementById('treeCanvas'),wrap=document.getElementById('treeCanvasWrap');
+  if(!c||!wrap||!c.offsetWidth||!c.offsetHeight)return;
+  const ps=(_treeLastRootIds||[]).map(id=>_treeLastPos&&_treeLastPos[id]).filter(Boolean);
+  if(!ps.length){fitTreeToScreen();return;}
+  const fit=Math.min((wrap.clientWidth-48)/c.offsetWidth,(wrap.clientHeight-48)/c.offsetHeight,1);
+  _treeZoom=Math.round(Math.min(1,Math.max(fit,0.6))*100)/100;
+  applyTreeZoom();
+  const x=(Math.min(...ps.map(p=>p.cx))+Math.max(...ps.map(p=>p.cx)))/2;
+  const y=(Math.min(...ps.map(p=>p.cy))+Math.max(...ps.map(p=>p.cy)))/2;
+  _treeScrollCenterTo(x,y);
 }
 function fitTreeToScreen(){
   const c=document.getElementById('treeCanvas');if(!c)return;
@@ -1757,16 +1817,8 @@ function fitTreeToScreen(){
   // forcing an overflow that then needs scrolling to see the rest at all.
   _treeZoom=Math.max(0.05,Math.round(fit*100)/100);
   applyTreeZoom();
-  // A tree wide/tall enough that even the 0.15 floor can't shrink it to fit
-  // still overflows — pinning scroll to (0,0) then leaves the whole thing
-  // looking like it's "over on the right" (or bottom), since only the very
-  // left/top sliver is on screen and everything else needs scrolling to
-  // reach. Center the initial scroll on the middle of the tree instead, in
-  // this same untransformed coordinate space _treeLayout/renderFamilyTree
-  // already use (scrollWidth/Height track the layout size, not the scaled-
-  // down visual size, so the visible slice at zoom Z is clientWidth/Z wide).
-  wrap.scrollLeft=Math.max(0,(c.offsetWidth-wrap.clientWidth/_treeZoom)/2);
-  wrap.scrollTop=Math.max(0,(c.offsetHeight-wrap.clientHeight/_treeZoom)/2);
+  // Put the middle of the tree in the middle of the screen.
+  _treeScrollCenterTo(c.offsetWidth/2,c.offsetHeight/2);
 }
 // Retries until the canvas has actually been laid out (offsetWidth/Height
 // read 0 right after a display:none→flex flip until the browser's next
@@ -1775,15 +1827,18 @@ function fitTreeToScreen(){
 // Once it succeeds, a couple of rAF follow-ups re-apply the same scroll
 // reset in case the browser re-anchors scroll position on a later paint
 // (seen on some mobile browsers right after a large layout change).
-function _fitTreeWhenReady(attempts){
+// onOpen: center on the root couple (_centerTreeOnRoot) instead of fitting
+// everything — used only when the tree page is opened.
+function _fitTreeWhenReady(attempts,onOpen){
   attempts=attempts||0;
   const c=document.getElementById('treeCanvas');
   if(c&&c.offsetWidth&&c.offsetHeight){
-    fitTreeToScreen();
-    requestAnimationFrame(()=>{fitTreeToScreen();requestAnimationFrame(fitTreeToScreen);});
+    const go=onOpen?_centerTreeOnRoot:fitTreeToScreen;
+    go();
+    requestAnimationFrame(()=>{go();requestAnimationFrame(go);});
     return;
   }
-  if(attempts<20)setTimeout(()=>_fitTreeWhenReady(attempts+1),50);
+  if(attempts<20)setTimeout(()=>_fitTreeWhenReady(attempts+1,onOpen),50);
 }
 // Recursive block layout. A "unit" is a married couple (husband first, so
 // he ends up on the right after the RTL mirror at the end) or a lone person.
@@ -1793,7 +1848,9 @@ function _fitTreeWhenReady(attempts){
 // fit() slides a block only as far as needed so no two cards overlap on any
 // row. Applied recursively, the husband's whole ancestry ends up on the
 // right and the wife's on the left, at every generation.
-function _treeLayout(people){
+// rootId (optional): lay the tree out from this person's couple instead of
+// the automatically picked root.
+function _treeLayout(people,rootId){
   const W=TREE_NODE_W,PG=TREE_COUPLE_GAP,SG=TREE_COUPLE_GAP,FG=TREE_H_GAP,EPS=1e-6;
   const P=new Map(),order=new Map();
   people.forEach((r,i)=>{ order.set(r.id,i); P.set(r.id,{id:r.id,g:r.gender==='girl'?'f':'m',by:parseInt(r.birthYear,10)||null,manual:!!r.siblingOrderManual,parents:[],kids:[],mates:new Set()}); });
@@ -1870,6 +1927,11 @@ function _treeLayout(people){
     roots.push({u:pickRoot(new Set(units.filter(u=>!inC.has(u.id)).map(u=>u.id))),n:mem.reduce((a,u)=>a+u.partners.length,0)});
   });
   roots.sort((a,b)=>b.n-a.n); roots=roots.map(r=>r.u);
+  if(rootId!=null&&unitOf.has(rootId)){
+    const ru=unitOf.get(rootId),i=roots.findIndex(r=>comp.get(r.id)===comp.get(ru.id));
+    if(i>=0)roots.splice(i,1);
+    roots.unshift(ru);
+  }
 
   // A block is a group of cards already placed relative to each other.
   // lv: row -> occupied spans {s0,s1}; pos: person -> {s, l}.
@@ -1995,7 +2057,9 @@ function _treeLayout(people){
   });
   const claimedBy={};
   people.forEach(p=>{ if(p.parentIds&&p.parentIds.length)claimedBy[p.id]=[...p.parentIds].sort((a,b)=>a-b).join(','); });
-  return {pos,maxLevel:X.pos.size?maxL-minL:0,claimedBy};
+  // rootIds: the couple both ancestries branch out of (roots[0]) — the
+  // tree opens centered on them (_centerTreeOnRoot).
+  return {pos,maxLevel:X.pos.size?maxL-minL:0,claimedBy,rootIds:roots[0]?roots[0].partners.slice():[]};
 }
 function renderFamilyTree(){
   const canvas=document.getElementById('treeCanvas');if(!canvas)return;
@@ -2008,12 +2072,19 @@ function renderFamilyTree(){
   const _hidden=_treeHiddenIds(_kidsMap);
   _treeHiddenAncestorIds().forEach(id=>_hidden.add(id));
   const people=_hidden.size?familyTree.filter(p=>!_hidden.has(p.id)):familyTree;
+  // The half-screen scroll padding (_treeWrapPad) would push the empty-
+  // state message off screen — plain padding while there's no tree.
+  const _pad=document.getElementById('treeCanvasPad');
+  if(_pad){_pad.style.padding=people.length?'50vh 50vw':'24px';_pad.style.width=people.length?'max-content':'auto';}
   if(!people.length){
     canvas.style.width='';canvas.style.height='';
+    _treeZoom=1;applyTreeZoom();
     canvas.innerHTML='<div class="empty" style="padding:40px 0"><span class="empty-ico">🌳</span>אין עדיין אנשים בעץ. לחצו על "+ הוסף אדם" כדי להתחיל.</div>';
     return;
   }
-  const {pos,maxLevel,claimedBy}=_treeLayout(people);
+  const _peekUp=[..._treeExpandedUp][0];
+  const {pos,maxLevel,claimedBy,rootIds}=_treeLayout(people,_peekUp);
+  _treeLastRootIds=rootIds;
   const maxX=Math.max(...Object.values(pos).map(p=>p.x+TREE_NODE_W))+20;
   const totalH=(maxLevel+1)*TREE_LEVEL_H+20;
   let svgLines='';
@@ -2225,7 +2296,7 @@ function _initTreeLasso(){
   if(!wrap||!canvas||wrap._lassoInit)return;
   wrap._lassoInit=true;
   const toCanvas=(cx,cy)=>{const r=canvas.getBoundingClientRect();return {x:(cx-r.left)/_treeZoom,y:(cy-r.top)/_treeZoom};};
-  const onEmpty=t=>t===canvas||t===wrap||t.tagName==='svg'||t.tagName==='line';
+  const onEmpty=t=>t===canvas||t===wrap||t.id==='treeCanvasPad'||t.tagName==='svg'||t.tagName==='line';
   wrap.addEventListener('pointerdown',e=>{
     if(!_treeStatsMode||!onEmpty(e.target))return;
     const p=toCanvas(e.clientX,e.clientY);
@@ -2478,7 +2549,7 @@ function closeTreePersonModal(){
 // person sheet (details, linking, hiding the line above/below). Built in JS
 // so index.html and admin.html don't need to carry the markup. Desktop:
 // floats over the tree's top-left corner; phone: a bottom sheet.
-let _treeInfoId=null,_treeLastPos=null;
+let _treeInfoId=null,_treeLastPos=null,_treeLastRootIds=[];
 function _ensureTreeInfoPanel(){
   const overlay=document.getElementById('familyTreeOverlay');if(!overlay)return null;
   let el=document.getElementById('treeInfoPanel');
@@ -2499,7 +2570,7 @@ function _ensureTreeInfoPanel(){
   const wrap=document.getElementById('treeCanvasWrap');
   if(wrap)wrap.addEventListener('click',e=>{
     const t=e.target;
-    if(_treeInfoId!=null&&!_treeStatsMode&&(t===wrap||t.id==='treeCanvas'||t.tagName==='svg'||t.tagName==='line'))closeTreeInfoPanel();
+    if(_treeInfoId!=null&&!_treeStatsMode&&(t===wrap||t.id==='treeCanvas'||t.id==='treeCanvasPad'||t.tagName==='svg'||t.tagName==='line'))closeTreeInfoPanel();
   });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&_treeInfoId!=null&&document.getElementById('treePersonModal').style.display!=='flex')closeTreeInfoPanel(); });
   return el;
@@ -2525,8 +2596,7 @@ function treeInfoGo(id){
   openTreeInfoPanel(id);
   const q=_treeLastPos&&_treeLastPos[id],wrap=document.getElementById('treeCanvasWrap');
   if(!q||!wrap)return;
-  const pad=24;
-  wrap.scrollTo({left:pad+q.cx*_treeZoom-wrap.clientWidth/2,top:pad+q.cy*_treeZoom-wrap.clientHeight/2,behavior:'smooth'});
+  _treeScrollCenterTo(q.cx,q.cy,true);
 }
 function renderTreeInfoPanel(){
   const el=_ensureTreeInfoPanel();if(!el)return;
