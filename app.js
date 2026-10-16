@@ -1734,17 +1734,21 @@ function renderFamilyTreeIfOpen(){
 // untransformed layout size regardless of scale, so "fit to screen" just
 // compares that natural size against the scrollable wrapper's viewport.
 let _treeZoom=1;
-// #treeCanvasWrap has half-a-screen of padding on every side, so any card —
-// even one at the tree's edge — can be scrolled to the exact middle of the
-// screen. Scroll math adds this offset to the card's scaled position.
-function _treeWrapPad(wrap){
-  const cs=getComputedStyle(wrap);
+// #treeCanvasPad (between the scroll wrapper and the canvas) has half-a-
+// screen of padding on every side, so any card — even one at the tree's
+// edge — can be scrolled to the exact middle of the screen. It sits inside
+// the wrapper rather than being the wrapper's own padding, which would
+// stretch the wrapper past the bottom of the screen. Scroll math adds this
+// offset to the card's scaled position.
+function _treeWrapPad(){
+  const el=document.getElementById('treeCanvasPad');if(!el)return {l:0,t:0};
+  const cs=getComputedStyle(el);
   return {l:parseFloat(cs.paddingLeft)||0,t:parseFloat(cs.paddingTop)||0};
 }
 // Scrolls so canvas point (x,y) (unscaled layout coords) is mid-screen.
 function _treeScrollCenterTo(x,y,smooth){
   const wrap=document.getElementById('treeCanvasWrap');if(!wrap)return;
-  const pad=_treeWrapPad(wrap);
+  const pad=_treeWrapPad();
   const left=pad.l+x*_treeZoom-wrap.clientWidth/2,top=pad.t+y*_treeZoom-wrap.clientHeight/2;
   if(smooth)wrap.scrollTo({left,top,behavior:'smooth'});
   else{wrap.scrollLeft=left;wrap.scrollTop=top;}
@@ -1759,7 +1763,7 @@ function zoomTree(delta){
   const old=_treeZoom;
   _treeZoom=Math.max(0.05,Math.min(2,Math.round((_treeZoom+delta)*100)/100));
   if(!wrap){applyTreeZoom();return;}
-  const pad=_treeWrapPad(wrap);
+  const pad=_treeWrapPad();
   const cx=(wrap.scrollLeft+wrap.clientWidth/2-pad.l)/old,cy=(wrap.scrollTop+wrap.clientHeight/2-pad.t)/old;
   applyTreeZoom();
   _treeScrollCenterTo(cx,cy);
@@ -2045,7 +2049,8 @@ function renderFamilyTree(){
   const people=_hidden.size?familyTree.filter(p=>!_hidden.has(p.id)):familyTree;
   // The half-screen scroll padding (_treeWrapPad) would push the empty-
   // state message off screen — plain padding while there's no tree.
-  const _wrap=canvas.parentElement;if(_wrap)_wrap.style.padding=people.length?'50vh 50vw':'24px';
+  const _pad=document.getElementById('treeCanvasPad');
+  if(_pad){_pad.style.padding=people.length?'50vh 50vw':'24px';_pad.style.width=people.length?'max-content':'auto';}
   if(!people.length){
     canvas.style.width='';canvas.style.height='';
     _treeZoom=1;applyTreeZoom();
@@ -2265,7 +2270,7 @@ function _initTreeLasso(){
   if(!wrap||!canvas||wrap._lassoInit)return;
   wrap._lassoInit=true;
   const toCanvas=(cx,cy)=>{const r=canvas.getBoundingClientRect();return {x:(cx-r.left)/_treeZoom,y:(cy-r.top)/_treeZoom};};
-  const onEmpty=t=>t===canvas||t===wrap||t.tagName==='svg'||t.tagName==='line';
+  const onEmpty=t=>t===canvas||t===wrap||t.id==='treeCanvasPad'||t.tagName==='svg'||t.tagName==='line';
   wrap.addEventListener('pointerdown',e=>{
     if(!_treeStatsMode||!onEmpty(e.target))return;
     const p=toCanvas(e.clientX,e.clientY);
@@ -2539,7 +2544,7 @@ function _ensureTreeInfoPanel(){
   const wrap=document.getElementById('treeCanvasWrap');
   if(wrap)wrap.addEventListener('click',e=>{
     const t=e.target;
-    if(_treeInfoId!=null&&!_treeStatsMode&&(t===wrap||t.id==='treeCanvas'||t.tagName==='svg'||t.tagName==='line'))closeTreeInfoPanel();
+    if(_treeInfoId!=null&&!_treeStatsMode&&(t===wrap||t.id==='treeCanvas'||t.id==='treeCanvasPad'||t.tagName==='svg'||t.tagName==='line'))closeTreeInfoPanel();
   });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&_treeInfoId!=null&&document.getElementById('treePersonModal').style.display!=='flex')closeTreeInfoPanel(); });
   return el;

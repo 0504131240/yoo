@@ -999,8 +999,10 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
       <button onclick="addRootTreePerson()" style="background:var(--blue-mid);color:#fff;border:none;border-radius:var(--r2);padding:7px 12px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ הוסף אדם</button>
     </div>
   </div>
-  <div id="treeCanvasWrap" dir="ltr" style="flex:1;overflow:auto;padding:50vh 50vw">
-    <div id="treeCanvas" style="position:relative;transform-origin:top left"></div>
+  <div id="treeCanvasWrap" dir="ltr" style="flex:1;min-height:0;overflow:auto">
+    <div id="treeCanvasPad" style="padding:50vh 50vw;width:max-content">
+      <div id="treeCanvas" style="position:relative;transform-origin:top left"></div>
+    </div>
   </div>
   <div style="position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:16px;z-index:4;display:flex;flex-direction:column;gap:10px;align-items:center">
     <button onclick="zoomTree(0.15)" title="הגדל" aria-label="הגדל" style="width:46px;height:46px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--text);box-shadow:0 3px 12px rgba(0,0,0,0.22);cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;padding:0;font-size:24px;font-weight:700">＋</button>
