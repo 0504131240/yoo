@@ -40,7 +40,7 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
-const CACHE = 'family-pay-v7';
+const CACHE = 'family-pay-v8';
 const STATIC = ['./icon.svg','./icon.jpg','./manifest.json'];
 
 self.addEventListener('install', e => {
