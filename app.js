@@ -3653,6 +3653,8 @@ const PHONE_CATS=[
   {id:'money',ico:'💰',label:'הפקדת כסף לקופה שקשורה אלינו',def:true},
   {id:'wallet',ico:'🏦',label:'הפקדה או משיכה בארנק שלנו',def:true},
   {id:'debt',ico:'📋',label:'תזכורת שבועית על חוב פתוח',def:true},
+  // Rings on the day itself only, in the morning run (api/cron/daily-backup.js).
+  {id:'occasion',ico:'🎂',label:'יום הולדת / יארצייט / יום נישואין — ביום עצמו',def:false,scoped:true},
 ];
 const _normPhone=p=>{let d=String(p||'').replace(/\D/g,'');if(d.startsWith('972'))d='0'+d.slice(3);return /^0\d{8,9}$/.test(d)?d:null;};
 // Unset categories fall back to their default: on, except opt-in ones (def:false).
