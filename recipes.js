@@ -215,6 +215,7 @@ function firestoreStore(){
       delete data.madeBy;delete data.madeCount;delete data.comments;
       await fs.setDoc(ref(id),data,{merge:true});},
     async remove(id){await init();await fs.deleteDoc(ref(id));},
+    async all(){await init();const snap=await fs.getDocs(fs.collection(db,'recipes'));return snap.docs.map(d=>({...d.data(),id:d.id}));},
     async addMade(id,entry){await init();await fs.updateDoc(ref(id),{madeBy:fs.arrayUnion(entry),madeCount:fs.increment(1)});},
     async addComment(id,c){await init();await fs.updateDoc(ref(id),{comments:fs.arrayUnion(c)});},
     async removeComment(id,c){await init();await fs.updateDoc(ref(id),{comments:fs.arrayRemove(c)});}
@@ -228,6 +229,7 @@ function mockStore(){
     async subscribe(f){cb=f;emit();return ()=>{cb=null;};},
     async put(r,isNew){const i=items.findIndex(x=>x.id===r.id);if(i<0||isNew){items.push(r);}else{const {madeBy,madeCount,comments,...rest}=r;Object.assign(items[i],rest);}emit();},
     async remove(id){items=items.filter(r=>r.id!==id);emit();},
+    async all(){return JSON.parse(JSON.stringify(items));},
     async addMade(id,e){const r=get(id);r.madeBy=(r.madeBy||[]).concat(e);r.madeCount=(r.madeCount||0)+1;emit();},
     async addComment(id,c){const r=get(id);r.comments=(r.comments||[]).concat(c);emit();},
     async removeComment(id,c){const r=get(id);r.comments=(r.comments||[]).filter(x=>x.id!==c.id);emit();}
@@ -310,6 +312,16 @@ function build(){
   document.body.appendChild(el);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&$('rcCook')&&$('rcCook').classList.contains('open'))acquireWake();});
 }
+
+// Recipe contest (the 🏆 window in app.js): how many recipes each person
+// added, by the name saved on the recipe. Never resets.
+window.rcContestRows=async function(){
+  let list=S.loaded&&!S.err?S.recipes:null;
+  if(!list){const st=window.RECIPES_MOCK?mockStore():firestoreStore();list=await st.all();}
+  const m=new Map();
+  list.forEach(r=>{const n=(r.createdBy||'').trim();if(n)m.set(n,(m.get(n)||0)+1);});
+  return [...m].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'he'));
+};
 
 window.openRecipesOverlay=function(){
   build();

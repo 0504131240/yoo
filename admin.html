@@ -33,6 +33,8 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
       <button id="notifBtn" style="background:rgba(0,0,0,0.06);border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;opacity:.7;line-height:1;color:var(--text2)">🔕</button>
       <button id="settingsHubBtn" class="edit-only" onclick="openSettingsHubModal()" style="background:rgba(0,0,0,0.06);border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;line-height:1;color:var(--text2)" title="הגדרות">⚙️</button>
     </div>
+    <!-- 🏆 Competitions: recipes, family tree and Shabbat contest (app.js openCompetitionsModal) -->
+    <button class="fh-trophy" onclick="openCompetitionsModal()" title="תחרויות" aria-label="תחרויות">🏆</button>
     <img src="logo.jpg" class="fh-hero-logo" alt="ינקלביץ">
     <div class="fh-hero-content">
       <div class="fh-hero-sub" id="fhSub"></div>

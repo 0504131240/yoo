@@ -975,6 +975,25 @@ function close(){
   document.body.style.overflow='';clearInterval(S.tick);stopSync();musicPause();
   if(typeof _clearHash==='function')_clearHash('contest');
 }
+// For the 🏆 window in app.js: this week's standings and past weekly wins.
+window.contestSummary=async function(){
+  let weeks;
+  if(window.CONTEST_MOCK)weeks=lsGet('scMockHall',null)||window.CONTEST_MOCK_HALL||{};
+  else{
+    const fb=await fbInit();const mod=await import(FS_URL);
+    const snap=await mod.getDoc(fb.doc(fb.db,'appData','contestHall'));
+    weeks=(snap.exists()&&snap.data().weeks)||{};
+  }
+  const wk=keyOf(satOf(now()));
+  const cur=weeks[wk]||{};
+  const week=Object.keys(cur).map(id=>({f:fam(+id),points:cur[id]||0})).filter(r=>r.f&&r.points>0)
+    .sort((a,b)=>b.points-a.points).map(r=>({name:short(r.f),points:r.points}));
+  const wins={};
+  Object.keys(weeks).filter(k=>k<wk).forEach(k=>{const sc=weeks[k]||{};const best=Object.keys(sc).sort((a,b)=>sc[b]-sc[a])[0];if(best&&sc[best]>0)wins[best]=(wins[best]||0)+1;});
+  const hall=Object.keys(wins).map(id=>({f:fam(+id),count:wins[id]})).filter(r=>r.f)
+    .sort((a,b)=>b.count-a.count).map(r=>({name:short(r.f),count:r.count}));
+  return {week,hall,locked:now()>=lockAt(wk)};
+};
 window.openContestOverlay=open;
 window.closeContestOverlay=close;
 window.contestUI={setTab,pickDay,toggleTask,saveTxt,setFam,answer,toggleBingo,spin,addCustom,delCustom,toggleHelp,toggleFamDetail,switchToggle,readHalacha,cheer,toggleSide,pickHal,askReady,askCheck,askDay,closeAsk,saveReady,toggleMusic};
