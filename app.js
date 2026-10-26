@@ -1583,6 +1583,8 @@ function _treeBirthYearFromHeb(hebYear,hebMonth,hebDay){
 }
 // ── Export / import / pull-from-families ────────────────────────────────
 function openTreeToolsModal(){
+  // Pulling only builds a first tree (see pullTreeFromFamilies).
+  document.querySelectorAll('.tree-pull-only-empty').forEach(el=>el.style.display=familyTree.length?'none':'');
   document.getElementById('treeToolsModal').style.display='flex';
 }
 function closeTreeToolsModal(){
@@ -1646,86 +1648,24 @@ function _importTreePeople(data){
   closeTreeToolsModal();
   showToast(`📥 יובאו ${remapped.length} אנשים לעץ`);
 }
-// Add whatever the regular family data (families[] — parents, kids, their
-// Hebrew birthdays) has that this tree doesn't yet: a brand new family gets
-// seeded in whole; a family already represented only gets its MISSING kids
-// added, matched by name against whoever here isn't already one of this
-// family's own tagged parents. Existing people — including ones renamed or
-// otherwise hand-edited in the tree since — are never touched, matching the
-// same never-delete, add-only promise as importing a file above.
+// Builds the first tree from the families list, and only that. Once a tree
+// exists it's been edited by hand (full names, ancestors, married kids), so
+// there's no reliable way to tell which tree people are which family: an
+// automatic "add what's missing" used to duplicate couples and hang kids
+// under every ancestor of the branch at once. People are added by hand
+// from then on.
 function pullTreeFromFamilies(){
-  if(!families.length){ showToast('אין עדיין משפחות באתר הרגיל'); closeTreeToolsModal(); return; }
-  const wasEmpty=!familyTree.length;
-  seedFamilyTreeIfEmpty();
-  if(wasEmpty){
-    renderFamilyTreeIfOpen();
-    _fitTreeWhenReady();
+  if(familyTree.length){
     closeTreeToolsModal();
-    showToast(`🌳 נבנה עץ ראשוני מ-${families.length} משפחות`);
+    showToast('העץ כבר קיים — הוסיפו אנשים דרך ＋ הוסף אדם',4000);
     return;
   }
-  const rootIds=_treeFindOrCreateFamilyRoot();
-  let addedFamilies=0,addedPeople=0;
-  families.forEach(f=>{
-    const famPeople=familyTree.filter(p=>p.sourceFamId===f.id);
-    if(!famPeople.length){
-      const entry=_buildFamilyTreeEntry(f,rootIds);
-      familyTree.push(...entry);
-      addedFamilies++;addedPeople+=entry.length;
-      return;
-    }
-    const parentIdSet=new Set(_famParentIds(famPeople));
-    const existingKidNames=new Set(famPeople.filter(p=>!parentIdSet.has(p.id)).map(p=>p.name));
-    const surname=f.name.replace('משפחת','').trim();
-    (f.kids||[]).forEach(k=>{
-      if(!k.name||existingKidNames.has(k.name))return;
-      familyTree.push({id:nxtTreePerson++,name:k.name,surname,gender:k.gender==='boy'||k.gender==='girl'?k.gender:'',parentIds:[...parentIdSet],spouseIds:[],sourceFamId:f.id,birthYear:_treeBirthYearFromHeb(k.hebYear,k.hebMonth,k.hebDay),deathYear:'',deceased:false,maidenName:''});
-      addedPeople++;
-    });
-  });
-  closeTreeToolsModal();
-  if(!addedPeople){ showToast('הכול כבר מעודכן — לא נמצאו נתונים חדשים להוסיף'); return; }
-  save();
+  if(!families.length){ showToast('אין עדיין משפחות באתר הרגיל'); closeTreeToolsModal(); return; }
+  seedFamilyTreeIfEmpty();
   renderFamilyTreeIfOpen();
   _fitTreeWhenReady();
-  showToast(`🔄 נוספו ${addedPeople} אנשים לעץ`+(addedFamilies?` (${addedFamilies} משפחות חדשות)`:''));
-}
-// Whoever among this family's own tagged tree people is already pointed to
-// as a parent by one of the others — no role tag needed, the existing
-// parentIds structure already says who's who. With nobody pointing to
-// anyone yet (just a childless couple seeded so far), everyone tagged so
-// far must BE the parents.
-function _famParentIds(famPeople){
-  const s=new Set();
-  famPeople.forEach(p=>(p.parentIds||[]).forEach(pid=>{ if(famPeople.some(q=>q.id===pid))s.add(pid); }));
-  return s.size?[...s]:famPeople.map(p=>p.id);
-}
-// The shared placeholder root couple every top-level family hangs off of —
-// found by its isTreeRoot tag when the tree was seeded after that existed,
-// or (for an older tree) by whichever parentIds pair is shared by people
-// from 2+ different families. Only creates a fresh one if truly nothing was
-// ever seeded into this tree before.
-function _treeFindOrCreateFamilyRoot(){
-  const root=familyTree.find(p=>p.isTreeRoot);
-  if(root){
-    const spouse=familyTree.find(p=>p.id===(root.spouseIds||[])[0]);
-    return spouse?[root.id,spouse.id]:[root.id];
-  }
-  const counts=new Map();
-  familyTree.forEach(p=>{
-    if(p.sourceFamId==null||!p.parentIds||!p.parentIds.length)return;
-    const key=[...p.parentIds].sort((a,b)=>a-b).join(',');
-    if(!counts.has(key))counts.set(key,new Set());
-    counts.get(key).add(p.sourceFamId);
-  });
-  let best=null,bestN=0;
-  counts.forEach((fams,key)=>{ if(fams.size>bestN){bestN=fams.size;best=key;} });
-  if(best)return best.split(',').map(Number);
-  const root1={id:nxtTreePerson++,name:'הורה 1',surname:'',gender:'',parentIds:[],spouseIds:[],sourceFamId:null,isTreeRoot:true,birthYear:'',deathYear:'',deceased:false,maidenName:''};
-  const root2={id:nxtTreePerson++,name:'הורה 2',surname:'',gender:'',parentIds:[],spouseIds:[root1.id],sourceFamId:null,isTreeRoot:true,birthYear:'',deathYear:'',deceased:false,maidenName:''};
-  root1.spouseIds.push(root2.id);
-  familyTree.push(root1,root2);
-  return [root1.id,root2.id];
+  closeTreeToolsModal();
+  showToast(`🌳 נבנה עץ ראשוני מ-${families.length} משפחות`);
 }
 function openFamilyTreeOverlay(){
   seedFamilyTreeIfEmpty();
