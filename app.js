@@ -2911,6 +2911,95 @@ function openTreeLeaderboardModal(){
 function closeTreeLeaderboardModal(){
   document.getElementById('treeLeaderboardModal').style.display='none';
 }
+// ── 🏆 Competitions (home tile): the recipe contest and the tree contest in
+// one window, one tab each.
+let _compTab='recipes';
+function _lbRowsHtml(rows,valueOf){
+  const medals=['🥇','🥈','🥉'];
+  return rows.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:6px">
+      <span style="font-size:17px;width:24px;text-align:center;flex-shrink:0">${medals[i]||(i+1)}</span>
+      <span style="flex:1;font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span>
+      <span style="font-size:13px;font-weight:800;color:var(--blue-mid);white-space:nowrap">${valueOf(r)}</span>
+    </div>`).join('');
+}
+function _buildCompetitionsModal(){
+  if(document.getElementById('compModal'))return;
+  const el=document.createElement('div');
+  el.id='compModal';
+  el.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+  el.onclick=e=>{if(e.target===el)closeCompetitionsModal();};
+  el.innerHTML=`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:400px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:16px;font-weight:800;color:var(--text)">🏆 תחרויות</span>
+      <button onclick="closeCompetitionsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;padding:12px 18px 0;flex-shrink:0">
+      <button type="button" id="compTabRecipes" onclick="setCompetitionsTab('recipes')" style="flex:1;padding:9px;border-radius:20px;font-size:13px;font-weight:800;font-family:var(--font);cursor:pointer">🍲 מתכונים</button>
+      <button type="button" id="compTabTree" onclick="setCompetitionsTab('tree')" style="flex:1;padding:9px;border-radius:20px;font-size:13px;font-weight:800;font-family:var(--font);cursor:pointer">🌳 אילן</button>
+      <button type="button" id="compTabShabbat" onclick="setCompetitionsTab('shabbat')" style="flex:1;padding:9px;border-radius:20px;font-size:13px;font-weight:800;font-family:var(--font);cursor:pointer">🕯️ שבת</button>
+    </div>
+    <div id="compRules" style="padding:10px 18px 2px;font-size:12px;color:var(--text2);line-height:1.7;flex-shrink:0"></div>
+    <div id="compList" style="padding:10px 18px;overflow-y:auto;flex:1;min-height:0"></div>
+    <div style="padding:0 18px 16px;flex-shrink:0"><button type="button" id="compGo" style="width:100%;padding:11px;border-radius:var(--r2);border:none;color:#fff;font-size:14px;font-weight:800;font-family:var(--font);cursor:pointer"></button></div>
+  </div>`;
+  document.body.appendChild(el);
+}
+function openCompetitionsModal(tab){
+  _buildCompetitionsModal();
+  if(tab)_compTab=tab;
+  document.getElementById('compModal').style.display='flex';
+  renderCompetitions();
+}
+function closeCompetitionsModal(){
+  const m=document.getElementById('compModal');if(m)m.style.display='none';
+}
+function setCompetitionsTab(tab){_compTab=tab;renderCompetitions();}
+async function renderCompetitions(){
+  const list=document.getElementById('compList');if(!list)return;
+  const isRc=_compTab==='recipes';
+  [['compTabRecipes',isRc],['compTabTree',_compTab==='tree'],['compTabShabbat',_compTab==='shabbat']].forEach(([id,on])=>{
+    const b=document.getElementById(id);
+    b.style.background=on?'var(--blue-mid)':'transparent';
+    b.style.color=on?'#fff':'var(--text)';
+    b.style.border=on?'1.5px solid var(--blue-mid)':'1.5px solid var(--border)';
+  });
+  const go=document.getElementById('compGo');
+  if(isRc){
+    document.getElementById('compRules').textContent='כל מתכון שמעלים לספר המתכונים נספר. מי שהעלה הכי הרבה מתכונים — מוביל!';
+    go.textContent='🍲 להוספת מתכון';go.style.background='linear-gradient(135deg,#FBBF24,#E2711D)';
+    go.onclick=()=>{closeCompetitionsModal();if(window.openRecipesOverlay)openRecipesOverlay();};
+    list.innerHTML='<div class="empty" style="padding:24px 0">טוען…</div>';
+    let rows;
+    try{rows=window.rcContestRows?await rcContestRows():[];}
+    catch(e){console.warn(e);if(_compTab==='recipes')list.innerHTML='<div class="empty" style="padding:24px 0">⚠️ לא ניתן לטעון את המתכונים</div>';return;}
+    if(_compTab!=='recipes')return; // switched tabs while loading
+    list.innerHTML=rows.length
+      ?_lbRowsHtml(rows,r=>r.count===1?'מתכון אחד':r.count+' מתכונים')
+      :'<div class="empty" style="padding:24px 0"><span class="empty-ico">🍲</span>עדיין אין מתכונים — העלו ראשונים!</div>';
+  }else if(_compTab==='shabbat'){
+    document.getElementById('compRules').textContent='תחרות הכנות לשבת — מראשון עד שישי ב-10:00. הנקודות של השבוע, והיכל התהילה של המשפחות שניצחו.';
+    go.textContent='😜 לתחרות השבת';go.style.background='linear-gradient(135deg,#14919B,#0E7490 55%,#0B2E3F)';
+    go.onclick=()=>{closeCompetitionsModal();if(window.openContestOverlay)openContestOverlay();};
+    list.innerHTML='<div class="empty" style="padding:24px 0">טוען…</div>';
+    let d;
+    try{d=window.contestSummary?await contestSummary():{week:[],hall:[]};}
+    catch(e){console.warn(e);if(_compTab==='shabbat')list.innerHTML='<div class="empty" style="padding:24px 0">⚠️ לא ניתן לטעון את תוצאות השבת</div>';return;}
+    if(_compTab!=='shabbat')return;
+    const head=t=>`<div style="font-size:13px;font-weight:800;color:var(--text);margin:4px 0 8px">${t}</div>`;
+    list.innerHTML=head(d.locked?'🔒 התוצאות של השבוע':'📊 השבוע עד עכשיו')
+      +(d.week.length?_lbRowsHtml(d.week,r=>r.points+" נק'"):'<div class="empty" style="padding:12px 0">עדיין אין נקודות השבוע</div>')
+      +(d.hall.length?'<div style="height:10px"></div>'+head('🏅 היכל התהילה — שבועות שניצחו')+_lbRowsHtml(d.hall,r=>'🏆'.repeat(Math.min(r.count,5))+(r.count>5?' ×'+r.count:'')):'');
+  }else{
+    document.getElementById('compRules').textContent="5 נק' על שם חדש בעץ · 2 נק' על הוספת שנת לידה/פטירה · 5 נק' על הוספת תמונה ⭐";
+    go.textContent='🌳 לאילן היוחסין';go.style.background='linear-gradient(135deg,#8FBC5A,#4E9A4E)';
+    go.onclick=()=>{closeCompetitionsModal();openFamilyTreeOverlay();};
+    const rows=Object.values(treeScores).sort((a,b)=>b.points-a.points);
+    list.innerHTML=rows.length
+      ?_lbRowsHtml(rows,r=>r.points+" נק'")
+      :'<div class="empty" style="padding:24px 0"><span class="empty-ico">🌳</span>עדיין אין נקודות — כל שם חדש שתוסיפו לעץ שווה 5 נקודות!</div>';
+  }
+}
 function renderTreeLeaderboard(){
   const list=document.getElementById('treeLeaderboardList');if(!list)return;
   const rows=Object.values(treeScores).sort((a,b)=>b.points-a.points);

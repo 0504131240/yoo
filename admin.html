@@ -61,6 +61,10 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
       <button class="fh-tile fh-tile-wide fh-tile-contest" style="background:linear-gradient(135deg,#14919B,#0E7490 55%,#0B2E3F);box-shadow:0 6px 20px rgba(14,116,144,0.3)" onclick="openContestOverlay()">
         <span class="fh-tile-ico">😜</span><span class="fh-tile-txt"><b>תחרות הכנות לשבת</b><small>משימות, משחקים ונקודות · ננעל בשישי ב-10:00</small></span>
       </button>
+      <!-- 🏆 Competitions: the recipe contest and the family-tree contest -->
+      <button class="fh-tile fh-tile-wide" style="background:linear-gradient(135deg,#FCD34D,#F59E0B 55%,#B45309);box-shadow:0 6px 20px rgba(217,119,6,0.3)" onclick="openCompetitionsModal()">
+        <span class="fh-tile-ico">🏆</span><span class="fh-tile-txt"><b>תחרויות</b><small>מתכונים · אילן יוחסין · שבת</small></span>
+      </button>
       <!-- Shabbat at the parents' — this week's parsha, tap a family to mark it -->
       <div id="shabbatHomeCard" class="fh-shb-card"></div>
       <div class="fh-tile-grid">
