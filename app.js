@@ -1583,8 +1583,6 @@ function _treeBirthYearFromHeb(hebYear,hebMonth,hebDay){
 }
 // ── Export / import / pull-from-families ────────────────────────────────
 function openTreeToolsModal(){
-  // Pulling only builds a first tree (see pullTreeFromFamilies).
-  document.querySelectorAll('.tree-pull-only-empty').forEach(el=>el.style.display=familyTree.length?'none':'');
   document.getElementById('treeToolsModal').style.display='flex';
 }
 function closeTreeToolsModal(){
@@ -1647,25 +1645,6 @@ function _importTreePeople(data){
   _fitTreeWhenReady();
   closeTreeToolsModal();
   showToast(`📥 יובאו ${remapped.length} אנשים לעץ`);
-}
-// Builds the first tree from the families list, and only that. Once a tree
-// exists it's been edited by hand (full names, ancestors, married kids), so
-// there's no reliable way to tell which tree people are which family: an
-// automatic "add what's missing" used to duplicate couples and hang kids
-// under every ancestor of the branch at once. People are added by hand
-// from then on.
-function pullTreeFromFamilies(){
-  if(familyTree.length){
-    closeTreeToolsModal();
-    showToast('העץ כבר קיים — הוסיפו אנשים דרך ＋ הוסף אדם',4000);
-    return;
-  }
-  if(!families.length){ showToast('אין עדיין משפחות באתר הרגיל'); closeTreeToolsModal(); return; }
-  seedFamilyTreeIfEmpty();
-  renderFamilyTreeIfOpen();
-  _fitTreeWhenReady();
-  closeTreeToolsModal();
-  showToast(`🌳 נבנה עץ ראשוני מ-${families.length} משפחות`);
 }
 function openFamilyTreeOverlay(){
   seedFamilyTreeIfEmpty();
