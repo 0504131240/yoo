@@ -17,7 +17,7 @@
 const { getDb, getMessaging, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isYomTovNow, sendViaEmailJS, notifEmailHtml } = require('../_lib/firebaseAdmin');
 const { allOccasions, occasionText } = require('../_lib/birthdayCalc');
 const { sendWeeklyDebtReminders } = require('../_lib/weeklyDebtReminder');
-const { flushPhoneQueue } = require('../_lib/yemot');
+const { flushPhoneQueue, occasionPhoneEntries } = require('../_lib/yemot');
 
 const BACKUP_RETENTION_DAYS = 30;
 
@@ -143,6 +143,21 @@ async function sendBirthdayReminders(db, data) {
   return { occasions, sent };
 }
 
+// Kosher-phone calls for today's occasions (the 'occasion' category).
+function todaysOccasionPhoneEntries(data) {
+  const tz = { timeZone: 'Asia/Jerusalem' };
+  const now = new Date();
+  const hd = parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', { day: 'numeric', ...tz }).format(now));
+  const hm = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { month: 'long', ...tz }).format(now);
+  const hy = parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn', { year: 'numeric', ...tz }).format(now));
+  const monthEq = (a, b) => a === b || (!!a && !!b && a.startsWith('אדר') && b.startsWith('אדר'));
+  const todays = allOccasions(data.families || [], data.yahrzeits || []).filter(b => b.hebDay === hd && monthEq(b.hebMonth, hm));
+  return occasionPhoneEntries(data.families || [], todays, list => {
+    const { title, body } = occasionText(list, 0, hy);
+    return title.replace(/!$/, '') + '. ' + body;
+  });
+}
+
 module.exports = async (req, res) => {
   // Fail closed, not open: if CRON_SECRET is ever missing from Vercel's env
   // (unset, wrong environment scope), this used to let the request through
@@ -195,7 +210,7 @@ module.exports = async (req, res) => {
   // and anything that came in during last night's quiet hours.
   let phoneCalls = {};
   try {
-    phoneCalls = await flushPhoneQueue(db, debtReminders.phoneEntries || []);
+    phoneCalls = await flushPhoneQueue(db, [...(debtReminders.phoneEntries || []), ...todaysOccasionPhoneEntries(data)]);
   } catch (e) {
     console.error('dailyBackup: phone calls failed', e);
   }

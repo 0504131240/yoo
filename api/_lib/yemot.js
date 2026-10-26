@@ -83,6 +83,25 @@ function phoneEntriesFor(families, kind, { target, excludeFamIds, relatedFamIds,
   return out;
 }
 
+// Today's birthdays, yahrzeits and anniversaries, for parents who chose the
+// 'occasion' category. Only the day itself (no "tomorrow" call). Scope
+// 'mine' keeps just the family's own occasions; yahrzeits have no family,
+// so they only go to 'all'.
+function occasionPhoneEntries(families, todays, textFor) {
+  const out = [];
+  if (!todays.length) return out;
+  (families || []).forEach(f => {
+    familyPhones(f).forEach(p => {
+      if (!p.cats.occasion) return;
+      const list = p.scopes.occasion === 'mine' ? todays.filter(b => b.famId === f.id) : todays;
+      if (!list.length) return;
+      const spoken = speakable(textFor(list));
+      if (spoken) out.push({ phone: p.phone, text: spoken, mode: p.mode });
+    });
+  });
+  return out;
+}
+
 // Israel local hour; calls between 22:00 and 08:00 wait for the morning run.
 function isQuietHours() {
   const h = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', hour: 'numeric', hour12: false }).format(new Date()), 10) % 24;
@@ -174,4 +193,4 @@ async function flushPhoneQueue(db, extraEntries = []) {
   return result;
 }
 
-module.exports = { yemotConfigured, speakable, normalizePhone, familyPhones, phoneEntriesFor, isQuietHours, runYemotCalls, runTzintuk, callOrQueue, flushPhoneQueue };
+module.exports = { yemotConfigured, speakable, normalizePhone, familyPhones, phoneEntriesFor, occasionPhoneEntries, isQuietHours, runYemotCalls, runTzintuk, callOrQueue, flushPhoneQueue };
