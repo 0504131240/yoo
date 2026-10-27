@@ -13,15 +13,16 @@
 :root{
   --bg:#e9edf3; --paper:#ffffff; --ink:#15213a; --muted:#5d6880; --line:#d3d9e4;
   --accent:#1f47b8; --accent-ink:#ffffff; --ok:#1d7a4a; --bad:#b4232c; --soft:#f3f5f9;
+  --right:#1b3f8f; --left:#c8394b; --arab:#2f7d5b;
   --display:"Secular One","Assistant",system-ui,sans-serif;
   --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0f1522; --paper:#18202f; --ink:#e8ecf4; --muted:#9aa5bb; --line:#2c3648;
-  --accent:#6f95ff; --accent-ink:#0b1020; --ok:#4cc38a; --bad:#ff7076; --soft:#1e2738; color-scheme:dark}}
+  --accent:#6f95ff; --accent-ink:#0b1020; --ok:#4cc38a; --bad:#ff7076; --soft:#1e2738; --right:#3b63c4; --left:#d24b5c; --arab:#3a9a6f; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1522; --paper:#18202f; --ink:#e8ecf4; --muted:#9aa5bb; --line:#2c3648;
-  --accent:#6f95ff; --accent-ink:#0b1020; --ok:#4cc38a; --bad:#ff7076; --soft:#1e2738; color-scheme:dark}
+  --accent:#6f95ff; --accent-ink:#0b1020; --ok:#4cc38a; --bad:#ff7076; --soft:#1e2738; --right:#3b63c4; --left:#d24b5c; --arab:#3a9a6f; color-scheme:dark}
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;direction:rtl}
 .wrap{max-width:680px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 140px;display:flex;flex-direction:column;gap:28px}
@@ -79,6 +80,18 @@ section.results{display:flex;flex-direction:column;gap:16px}
 .entries .top{color:var(--muted);min-width:0;text-align:left;direction:rtl}
 .note{font-size:.85rem;color:var(--muted);background:var(--soft);border-radius:8px;padding:10px 12px}
 .sources{font-size:.8rem;color:var(--muted)}
+.blocs{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:14px 14px 12px;display:flex;flex-direction:column;gap:14px}
+.blocs h2{font-size:1.15rem}
+.bloc-row{display:flex;flex-direction:column;gap:6px}
+.bloc-head{display:flex;justify-content:space-between;gap:8px;font-size:.88rem;color:var(--muted)}
+.bloc-head b{color:var(--ink)}
+.stack{position:relative;display:flex;height:30px;border-radius:4px;overflow:hidden;background:var(--soft)}
+.stack span{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.9rem;font-variant-numeric:tabular-nums;min-width:0;overflow:hidden;white-space:nowrap}
+.stack .r{background:var(--right)}.stack .l{background:var(--left)}.stack .a{background:var(--arab)}
+.stack .m61{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);right:calc(61/120*100% - 1px)}
+.bloc-key{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.82rem;color:var(--muted)}
+.bloc-key i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:5px;vertical-align:-1px}
+.bloc-verdict{font-size:.88rem;font-weight:600}
 @media (prefers-reduced-motion:no-preference){.fill{transition:width .4s ease}}
 </style>
 </head>
@@ -90,6 +103,19 @@ section.results{display:flex;flex-direction:column;gap:16px}
     <h1>הקלפי של 2026</h1>
     <p class="lede">כמה מנדטים כל מפלגה תקבל לדעתך? חלק 120 מנדטים בין המפלגות והגש. אפשר לחזור מאותו מכשיר ולעדכן. למטה רואים את ממוצע התחזיות של כל המשתתפים.</p>
   </header>
+
+  <section class="blocs" aria-labelledby="h-blocs">
+    <h2 id="h-blocs">חלוקה לגושים</h2>
+    <div class="bloc-row">
+      <div class="bloc-head"><b>התחזית שלי</b><span id="mine-verdict" class="bloc-verdict"></span></div>
+      <div class="stack" id="stack-mine"></div>
+    </div>
+    <div class="bloc-row" id="row-avg" hidden>
+      <div class="bloc-head"><b>ממוצע כל המשתתפים</b><span id="avg-verdict" class="bloc-verdict"></span></div>
+      <div class="stack" id="stack-avg"></div>
+    </div>
+    <div class="bloc-key" id="bloc-key"></div>
+  </section>
 
   <section style="display:flex;flex-direction:column;gap:14px" aria-labelledby="h-ballot">
     <h2 id="h-ballot">התחזית שלי</h2>
@@ -123,22 +149,53 @@ section.results{display:flex;flex-direction:column;gap:16px}
 
 <script>
 const PARTIES = [
-  {id:"yashar",   name:"ישר!",              leader:"גדי איזנקוט",   poll:23, color:"#2b6cd6", bloc:"opp"},
-  {id:"likud",    name:"הליכוד",            leader:"בנימין נתניהו", poll:19, color:"#1b3f8f", bloc:"coal"},
-  {id:"beyachad", name:"ביחד",              leader:"נפתלי בנט",     poll:14, color:"#0f8a8a", bloc:"opp"},
-  {id:"dems",     name:"הדמוקרטים",         leader:"יאיר גולן",     poll:10, color:"#d9364a", bloc:"opp"},
+  {id:"yashar",   name:"ישר!",              leader:"גדי איזנקוט",   poll:23, color:"#2b6cd6", bloc:"left"},
+  {id:"likud",    name:"הליכוד",            leader:"בנימין נתניהו", poll:19, color:"#1b3f8f", bloc:"right"},
+  {id:"beyachad", name:"ביחד",              leader:"נפתלי בנט",     poll:14, color:"#0f8a8a", bloc:"left"},
+  {id:"dems",     name:"הדמוקרטים",         leader:"יאיר גולן",     poll:10, color:"#d9364a", bloc:"left"},
   {id:"joint",    name:"הרשימה המשותפת",    leader:"חד״ש · תע״ל · בל״ד", poll:9, color:"#3f9a4a", bloc:"arab"},
-  {id:"ybeytenu", name:"ישראל ביתנו",       leader:"אביגדור ליברמן", poll:8, color:"#5a3fa8", bloc:"opp"},
-  {id:"otzma",    name:"עוצמה יהודית",      leader:"איתמר בן גביר", poll:8, color:"#c46a12", bloc:"coal"},
-  {id:"shas",     name:"ש״ס",               leader:"אריה דרעי",     poll:8, color:"#24324d", bloc:"coal"},
-  {id:"utj",      name:"יהדות התורה",       leader:"",              poll:8, color:"#6b7280", bloc:"coal"},
-  {id:"rz",       name:"הציונות הדתית",     leader:"בצלאל סמוטריץ׳", poll:7, color:"#8a6d1f", bloc:"coal"},
+  {id:"ybeytenu", name:"ישראל ביתנו",       leader:"אביגדור ליברמן", poll:8, color:"#5a3fa8", bloc:"left"},
+  {id:"otzma",    name:"עוצמה יהודית",      leader:"איתמר בן גביר", poll:8, color:"#c46a12", bloc:"right"},
+  {id:"shas",     name:"ש״ס",               leader:"אריה דרעי",     poll:8, color:"#24324d", bloc:"right"},
+  {id:"utj",      name:"יהדות התורה",       leader:"",              poll:8, color:"#6b7280", bloc:"right"},
+  {id:"rz",       name:"הציונות הדתית",     leader:"בצלאל סמוטריץ׳", poll:7, color:"#8a6d1f", bloc:"right"},
   {id:"raam",     name:"רע״ם",              leader:"מנסור עבאס",    poll:6, color:"#2f7d5b", bloc:"arab"},
-  {id:"amcha",    name:"עמך ישראל",         leader:"עופר וינטר",    poll:0, pct:"2.9%", color:"#9a3b6b", bloc:"other"},
-  {id:"reserv",   name:"המילואימניקים",     leader:"יועז הנדל",     poll:0, pct:"2.5%–3%", color:"#556b2f", bloc:"other"},
-  {id:"haredi",   name:"הציבור החרדי",      leader:"",              poll:0, pct:"1.3%", color:"#8b8f99", bloc:"other"},
+  {id:"amcha",    name:"עמך ישראל",         leader:"עופר וינטר",    poll:0, pct:"2.9%", color:"#9a3b6b", bloc:"right"},
+  {id:"reserv",   name:"המילואימניקים",     leader:"יועז הנדל",     poll:0, pct:"2.5%–3%", color:"#556b2f", bloc:"left"},
+  {id:"haredi",   name:"הציבור החרדי",      leader:"",              poll:0, pct:"1.3%", color:"#8b8f99", bloc:"right"},
 ];
 const TOTAL = 120, MIN_SEATS = 4;
+const BLOCS = [
+  {id:"right", cls:"r", name:"ימין", sub:"גוש נתניהו"},
+  {id:"left",  cls:"l", name:"שמאל-מרכז", sub:"האופוזיציה"},
+  {id:"arab",  cls:"a", name:"ערבים", sub:"משותפת ורע״ם"},
+];
+function blocSums(get){ const o = {right:0,left:0,arab:0}; for (const p of PARTIES) o[p.bloc] += get(p.id); return o; }
+function drawStack(el, b){
+  el.innerHTML = "";
+  for (const B of BLOCS){
+    const v = b[B.id], sp = document.createElement("span");
+    sp.className = B.cls; sp.style.width = (v / TOTAL * 100) + "%";
+    sp.textContent = v >= 6 ? (Math.round(v*10)/10).toLocaleString("he-IL") : "";
+    sp.title = B.name + ": " + (Math.round(v*10)/10);
+    el.appendChild(sp);
+  }
+  const m = document.createElement("i"); m.className = "m61"; m.title = "61 = רוב"; el.appendChild(m);
+}
+function verdict(b){
+  const r = Math.round(b.right*10)/10;
+  if (b.right >= 61) return `לימין יש רוב: ${r.toLocaleString("he-IL")}`;
+  return `לימין חסרים ${(Math.round((61-b.right)*10)/10).toLocaleString("he-IL")} לרוב`;
+}
+function renderBlocs(avgSeats){
+  const mineB = blocSums(id => seats[id]);
+  drawStack($("#stack-mine"), mineB);
+  $("#mine-verdict").textContent = sum(seats) === TOTAL ? verdict(mineB) : "";
+  const row = $("#row-avg");
+  if (avgSeats){ row.hidden = false; const a = blocSums(id => avgSeats[id]); drawStack($("#stack-avg"), a); $("#avg-verdict").textContent = verdict(a); }
+  else row.hidden = true;
+}
+let lastAvg = null;
 const $ = s => document.querySelector(s);
 const seats = Object.fromEntries(PARTIES.map(p => [p.id, 0]));
 let all = [], mine = null, dirty = false, saving = false, online = null;
@@ -190,6 +247,7 @@ function render(syncInputs=true){
     li.classList.toggle("bad", bad);
     li.querySelector(".err").textContent = bad ? "· 0 או 4 ומעלה" : "";
   }
+  renderBlocs(lastAvg);
   const s = sum(seats);
   $("#count").firstChild.nodeValue = s;
   const st = $("#status"), btn = $("#submit");
@@ -215,18 +273,16 @@ function validEntry(d){
 function renderResults(){
   const box = $("#results");
   const entries = all.map(e => ({...e, s: validEntry(e)})).filter(e => e.s);
-  if (!entries.length){ box.innerHTML = '<div class="empty">עדיין אין תחזיות. מלא את הפתקים למעלה והגש ראשון.</div>'; return; }
+  if (!entries.length){ lastAvg = null; box.innerHTML = '<div class="empty">עדיין אין תחזיות. מלא את הפתקים למעלה והגש ראשון.</div>'; return; }
   const n = entries.length;
   const avg = Object.fromEntries(PARTIES.map(p => [p.id, entries.reduce((a,e)=>a+e.s[p.id],0)/n]));
-  const coal = PARTIES.filter(p=>p.bloc==="coal").reduce((a,p)=>a+avg[p.id],0);
+  lastAvg = avg;
   const order = [...PARTIES].sort((a,b)=>avg[b.id]-avg[a.id] || b.poll-a.poll);
   const max = Math.max(30, ...order.map(p=>Math.max(avg[p.id], p.poll)));
   const fmt = v => (Math.round(v*10)/10).toLocaleString("he-IL");
   box.innerHTML = `
     <div class="summary">
       <div><b>${n}</b>משתתפים</div>
-      <div><b>${fmt(coal)}</b>גוש נתניהו (ממוצע)</div>
-      <div><b>${fmt(TOTAL-coal)}</b>כל השאר</div>
     </div>
     <div class="legend"><span><i></i>ממוצע הסקרים</span><span>הפס: ממוצע תחזיות המשתתפים</span></div>
     <div class="chart" id="chart"></div>
@@ -304,6 +360,7 @@ $("#clear").addEventListener("click", () => { for (const p of PARTIES) seats[p.i
 $("#nick").addEventListener("input", () => { if (mine) dirty = true; saveDraft(); render(false); });
 $("#submit").addEventListener("click", submit);
 
+$("#bloc-key").innerHTML = BLOCS.map(B => `<span><i style="background:var(--${B.id})"></i>${B.name} (${B.sub}): ${PARTIES.filter(p=>p.bloc===B.id).map(p=>p.name).join(", ")}</span>`).join("") + '<span>הקו באמצע = 61 מנדטים (רוב)</span>';
 buildSlips();
 if (!load()) for (const p of PARTIES) seats[p.id] = p.poll;
 render();
