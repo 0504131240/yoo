@@ -92,6 +92,18 @@ section.results{display:flex;flex-direction:column;gap:16px}
 .bloc-key{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.82rem;color:var(--muted)}
 .bloc-key i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:5px;vertical-align:-1px}
 .bloc-verdict{font-size:.88rem;font-weight:600}
+.wa{display:inline-flex;align-items:center;justify-content:center;gap:8px;align-self:flex-start;background:#1f9e55;color:#fff;text-decoration:none;font-weight:700;border-radius:999px;padding:9px 18px;font-size:.95rem}
+.wa svg{width:18px;height:18px;fill:currentColor}
+.wa[aria-disabled="true"]{opacity:.45;pointer-events:none}
+.share-note{font-size:.8rem;color:var(--muted)}
+.bet{background:var(--paper);border:2px solid var(--accent);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.bet h2{font-size:1.5rem}
+.bet-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px}
+.bet-list li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-block:4px;font-size:.95rem}
+.bet-list li b{font-variant-numeric:tabular-nums}
+.bet-list li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bet-list i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-inline-end:6px;background:var(--c)}
+.cta{align-self:flex-start;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:10px 20px;font-weight:700;text-decoration:none}
 @media (prefers-reduced-motion:no-preference){.fill{transition:width .4s ease}}
 </style>
 </head>
@@ -104,6 +116,17 @@ section.results{display:flex;flex-direction:column;gap:16px}
     <p class="lede">כמה מנדטים כל מפלגה תקבל לדעתך? חלק 120 מנדטים בין המפלגות והגש. אפשר לחזור מאותו מכשיר ולעדכן. למטה רואים את ממוצע התחזיות של כל המשתתפים.</p>
   </header>
 
+  <section class="bet" id="bet" hidden aria-labelledby="h-bet">
+    <span class="eyebrow">שלחו לך הימור</span>
+    <h2 id="h-bet"></h2>
+    <div class="bloc-row">
+      <div class="bloc-head"><b>חלוקה לגושים</b><span id="bet-verdict" class="bloc-verdict"></span></div>
+      <div class="stack" id="stack-bet"></div>
+    </div>
+    <ul class="bet-list" id="bet-list"></ul>
+    <a class="cta" href="#h-ballot">עכשיו תורך: מלא את ההימור שלך</a>
+  </section>
+
   <section class="blocs" aria-labelledby="h-blocs">
     <h2 id="h-blocs">חלוקה לגושים</h2>
     <div class="bloc-row">
@@ -114,6 +137,8 @@ section.results{display:flex;flex-direction:column;gap:16px}
       <div class="bloc-head"><b>ממוצע כל המשתתפים</b><span id="avg-verdict" class="bloc-verdict"></span></div>
       <div class="stack" id="stack-avg"></div>
     </div>
+    <a class="wa" id="wa" href="#" target="_blank" rel="noopener" aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.5-.3z"/></svg>שתף את ההימור בוואטסאפ</a>
+    <span class="share-note" id="share-note">החבר שיקבל את הקישור יראה את ההימור שלך עם החלוקה לגושים.</span>
     <div class="bloc-key" id="bloc-key"></div>
   </section>
 
@@ -196,6 +221,52 @@ function renderBlocs(avgSeats){
   else row.hidden = true;
 }
 let lastAvg = null;
+// Share link: the whole bet lives in the URL, e.g. /kalpi?b=23-19-14-...&n=nick
+function betUrl(){
+  const u = new URL("/kalpi", location.origin);
+  u.searchParams.set("b", PARTIES.map(p => seats[p.id]).join("-"));
+  const n = $("#nick").value.trim().slice(0,24);
+  if (n) u.searchParams.set("n", n);
+  return u.toString();
+}
+function shareText(){
+  const b = blocSums(id => seats[id]);
+  const top = [...PARTIES].filter(p => seats[p.id] > 0).sort((a,c) => seats[c.id] - seats[a.id]).map(p => `${p.name} ${seats[p.id]}`).join(" · ");
+  return `🗳️ ההימור שלי לבחירות 2026:\n${top}\n\nימין ${b.right} | שמאל-מרכז ${b.left} | ערבים ${b.arab}\n\nתראו את ההימור שלי ותהמרו גם אתם:\n${betUrl()}`;
+}
+function updateShare(valid){
+  const a = $("#wa");
+  a.setAttribute("aria-disabled", valid ? "false" : "true");
+  a.href = valid ? "https://wa.me/?text=" + encodeURIComponent(shareText()) : "#";
+  $("#share-note").textContent = valid ? "החבר שיקבל את הקישור יראה את ההימור שלך עם החלוקה לגושים." : "כדי לשתף, חלק בדיוק 120 מנדטים.";
+}
+function readSharedBet(){
+  const q = new URLSearchParams(location.search), raw = q.get("b");
+  if (!raw) return null;
+  const nums = raw.split("-");
+  if (nums.length !== PARTIES.length) return null;
+  const s = {};
+  PARTIES.forEach((p, i) => { s[p.id] = Number(nums[i]); });
+  const ok = validEntry({seats: s});
+  return ok ? { seats: ok, nick: (q.get("n") || "").trim().slice(0,24) } : null;
+}
+function showSharedBet(){
+  const bet = readSharedBet();
+  if (!bet) return;
+  $("#bet").hidden = false;
+  $("#h-bet").textContent = "ההימור של " + (bet.nick || "חבר/ה");
+  const b = blocSums(id => bet.seats[id]);
+  drawStack($("#stack-bet"), b);
+  $("#bet-verdict").textContent = verdict(b);
+  const ul = $("#bet-list");
+  for (const p of [...PARTIES].filter(p => bet.seats[p.id] > 0).sort((a,c) => bet.seats[c.id] - bet.seats[a.id])){
+    const li = document.createElement("li"); li.style.setProperty("--c", p.color);
+    const nm = document.createElement("span"); nm.innerHTML = "<i></i>"; nm.append(p.name);
+    const v = document.createElement("b"); v.textContent = bet.seats[p.id];
+    li.append(nm, v); ul.appendChild(li);
+  }
+  document.title = "ההימור של " + (bet.nick || "חבר/ה") + " · הקלפי של 2026";
+}
 const $ = s => document.querySelector(s);
 const seats = Object.fromEntries(PARTIES.map(p => [p.id, 0]));
 let all = [], mine = null, dirty = false, saving = false, online = null;
@@ -258,6 +329,7 @@ function render(syncInputs=true){
   else if (anyBad) { msg = "מפלגה מתחת ל-4 מנדטים לא עוברת את החסימה"; cls = "bad"; }
   else { ok = true; msg = mine && !dirty ? "התחזית שלך נשמרה ✓" : "מוכן להגשה"; cls = "ok"; }
   if (online === false) { msg = "אין חיבור לשרת כרגע. נסה שוב בעוד רגע."; cls = "bad"; ok = false; }
+  updateShare(s === TOTAL && !anyBad);
   st.textContent = saving ? "שומר…" : msg; st.className = "status " + cls;
   btn.disabled = !ok || saving || (mine && !dirty);
   btn.textContent = mine ? "עדכן תחזית" : "הגש תחזית";
@@ -361,6 +433,7 @@ $("#nick").addEventListener("input", () => { if (mine) dirty = true; saveDraft()
 $("#submit").addEventListener("click", submit);
 
 $("#bloc-key").innerHTML = BLOCS.map(B => `<span><i style="background:var(--${B.id})"></i>${B.name} (${B.sub}): ${PARTIES.filter(p=>p.bloc===B.id).map(p=>p.name).join(", ")}</span>`).join("") + '<span>הקו באמצע = 61 מנדטים (רוב)</span>';
+showSharedBet();
 buildSlips();
 if (!load()) for (const p of PARTIES) seats[p.id] = p.poll;
 render();
