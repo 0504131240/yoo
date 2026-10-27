@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta property="og:title" content="הקלפי של 2026">
+<meta property="og:description" content="כמה מנדטים כל מפלגה תקבל? חלקו 120 מנדטים ותראו מה כולם חושבים.">
+<title>הקלפי של 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Secular+One&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: one narrow column like a ballot envelope — slips to fill, then the tally. A fixed bottom bar counts seats to 120. */
+:root{
+  --bg:#e9edf3; --paper:#ffffff; --ink:#15213a; --muted:#5d6880; --line:#d3d9e4;
+  --accent:#1f47b8; --accent-ink:#ffffff; --ok:#1d7a4a; --bad:#b4232c; --soft:#f3f5f9;
+  --display:"Secular One","Assistant",system-ui,sans-serif;
+  --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1522; --paper:#18202f; --ink:#e8ecf4; --muted:#9aa5bb; --line:#2c3648;
+  --accent:#6f95ff; --accent-ink:#0b1020; --ok:#4cc38a; --bad:#ff7076; --soft:#1e2738; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1522; --paper:#18202f; --ink:#e8ecf4; --muted:#9aa5bb; --line:#2c3648;
+  --accent:#6f95ff; --accent-ink:#0b1020; --ok:#4cc38a; --bad:#ff7076; --soft:#1e2738; color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;direction:rtl}
+.wrap{max-width:680px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 140px;display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--display);font-weight:400;text-wrap:balance;margin:0}
+h1{font-size:2.1rem;line-height:1.15}
+h2{font-size:1.4rem}
+p{margin:0}
+.lede{color:var(--muted);max-width:60ch}
+.eyebrow{font-size:.8rem;letter-spacing:.06em;color:var(--accent);font-weight:700}
+header{display:flex;flex-direction:column;gap:8px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:6px 14px;font-weight:600;font-size:.9rem}
+.btn:hover{border-color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.nick{display:flex;flex-direction:column;gap:4px;font-size:.9rem;color:var(--muted)}
+.nick input{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:260px}
+.slips{display:flex;flex-direction:column;gap:8px;list-style:none;margin:0;padding:0}
+.slip{display:grid;grid-template-columns:6px 1fr auto;align-items:center;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px 12px 10px 10px}
+.slip .chip{align-self:stretch;border-radius:3px;background:var(--c)}
+.slip .who{min-width:0}
+.slip .pname{font-weight:700;font-size:1.05rem}
+.slip .meta{font-size:.82rem;color:var(--muted)}
+.slip.bad{border-color:var(--bad)}
+.slip.bad .meta .err{color:var(--bad);font-weight:600}
+.step{display:flex;align-items:center;gap:4px;direction:ltr}
+.step button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--soft);color:var(--ink);font-size:1.2rem;line-height:1}
+.step input{width:52px;height:36px;text-align:center;font:inherit;font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;-moz-appearance:textfield}
+.step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.rules{font-size:.85rem;color:var(--muted)}
+.bar-fixed{position:fixed;inset:auto 0 0;z-index:5;background:var(--paper);border-top:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.bar-in{max-width:680px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.count{font-family:var(--display);font-size:1.6rem;font-variant-numeric:tabular-nums;line-height:1}
+.count small{font-family:var(--body);font-size:.85rem;color:var(--muted)}
+.status{flex:1;min-width:140px;font-size:.88rem;color:var(--muted)}
+.status.ok{color:var(--ok);font-weight:600}
+.status.bad{color:var(--bad);font-weight:600}
+.submit{background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:10px 22px;font-weight:700;font-size:1rem}
+.submit:disabled{opacity:.45;cursor:not-allowed}
+section.results{display:flex;flex-direction:column;gap:16px}
+.summary{display:flex;flex-wrap:wrap;gap:20px;color:var(--muted);font-size:.9rem}
+.summary b{display:block;font-family:var(--display);font-weight:400;font-size:1.6rem;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1}
+.chart{display:flex;flex-direction:column;gap:10px}
+.row{display:grid;grid-template-columns:minmax(90px,30%) 1fr 44px;gap:10px;align-items:center;font-size:.92rem}
+.row .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.track{position:relative;height:18px;background:var(--soft);border-radius:3px}
+.fill{position:absolute;inset-block:0;right:0;background:var(--c);border-radius:3px}
+.tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55}
+.row .val{font-variant-numeric:tabular-nums;font-weight:700;text-align:left}
+.legend{font-size:.82rem;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.legend i{display:inline-block;width:2px;height:12px;background:var(--ink);opacity:.55;vertical-align:middle;margin-inline-end:6px}
+.empty{background:var(--paper);border:1px dashed var(--line);border-radius:8px;padding:18px;color:var(--muted)}
+.entries{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.9rem}
+.entries li{display:flex;gap:10px;justify-content:space-between;border-bottom:1px solid var(--line);padding-block:6px}
+.entries .top{color:var(--muted);min-width:0;text-align:left;direction:rtl}
+.note{font-size:.85rem;color:var(--muted);background:var(--soft);border-radius:8px;padding:10px 12px}
+.sources{font-size:.8rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.fill{transition:width .4s ease}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">מדגם חברים · הכנסת ה-26</span>
+    <h1>הקלפי של 2026</h1>
+    <p class="lede">כמה מנדטים כל מפלגה תקבל לדעתך? חלק 120 מנדטים בין המפלגות והגש. אפשר לחזור מאותו מכשיר ולעדכן. למטה רואים את ממוצע התחזיות של כל המשתתפים.</p>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:14px" aria-labelledby="h-ballot">
+    <h2 id="h-ballot">התחזית שלי</h2>
+    <div class="tools">
+      <button class="btn" id="fill-polls" type="button">מלא לפי ממוצע הסקרים</button>
+      <button class="btn" id="clear" type="button">אפס הכל</button>
+    </div>
+    <label class="nick" for="nick">כינוי (לא חובה)
+      <input id="nick" maxlength="24" placeholder="למשל: דודה רינה" autocomplete="nickname">
+    </label>
+    <ul class="slips" id="slips"></ul>
+    <p class="rules">אחוז החסימה הוא 3.25%, כלומר מפלגה מקבלת 0 מנדטים או לפחות 4. ליד כל מפלגה מופיע ממוצע הסקרים האחרונים (22–23 באוקטובר) לעיון.</p>
+  </section>
+
+  <section class="results" aria-labelledby="h-res">
+    <h2 id="h-res">מה כולם חושבים</h2>
+    <div id="results"><div class="empty">עדיין אין תחזיות. ברגע שמישהו יגיש, הממוצע יופיע כאן.</div></div>
+  </section>
+
+  <p class="sources">ממוצע הסקרים מבוסס על דיווחי מעריב, חדשות 12 ו-skarim.org מ-22–23 באוקטובר 2026, מעוגל. המספרים להתרשמות בלבד.</p>
+</div>
+
+<div class="bar-fixed">
+  <div class="bar-in">
+    <div class="count" id="count">0<small> / 120</small></div>
+    <div class="status" id="status">מתחבר…</div>
+    <button class="submit" id="submit" type="button" disabled>הגש תחזית</button>
+  </div>
+</div>
+
+
+<script>
+const PARTIES = [
+  {id:"yashar",   name:"ישר!",              leader:"גדי איזנקוט",   poll:23, color:"#2b6cd6", bloc:"opp"},
+  {id:"likud",    name:"הליכוד",            leader:"בנימין נתניהו", poll:19, color:"#1b3f8f", bloc:"coal"},
+  {id:"beyachad", name:"ביחד",              leader:"נפתלי בנט",     poll:14, color:"#0f8a8a", bloc:"opp"},
+  {id:"dems",     name:"הדמוקרטים",         leader:"יאיר גולן",     poll:10, color:"#d9364a", bloc:"opp"},
+  {id:"joint",    name:"הרשימה המשותפת",    leader:"חד״ש · תע״ל · בל״ד", poll:9, color:"#3f9a4a", bloc:"arab"},
+  {id:"ybeytenu", name:"ישראל ביתנו",       leader:"אביגדור ליברמן", poll:8, color:"#5a3fa8", bloc:"opp"},
+  {id:"otzma",    name:"עוצמה יהודית",      leader:"איתמר בן גביר", poll:8, color:"#c46a12", bloc:"coal"},
+  {id:"shas",     name:"ש״ס",               leader:"אריה דרעי",     poll:8, color:"#24324d", bloc:"coal"},
+  {id:"utj",      name:"יהדות התורה",       leader:"",              poll:8, color:"#6b7280", bloc:"coal"},
+  {id:"rz",       name:"הציונות הדתית",     leader:"בצלאל סמוטריץ׳", poll:7, color:"#8a6d1f", bloc:"coal"},
+  {id:"raam",     name:"רע״ם",              leader:"מנסור עבאס",    poll:6, color:"#2f7d5b", bloc:"arab"},
+  {id:"amcha",    name:"עמך ישראל",         leader:"עופר וינטר",    poll:0, pct:"2.9%", color:"#9a3b6b", bloc:"other"},
+  {id:"reserv",   name:"המילואימניקים",     leader:"יועז הנדל",     poll:0, pct:"2.5%–3%", color:"#556b2f", bloc:"other"},
+  {id:"haredi",   name:"הציבור החרדי",      leader:"",              poll:0, pct:"1.3%", color:"#8b8f99", bloc:"other"},
+];
+const TOTAL = 120, MIN_SEATS = 4;
+const $ = s => document.querySelector(s);
+const seats = Object.fromEntries(PARTIES.map(p => [p.id, 0]));
+let all = [], mine = null, dirty = false, saving = false, online = null;
+
+function load(){ try{ const d = JSON.parse(localStorage.getItem("kalpi-draft")||"null"); if(d&&d.seats){ for(const k in seats) seats[k]=clamp(d.seats[k]); $("#nick").value=d.nick||""; return true; } }catch(e){} return false; }
+function saveDraft(){ try{ localStorage.setItem("kalpi-draft", JSON.stringify({seats, nick:$("#nick").value})); }catch(e){} }
+function clamp(v){ v = Math.round(Number(v)); return Number.isFinite(v) ? Math.max(0, Math.min(TOTAL, v)) : 0; }
+const sum = s => PARTIES.reduce((a,p)=>a+(s[p.id]||0),0);
+const badThreshold = v => v>0 && v<MIN_SEATS;
+
+function buildSlips(){
+  const ul = $("#slips");
+  ul.innerHTML = "";
+  for(const p of PARTIES){
+    const li = document.createElement("li");
+    li.className = "slip"; li.style.setProperty("--c", p.color); li.id = "slip-"+p.id;
+    const hint = p.poll ? `ממוצע סקרים: ${p.poll}` : `בסקרים: ${p.pct}, מתחת לחסימה`;
+    li.innerHTML = `<span class="chip" aria-hidden="true"></span>
+      <div class="who"><div class="pname"></div><div class="meta"><span class="ld"></span><span class="hint"></span> <span class="err"></span></div></div>
+      <div class="step">
+        <button type="button" data-d="-1" aria-label="הפחת מנדט">−</button>
+        <input type="number" inputmode="numeric" min="0" max="120" id="in-${p.id}">
+        <button type="button" data-d="1" aria-label="הוסף מנדט">+</button>
+      </div>`;
+    li.querySelector(".pname").textContent = p.name;
+    li.querySelector(".ld").textContent = p.leader ? p.leader + " · " : "";
+    li.querySelector(".hint").textContent = hint;
+    const inp = li.querySelector("input");
+    inp.setAttribute("aria-label", "מנדטים ל" + p.name);
+    inp.addEventListener("input", () => { seats[p.id] = clamp(inp.value); changed(false); });
+    inp.addEventListener("blur", () => { inp.value = seats[p.id]; });
+    li.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      let v = seats[p.id] + Number(b.dataset.d);
+      if (b.dataset.d === "1" && v > 0 && v < MIN_SEATS) v = MIN_SEATS;
+      if (b.dataset.d === "-1" && v > 0 && v < MIN_SEATS) v = 0;
+      seats[p.id] = clamp(v); changed(true);
+    }));
+    ul.appendChild(li);
+  }
+}
+
+function changed(syncInputs){ dirty = true; saveDraft(); render(syncInputs); }
+
+function render(syncInputs=true){
+  for(const p of PARTIES){
+    const li = $("#slip-"+p.id), inp = $("#in-"+p.id);
+    if (syncInputs || document.activeElement !== inp) inp.value = seats[p.id];
+    const bad = badThreshold(seats[p.id]);
+    li.classList.toggle("bad", bad);
+    li.querySelector(".err").textContent = bad ? "· 0 או 4 ומעלה" : "";
+  }
+  const s = sum(seats);
+  $("#count").firstChild.nodeValue = s;
+  const st = $("#status"), btn = $("#submit");
+  const anyBad = PARTIES.some(p => badThreshold(seats[p.id]));
+  let msg, cls = "", ok = false;
+  if (s < TOTAL) msg = `נשארו ${TOTAL - s} מנדטים לחלק`;
+  else if (s > TOTAL) { msg = `יותר מדי: הורד ${s - TOTAL}`; cls = "bad"; }
+  else if (anyBad) { msg = "מפלגה מתחת ל-4 מנדטים לא עוברת את החסימה"; cls = "bad"; }
+  else { ok = true; msg = mine && !dirty ? "התחזית שלך נשמרה ✓" : "מוכן להגשה"; cls = "ok"; }
+  if (online === false) { msg = "אין חיבור לשרת כרגע. נסה שוב בעוד רגע."; cls = "bad"; ok = false; }
+  st.textContent = saving ? "שומר…" : msg; st.className = "status " + cls;
+  btn.disabled = !ok || saving || (mine && !dirty);
+  btn.textContent = mine ? "עדכן תחזית" : "הגש תחזית";
+}
+
+function validEntry(d){
+  if (!d || typeof d.seats !== "object" || !d.seats) return null;
+  const s = {}; let t = 0;
+  for (const p of PARTIES){ const v = clamp(d.seats[p.id]); if (badThreshold(v)) return null; s[p.id] = v; t += v; }
+  return t === TOTAL ? s : null;
+}
+
+function renderResults(){
+  const box = $("#results");
+  const entries = all.map(e => ({...e, s: validEntry(e)})).filter(e => e.s);
+  if (!entries.length){ box.innerHTML = '<div class="empty">עדיין אין תחזיות. מלא את הפתקים למעלה והגש ראשון.</div>'; return; }
+  const n = entries.length;
+  const avg = Object.fromEntries(PARTIES.map(p => [p.id, entries.reduce((a,e)=>a+e.s[p.id],0)/n]));
+  const coal = PARTIES.filter(p=>p.bloc==="coal").reduce((a,p)=>a+avg[p.id],0);
+  const order = [...PARTIES].sort((a,b)=>avg[b.id]-avg[a.id] || b.poll-a.poll);
+  const max = Math.max(30, ...order.map(p=>Math.max(avg[p.id], p.poll)));
+  const fmt = v => (Math.round(v*10)/10).toLocaleString("he-IL");
+  box.innerHTML = `
+    <div class="summary">
+      <div><b>${n}</b>משתתפים</div>
+      <div><b>${fmt(coal)}</b>גוש נתניהו (ממוצע)</div>
+      <div><b>${fmt(TOTAL-coal)}</b>כל השאר</div>
+    </div>
+    <div class="legend"><span><i></i>ממוצע הסקרים</span><span>הפס: ממוצע תחזיות המשתתפים</span></div>
+    <div class="chart" id="chart"></div>
+    <h2 style="font-size:1.1rem;margin-top:8px">כל התחזיות</h2>
+    <ul class="entries" id="entries"></ul>`;
+  const ch = $("#chart");
+  for (const p of order){
+    const r = document.createElement("div"); r.className = "row"; r.style.setProperty("--c", p.color);
+    r.innerHTML = `<span class="lbl"></span><div class="track"><div class="fill" style="width:${avg[p.id]/max*100}%"></div>${p.poll?`<div class="tick" style="right:calc(${p.poll/max*100}% - 1px)"></div>`:""}</div><span class="val">${fmt(avg[p.id])}</span>`;
+    r.querySelector(".lbl").textContent = p.name;
+    ch.appendChild(r);
+  }
+  const ul = $("#entries");
+  entries.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  for (const e of entries){
+    const li = document.createElement("li");
+    const top = [...PARTIES].sort((a,b)=>e.s[b.id]-e.s[a.id]).slice(0,3).map(p=>`${p.name} ${e.s[p.id]}`).join(" · ");
+    const who = document.createElement("span");
+    who.textContent = (typeof e.nick === "string" && e.nick.trim() ? e.nick.trim().slice(0,24) : "משתתף/ת") + (e.mine ? " (את/ה)" : "");
+    who.style.fontWeight = "600";
+    const t = document.createElement("span"); t.className = "top"; t.textContent = top;
+    li.append(who, t); ul.appendChild(li);
+  }
+}
+
+
+function voterId(){
+  try {
+    let v = localStorage.getItem("kalpi-voter");
+    if (!v || !/^[A-Za-z0-9_-]{16,64}$/.test(v)) {
+      const a = new Uint8Array(18); crypto.getRandomValues(a);
+      v = btoa(String.fromCharCode(...a)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+      localStorage.setItem("kalpi-voter", v);
+    }
+    return v;
+  } catch (e) { return window._kalpiVoter || (window._kalpiVoter = "t" + Math.random().toString(36).slice(2) + Date.now().toString(36)); }
+}
+const VOTER = voterId();
+
+async function refresh(){
+  try {
+    const r = await fetch("/api/kalpi?voter=" + encodeURIComponent(VOTER), {cache: "no-store"});
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    all = Array.isArray(j.entries) ? j.entries : [];
+    online = true;
+    const m = all.find(e => e.mine && validEntry(e));
+    if (m) {
+      const first = !mine;
+      mine = m;
+      if (first && !dirty) { const s = validEntry(m); for (const k in seats) seats[k] = s[k]; if (typeof m.nick === "string") $("#nick").value = m.nick; }
+    }
+  } catch (e) { online = false; }
+  renderResults(); render();
+}
+
+async function submit(){
+  saving = true; render();
+  const body = { voterId: VOTER, seats: {...seats}, nick: $("#nick").value.trim().slice(0,24) };
+  try {
+    const r = await fetch("/api/kalpi", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(r.status);
+    mine = { ...body, mine: true }; dirty = false;
+    saving = false;
+    await refresh();
+    return;
+  } catch (e) {
+    saving = false; render();
+    $("#status").textContent = "השמירה נכשלה. נסה שוב בעוד רגע."; $("#status").className = "status bad";
+  }
+}
+
+$("#fill-polls").addEventListener("click", () => { for (const p of PARTIES) seats[p.id] = p.poll; changed(true); });
+$("#clear").addEventListener("click", () => { for (const p of PARTIES) seats[p.id] = 0; changed(true); });
+$("#nick").addEventListener("input", () => { if (mine) dirty = true; saveDraft(); render(false); });
+$("#submit").addEventListener("click", submit);
+
+buildSlips();
+if (!load()) for (const p of PARTIES) seats[p.id] = p.poll;
+render();
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, 20000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>
