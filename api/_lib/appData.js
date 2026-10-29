@@ -1,19 +1,40 @@
 // Reading and writing the site's shared data from the server.
 //
 // The data used to be one document (appData/familyPayments). It now lives in
-// appParts, one document per field (appParts/families, appParts/events...),
-// each holding the field as a JSON string in `j`. A field too big for one
-// document continues in appParts/<field>~1, ~2... (the head doc's `n` says
-// how many; all chunks of one write share the same `ver`). Photos are cut out
-// into appPhotos/<hash> and appear in the JSON as "fsphoto://<hash>" — the
-// server never needs the images themselves. appParts/_meta marks that the
-// move happened; before that (or if it never does) everything is still in
-// appData/familyPayments, which always keeps adminPass. See app.js "Split
-// storage" for the client side of the same format.
+// one document per field, appData/part_<field> (part_families,
+// part_events...), each holding the field as a JSON string in `j`. A field
+// too big for one document continues in part_<field>~1, ~2... (the head
+// doc's `n` says how many; all chunks of one write share the same `ver`).
+// Photos are cut out into appData/photo_<hash> and appear in the JSON as
+// "fsphoto://<hash>" — the server never needs the images themselves.
+// appData/part__meta marks that the move happened; before that (or if it
+// never does) everything is still in appData/familyPayments, which always
+// keeps adminPass. A first version used the appParts collection instead
+// (ids without the prefix); that is still read until a device moves it.
+// See app.js "Split storage" for the client side of the same format.
+const admin = require('firebase-admin');
 const MAIN = 'appData/familyPayments';
-const PARTS = 'appParts';
-const PHOTOS = 'appPhotos';
+const PART_PRE = 'part_';
+const PHOTO_PRE = 'photo_';
 const CHUNK_CHARS = 300000;
+const NEW = { col: 'appData', pre: PART_PRE };
+const OLD = { col: 'appParts', pre: '' };
+
+const partRef = (db, loc, id) => db.collection(loc.col).doc(loc.pre + id);
+const prefixQuery = (db, pre) => db.collection('appData')
+  .where(admin.firestore.FieldPath.documentId(), '>=', pre)
+  .where(admin.firestore.FieldPath.documentId(), '<', pre.slice(0, -1) + '`');
+const listParts = (db, loc) => loc.pre ? prefixQuery(db, loc.pre).get() : db.collection(loc.col).get();
+const partId = (loc, docId) => docId.slice(loc.pre.length);
+
+// Where the parts are: { loc, docs } — or null before the move.
+async function findParts(db) {
+  for (const loc of [NEW, OLD]) {
+    const snap = await listParts(db, loc);
+    if (snap.docs.some(d => partId(loc, d.id) === '_meta')) return { loc, docs: snap.docs };
+  }
+  return null;
+}
 
 function assemble(byId, field) {
   const head = byId[field];
@@ -27,9 +48,9 @@ function assemble(byId, field) {
   return JSON.parse(j);
 }
 
-function partsById(docs) {
+function partsById(docs, loc) {
   const byId = {};
-  docs.forEach(d => { byId[d.id] = d.data(); });
+  docs.forEach(d => { byId[loc ? partId(loc, d.id) : d.id] = d.data(); });
   return byId;
 }
 
@@ -39,10 +60,10 @@ function fieldsOf(byId) {
 
 // Everything, in the old single-document shape: { families, events, ..., adminPass }.
 async function loadAppData(db) {
-  const [parts, main] = await Promise.all([db.collection(PARTS).get(), db.doc(MAIN).get()]);
+  const [parts, main] = await Promise.all([findParts(db), db.doc(MAIN).get()]);
   const mainData = main.exists ? main.data() : null;
-  if (!parts.docs.some(d => d.id === '_meta')) return mainData;
-  const byId = partsById(parts.docs);
+  if (!parts) return mainData;
+  const byId = partsById(parts.docs, parts.loc);
   const data = {};
   fieldsOf(byId).forEach(f => { const v = assemble(byId, f); if (v !== undefined) data[f] = v; });
   data.adminPass = (mainData && mainData.adminPass) || '';
@@ -63,12 +84,12 @@ function chunksOf(json) {
 
 // Writes one field (in a transaction or batch). prevN = how many chunk docs
 // it had, so leftovers get deleted.
-function writeField(db, writer, field, value, prevN) {
+function writeField(db, writer, field, value, prevN, loc = NEW) {
   const chunks = chunksOf(JSON.stringify(value === undefined ? null : value));
   const ver = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  writer.set(db.doc(`${PARTS}/${field}`), { j: chunks[0], n: chunks.length, ver, at: Date.now() });
-  for (let i = 1; i < chunks.length; i++) writer.set(db.doc(`${PARTS}/${field}~${i}`), { j: chunks[i], ver });
-  for (let i = chunks.length; i < (prevN || 0); i++) writer.delete(db.doc(`${PARTS}/${field}~${i}`));
+  writer.set(partRef(db, loc, field), { j: chunks[0], n: chunks.length, ver, at: Date.now() });
+  for (let i = 1; i < chunks.length; i++) writer.set(partRef(db, loc, `${field}~${i}`), { j: chunks[i], ver });
+  for (let i = chunks.length; i < (prevN || 0); i++) writer.delete(partRef(db, loc, `${field}~${i}`));
 }
 
 // Read-modify-write of some fields, atomically. fn(data) gets { field: value }
@@ -76,8 +97,9 @@ function writeField(db, writer, field, value, prevN) {
 // { changed: [field names to write], ...anything else to hand back }.
 async function updateFields(db, fields, fn) {
   return db.runTransaction(async tx => {
-    const meta = await tx.get(db.doc(`${PARTS}/_meta`));
-    if (!meta.exists) {
+    let loc = null;
+    for (const l of [NEW, OLD]) { if ((await tx.get(partRef(db, l, '_meta'))).exists) { loc = l; break; } }
+    if (!loc) {
       const ref = db.doc(MAIN);
       const data = (await tx.get(ref)).data() || {};
       const r = (await fn(data)) || {};
@@ -86,15 +108,15 @@ async function updateFields(db, fields, fn) {
     }
     const data = {}, prevN = {};
     for (const f of fields) {
-      const head = await tx.get(db.doc(`${PARTS}/${f}`));
+      const head = await tx.get(partRef(db, loc, f));
       if (!head.exists) continue;
       const byId = { [f]: head.data() };
-      for (let i = 1; i < (head.data().n || 1); i++) byId[`${f}~${i}`] = (await tx.get(db.doc(`${PARTS}/${f}~${i}`))).data();
+      for (let i = 1; i < (head.data().n || 1); i++) byId[`${f}~${i}`] = (await tx.get(partRef(db, loc, `${f}~${i}`))).data();
       data[f] = assemble(byId, f);
       prevN[f] = head.data().n || 1;
     }
     const r = (await fn(data)) || {};
-    (r.changed || []).forEach(f => writeField(db, tx, f, data[f], prevN[f]));
+    (r.changed || []).forEach(f => writeField(db, tx, f, data[f], prevN[f], loc));
     return r;
   });
 }
@@ -124,17 +146,18 @@ async function inBatches(db, ops) {
 // every appParts doc. Returns null (nothing written) before the move — the
 // caller then keeps writing the old single-doc backup.
 async function backupParts(db, date, extra) {
-  const parts = await db.collection(PARTS).get();
-  if (!parts.docs.some(d => d.id === '_meta')) return null;
+  const parts = await findParts(db);
+  if (!parts) return null;
   const ref = db.doc(`backups/${date}`);
   const old = await ref.collection('parts').get();
   const photos = new Set();
   parts.docs.forEach(d => { if (typeof d.data().j === 'string') photoRefs(d.data().j, photos); });
+  // Stored without the prefix: backups/<date>/parts/<field>.
   await inBatches(db, [
     ...old.docs.map(d => ({ ref: d.ref, del: true })),
-    ...parts.docs.map(d => ({ ref: ref.collection('parts').doc(d.id), data: d.data() })),
+    ...parts.docs.map(d => ({ ref: ref.collection('parts').doc(partId(parts.loc, d.id)), data: d.data() })),
   ]);
-  const byId = partsById(parts.docs);
+  const byId = partsById(parts.docs, parts.loc);
   const count = f => { try { return (assemble(byId, f) || []).length; } catch (e) { return null; } };
   await ref.set({ format: 2, photos: [...photos], summary: { families: count('families'), events: count('events') }, ...extra });
   return { parts: parts.size, photos: photos.size };
@@ -161,17 +184,17 @@ async function deleteBackup(db, snap) {
 // written ahead of its data is never caught in between.
 async function cleanupPhotos(db) {
   const keep = new Set();
-  const parts = await db.collection(PARTS).get();
-  if (!parts.docs.some(d => d.id === '_meta')) return { skipped: 'not moved yet' };
+  const parts = await findParts(db);
+  if (!parts || parts.loc !== NEW) return { skipped: 'not moved yet' };
   parts.docs.forEach(d => { if (typeof d.data().j === 'string') photoRefs(d.data().j, keep); });
   const backups = await db.collection('backups').get();
   backups.docs.forEach(b => (b.data().photos || []).forEach(h => keep.add(h)));
-  const photos = await db.collection(PHOTOS).select('at').get();
+  const photos = await prefixQuery(db, PHOTO_PRE).select('at').get();
   const cutoff = Date.now() - 2 * 24 * 60 * 60 * 1000;
-  const dead = photos.docs.filter(d => !keep.has(d.id) && (d.data().at || 0) < cutoff);
+  const dead = photos.docs.filter(d => !keep.has(d.id.slice(PHOTO_PRE.length)) && (d.data().at || 0) < cutoff);
   await inBatches(db, dead.map(d => ({ ref: d.ref, del: true })));
   return { photos: photos.size, deleted: dead.length };
 }
 
-module.exports = { MAIN, PARTS, PHOTOS, loadAppData, updateFields, writeField, partsById, fieldsOf, assemble, photoRefs,
+module.exports = { MAIN, NEW, PART_PRE, PHOTO_PRE, partRef, findParts, partId, loadAppData, updateFields, writeField, partsById, fieldsOf, assemble, photoRefs,
   inBatches, backupParts, loadBackup, deleteBackup, cleanupPhotos };

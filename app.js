@@ -269,7 +269,7 @@ async function fbInit(){
   _fbApp=appMod.initializeApp(firebaseConfig);
   const db=fsMod.getFirestore(_fbApp);
   _fb={db,doc:fsMod.doc,getDoc:fsMod.getDoc,setDoc:fsMod.setDoc,onSnapshot:fsMod.onSnapshot,collection:fsMod.collection,
-    getDocs:fsMod.getDocs,query:fsMod.query,where:fsMod.where,deleteDoc:fsMod.deleteDoc,writeBatch:fsMod.writeBatch,arrayUnion:fsMod.arrayUnion,arrayRemove:fsMod.arrayRemove};
+    getDocs:fsMod.getDocs,query:fsMod.query,where:fsMod.where,deleteDoc:fsMod.deleteDoc,writeBatch:fsMod.writeBatch,documentId:fsMod.documentId,arrayUnion:fsMod.arrayUnion,arrayRemove:fsMod.arrayRemove};
   return _fb;
 }
 
@@ -336,6 +336,7 @@ function renderDataSizeCheck(){
       <span style="font-size:13px;font-weight:700;color:${danger?'var(--red-mid)':'var(--text2)'}">${pct}%</span>
     </div>
     <div class="pbar"><div class="pfill ${danger?'full':'part'}" style="width:${pct}%;${danger?'background:var(--red-mid)':''}"></div></div>
+    ${_splitBlocked?'<div style="font-size:12px;color:var(--red-mid);font-weight:700;margin-top:8px">⚠️ חוקי האבטחה של פיירבייס חוסמים את השמירה במסמכים נפרדים, אז הכל עדיין במסמך אחד.</div>':''}
     ${danger?'<div style="font-size:12px;color:var(--red-mid);font-weight:700;margin-top:8px">⚠️ קרוב לגבול — זו כנראה הסיבה ששמירות נכשלות. צריך למחוק הודעות צ\'אט ישנות או לפנות למפתח.</div>':''}
     <button onclick="closeSettingsHubModal();openDataSizeBreakdown()" style="width:100%;margin-top:12px;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🔍 מה תופס מקום?</button>`;
 }
@@ -1141,25 +1142,33 @@ const _STALE_MS=45000;
 // ── Split storage ──────────────────────────────────────────────────────────
 // Everything used to live in ONE document (appData/familyPayments), and a
 // Firestore document can't pass 1MiB — photos alone were eating most of it.
-// Now each field gets its own document in appParts (appParts/familyTree,
-// appParts/messages...), stored as a JSON string so a field that ever grows
-// past ~900KB simply continues in appParts/<field>~1, ~2... (head doc holds
+// Now each field gets its own document, appData/part_<field>
+// (part_familyTree, part_messages...), stored as a JSON string so a field
+// that ever grows past ~900KB simply continues in part_<field>~1, ~2... (head doc holds
 // the chunk count n; every chunk of one write shares the same ver, so a
 // half-seen write is never assembled). Photos (base64 data: URLs) are cut
-// out of that JSON and stored one per document in appPhotos/<hash>,
+// out of that JSON and stored one per document in appData/photo_<hash>,
 // replaced in the field by "fsphoto://<hash>" — content-addressed, so a
-// photo is written once and never changes. appParts/_meta marks that the
+// photo is written once and never changes. appData/part__meta marks that the
 // move happened; appData/familyPayments keeps only adminPass (the server
-// checks it there). If appParts can't be read at all (Firestore rules),
-// everything stays in the old single document as before.
+// checks it there). All of it sits under appData/* because that's what the
+// Firestore rules open to the client (a first version used separate
+// appParts/appPhotos collections, which the rules refused — data found
+// there is moved over too). If the parts can't be read at all, everything
+// stays in the old single document as before.
 const _PART_FIELDS=_SYNC_FIELDS.filter(f=>f!=='adminPass');
-const _PARTS_COL='appParts',_PHOTOS_COL='appPhotos',_PHOTO_REF='fsphoto://';
+const _PHOTO_REF='fsphoto://',_PART_PRE='part_',_PHOTO_PRE='photo_';
+const _partRef=(fb,id)=>fb.doc(fb.db,'appData',_PART_PRE+id);
+const _photoRef=(fb,h)=>fb.doc(fb.db,'appData',_PHOTO_PRE+h);
+// Every appData doc whose id starts with the prefix ('`' sorts right after '_').
+const _prefixQuery=(fb,pre)=>fb.query(fb.collection(fb.db,'appData'),fb.where(fb.documentId(),'>=',pre),fb.where(fb.documentId(),'<',pre.slice(0,-1)+'`'));
 const _CHUNK_CHARS=300000; // ≤900KB even if every char took 3 bytes
-let _splitMode=null;   // null = not known yet, true = appParts, false = old single doc
+let _splitMode=null;   // null = not known yet, true = split parts, false = old single doc
+let _splitBlocked=false; // the Firestore rules refused the parts
 let _needMeta=false;   // the next save is the move itself: also write _meta
 let _baseJson={};      // field → stored (photo-less) JSON as of the last known sync
-let _rawParts={};      // field → JSON currently in appParts
-let _partChunks={};    // field → how many chunk docs it has in appParts now
+let _rawParts={};      // field → JSON currently stored
+let _partChunks={};    // field → how many chunk docs it has stored now
 let _remoteAdminPass='';
 const _photoCache={};  // hash → data URL
 const _photoKnown=new Set(); // hashes already stored in appPhotos
@@ -1217,7 +1226,7 @@ function _chunksOf(json){
 // chunks are all there with the same ver. Returns whether _meta exists.
 function _ingestParts(docs){
   const byId={};let meta=false;
-  docs.forEach(d=>{if(d.id==='_meta')meta=true;else byId[d.id]=d.data();});
+  docs.forEach(d=>{const id=d.id.startsWith(_PART_PRE)?d.id.slice(_PART_PRE.length):d.id;if(id==='_meta')meta=true;else byId[id]=d.data();});
   _PART_FIELDS.forEach(f=>{
     const head=byId[f];if(!head||typeof head.j!=='string')return;
     const n=head.n||1;const parts=[head.j];
@@ -1241,37 +1250,49 @@ function _assembleFromParts(missing){
   return d;
 }
 async function _fetchPhotos(hashes){
-  const {db,doc,getDoc}=await fbInit();
+  const fb=await fbInit();
   let got=0;
   await Promise.all(hashes.map(async h=>{
-    try{const s=await getDoc(doc(db,_PHOTOS_COL,h));if(s.exists()&&s.data().d){_photoCache[h]=s.data().d;_photoKnown.add(h);got++;}}
+    try{const s=await fb.getDoc(_photoRef(fb,h));if(s.exists()&&s.data().d){_photoCache[h]=s.data().d;_photoKnown.add(h);got++;}}
     catch(e){console.warn('photo fetch failed',h,e);}
   }));
   return got;
 }
 async function _loadAllPhotos(){
-  const {db,collection,getDocs}=await fbInit();
-  const snap=await getDocs(collection(db,_PHOTOS_COL));
-  snap.docs.forEach(d=>{const u=d.data().d;if(u){_photoCache[d.id]=u;_photoKnown.add(d.id);}});
+  const fb=await fbInit();
+  const snap=await fb.getDocs(_prefixQuery(fb,_PHOTO_PRE));
+  snap.docs.forEach(d=>{const u=d.data().d,h=d.id.slice(_PHOTO_PRE.length);if(u){_photoCache[h]=u;_photoKnown.add(h);}});
 }
-// Which storage this database uses. Reading appParts is the test: if the
-// rules refuse it, stay on the old single document.
+// Which storage this database uses. Reading the parts is the test: if the
+// rules refuse it, stay on the old single document. fromOld: the data sits
+// in the first version's appParts/appPhotos collections (already loaded
+// into _rawParts/_photoCache here) and should be moved to appData.
 async function _detectSplitMode(){
-  const {db,doc,getDoc,collection,getDocs}=await fbInit();
+  const fb=await fbInit();
   let partsSnap;
-  try{partsSnap=await getDocs(collection(db,_PARTS_COL));}
+  try{partsSnap=await fb.getDocs(_prefixQuery(fb,_PART_PRE));}
   catch(e){
-    if(e&&e.code==='permission-denied'){console.warn('appParts not readable — staying on the single document');_splitMode=false;return{split:false,canSplit:false};}
+    if(e&&e.code==='permission-denied'){console.warn('appData parts not readable — staying on the single document');_splitMode=false;_splitBlocked=true;return{split:false,canSplit:false};}
     throw e;
   }
   const meta=_ingestParts(partsSnap.docs);
+  const readPass=async()=>{const main=await fb.getDoc(fb.doc(fb.db,'appData','familyPayments'));_remoteAdminPass=(main.exists()&&main.data().adminPass)||'';};
   if(meta){
-    const main=await getDoc(doc(db,'appData','familyPayments'));
-    _remoteAdminPass=(main.exists()&&main.data().adminPass)||'';
+    await readPass();
     await _loadAllPhotos();
     _splitMode=true;
+    return{split:true,canSplit:true};
   }
-  return{split:meta,canSplit:true};
+  let old=null;
+  try{old=await fb.getDocs(fb.collection(fb.db,'appParts'));}catch(e){}
+  if(old&&old.docs.some(d=>d.id==='_meta')){
+    _rawParts={};_partChunks={};
+    _ingestParts(old.docs);
+    await readPass();
+    try{(await fb.getDocs(fb.collection(fb.db,'appPhotos'))).docs.forEach(d=>{if(d.data().d)_photoCache[d.id]=d.data().d;});}catch(e){}
+    return{split:false,canSplit:true,fromOld:true};
+  }
+  return{split:false,canSplit:true};
 }
 function _hasLocalChanges(){
   if(!_splitMode)return false;
@@ -1283,7 +1304,8 @@ function _hasLocalChanges(){
 // on the move), new photos first. A field this device didn't touch is never
 // written, so a stale copy here can't overwrite someone else's edit to it.
 async function _saveParts(){
-  const {db,doc,setDoc,writeBatch}=await fbInit();
+  const fb=await fbInit();
+  const {db,doc,setDoc,writeBatch}=fb;
   const newPhotos={},changed=[];
   _PART_FIELDS.forEach(f=>{const j=_fieldJson(f,newPhotos);if(_needMeta||j!==_baseJson[f])changed.push([f,j]);});
   // Photos: immutable, so writing them ahead is always safe. Batches stay
@@ -1291,7 +1313,7 @@ async function _saveParts(){
   let batch=writeBatch(db),size=0,count=0;
   for(const [h,url] of Object.entries(newPhotos)){
     if(size+url.length>4000000||count>=400){await batch.commit();batch=writeBatch(db);size=0;count=0;}
-    batch.set(doc(db,_PHOTOS_COL,h),{d:url,at:Date.now()});size+=url.length;count++;
+    batch.set(_photoRef(fb,h),{d:url,at:Date.now()});size+=url.length;count++;
   }
   if(count)await batch.commit();
   Object.keys(newPhotos).forEach(h=>_photoKnown.add(h));
@@ -1301,12 +1323,12 @@ async function _saveParts(){
   const ver=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   changed.forEach(([f,j])=>{
     const chunks=_chunksOf(j);
-    b.set(doc(db,_PARTS_COL,f),{j:chunks[0],n:chunks.length,ver,at:Date.now()});
-    for(let i=1;i<chunks.length;i++)b.set(doc(db,_PARTS_COL,f+'~'+i),{j:chunks[i],ver});
-    for(let i=chunks.length;i<(_partChunks[f]||0);i++)b.delete(doc(db,_PARTS_COL,f+'~'+i));
+    b.set(_partRef(fb,f),{j:chunks[0],n:chunks.length,ver,at:Date.now()});
+    for(let i=1;i<chunks.length;i++)b.set(_partRef(fb,f+'~'+i),{j:chunks[i],ver});
+    for(let i=chunks.length;i<(_partChunks[f]||0);i++)b.delete(_partRef(fb,f+'~'+i));
     written.push([f,j,chunks.length]);
   });
-  if(_needMeta)b.set(doc(db,_PARTS_COL,'_meta'),{v:1,movedAt:new Date().toISOString()});
+  if(_needMeta)b.set(_partRef(fb,'_meta'),{v:1,movedAt:new Date().toISOString()});
   if(passChanged&&!_needMeta)b.set(doc(db,'appData','familyPayments'),{adminPass},{merge:true});
   await b.commit();
   written.forEach(([f,j,n])=>{_baseJson[f]=j;_rawParts[f]=j;_partChunks[f]=n;});
@@ -1381,7 +1403,7 @@ async function save(){
     console.warn('save failed, will retry:',e);
     // The move to appParts itself was refused (rules allow reading it but
     // not writing): stay on the single document.
-    if(_needMeta&&e&&e.code==='permission-denied'){_needMeta=false;_splitMode=false;_saving=false;save();return;}
+    if(_needMeta&&e&&e.code==='permission-denied'){_needMeta=false;_splitMode=false;_splitBlocked=true;_saving=false;save();return;}
     // The generic "שמור מקומי" text alone gave no way to tell WHY a save
     // keeps failing without opening devtools (which most people using this
     // app never will) — show the actual error on screen too, long enough
@@ -1396,8 +1418,10 @@ async function save(){
   }
   _saving=false;
   // Something changed while that write was in flight (a second save() call
-  // returns early while one is running) — send it too.
-  if(_splitMode&&_hasLocalChanges())save();
+  // returns early while one is running) — send it too. Otherwise apply what
+  // other devices saved meanwhile: the listener skips adopting while we
+  // save, and nothing else would bring it in until the next change.
+  if(_splitMode){if(_hasLocalChanges())save();else _adoptFromRaw();}
 }
 
 
@@ -1412,6 +1436,12 @@ async function load(){
       const missing=new Set();
       d=_assembleFromParts(missing);
       if(missing.size)_fetchPhotos([...missing]).then(n=>{if(n&&!_saving)_adoptFromRaw();});
+    }else if(mode.fromOld){
+      // Moved by the first version into appParts: take it from there and
+      // move it again, to appData.
+      d=_assembleFromParts(null);
+      _splitMode=false;
+      migrate=true;
     }else{
       const snap=await getDoc(doc(db,'appData','familyPayments'));
       d=snap.exists()?snap.data():{};
@@ -4323,7 +4353,7 @@ async function startRealtimeSync(){
     const {db,doc,onSnapshot,collection}=await fbInit();
     if(_splitMode===null){try{const m=await _detectSplitMode();if(m.split===false)_splitMode=false;}catch(e){}}
     if(_splitMode){
-      _realtimeUnsub=onSnapshot(collection(db,_PARTS_COL),snap=>{
+      _realtimeUnsub=onSnapshot(_prefixQuery(await fbInit(),_PART_PRE),snap=>{
         _lastSnapshotAt=Date.now();
         _ingestParts(snap.docs);
         if(!_saving&&!_needMeta)_adoptFromRaw();
