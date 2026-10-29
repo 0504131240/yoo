@@ -37,11 +37,5 @@
       "path": "/api/cron/daily-backup",
       "schedule": "0 6 * * *"
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/kalpi",
-      "destination": "/kalpi.html"
-    }
   ]
 }

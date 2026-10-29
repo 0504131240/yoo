@@ -313,13 +313,120 @@ function renderDataSizeCheck(){
   const limitKb=1024;
   const pct=Math.min(100,Math.round(bytes/(limitKb*1024)*100));
   const danger=pct>=85;
-  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">גודל כל הנתונים המשותפים (משפחות, אירועים, צ'אט, קופות...) — פיירסטור לא מאפשר יותר מ-1MB למסמך בודד. הודעות צ'אט ישנות הן בדרך כלל התורמות הכי גדולות לגודל.</div>
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">גודל כל הנתונים המשותפים (משפחות, אילן יוחסין, אירועים, צ'אט, קופות...) — פיירסטור לא מאפשר יותר מ-1MB למסמך בודד. מתכונים נשמרים בנפרד ולא נספרים כאן.</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <span style="font-size:13px;font-weight:700;color:${danger?'var(--red-mid)':'var(--text)'}">${kb.toLocaleString()} KB מתוך ${limitKb.toLocaleString()} KB</span>
       <span style="font-size:13px;font-weight:700;color:${danger?'var(--red-mid)':'var(--text2)'}">${pct}%</span>
     </div>
     <div class="pbar"><div class="pfill ${danger?'full':'part'}" style="width:${pct}%;${danger?'background:var(--red-mid)':''}"></div></div>
-    ${danger?'<div style="font-size:12px;color:var(--red-mid);font-weight:700;margin-top:8px">⚠️ קרוב לגבול — זו כנראה הסיבה ששמירות נכשלות. צריך למחוק הודעות צ\'אט ישנות או לפנות למפתח.</div>':''}`;
+    ${danger?'<div style="font-size:12px;color:var(--red-mid);font-weight:700;margin-top:8px">⚠️ קרוב לגבול — זו כנראה הסיבה ששמירות נכשלות. צריך למחוק הודעות צ\'אט ישנות או לפנות למפתח.</div>':''}
+    <button onclick="closeSettingsHubModal();openDataSizeBreakdown()" style="width:100%;margin-top:12px;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🔍 מה תופס מקום?</button>`;
+}
+// ── 📦 What takes up space: a per-category breakdown of the shared
+// document's size (the same payload save() writes), sorted biggest first.
+// Photos are stored inline as base64 data: URLs, so each row also says how
+// much of it is photos — those are usually the big wins when cleaning up.
+// Recipes live in their own 'recipes' collection (one doc each) and don't
+// count toward this document's 1MB at all.
+const _DATA_SIZE_CATS=[
+  {key:'familyTree',icon:'🌳',label:'אילן יוחסין',items:'אנשים',tip:'התמונות של האנשים באילן הן רוב הגודל. אפשר להסיר תמונות של אנשים שפחות חשובה התמונה שלהם.'},
+  {key:'families',icon:'👨‍👩‍👧',label:'משפחות',items:'משפחות',tip:'בעיקר תמונות הפרופיל של המשפחות.'},
+  {key:'messages',icon:'💬',label:"צ'אט",items:'הודעות',tip:"הודעות צ'אט לא נמחקות אף פעם — מחיקת הודעות ישנות חוסכת מקום."},
+  {key:'notifications',icon:'🔔',label:'התראות',items:'התראות',tip:'נשמרות רק 200 האחרונות, אז זה לא גדל בלי סוף.'},
+  {key:'events',icon:'🎉',label:'אירועים',items:'אירועים',tip:'מחיקת אירועים ישנים שכבר נסגרו חוסכת מקום.'},
+  {key:'fund',icon:'💰',label:'קופה משותפת (שוטף)',items:'תנועות',count:v=>(v&&v.transactions||[]).length,tip:'כל תנועה בקופה נשמרת לתמיד.'},
+  {key:'paymentClaims',icon:'🧾',label:'דיווחי תשלום',items:'דיווחים'},
+  {key:'globalSettled',icon:'✅',label:'תשלומים שסומנו כשולמו',items:'רשומות'},
+  {key:'goalFunds',icon:'🎯',label:'קופות יעד',items:'קופות'},
+  {key:'savingsPot',icon:'🐷',label:'קופת חיסכון',items:'הוצאות',count:v=>(v&&v.expenses||[]).length},
+  {key:'calItems',icon:'📅',label:'לוח שנה',items:'פריטים'},
+  {key:'birthdays',icon:'🎂',label:'ימי הולדת',items:'ימי הולדת'},
+  {key:'yahrzeits',icon:'🕯️',label:'ימי זיכרון',items:'ימי זיכרון'},
+  {key:'countdowns',icon:'⏳',label:'שעון לאחור',items:'שעונים'},
+  {key:'polls',icon:'📊',label:'סקרים',items:'סקרים',tip:'מחיקת סקרים ישנים שנסגרו חוסכת מקום.'},
+  {key:'visits',icon:'👥',label:'יומן כניסות',items:'רשומות'},
+  {key:'treeScores',icon:'🏆',label:'ניקוד תחרות האילן',items:'משתתפים',count:v=>Object.keys(v||{}).length},
+  {key:'adminPass',icon:'🔑',label:'סיסמת ניהול'}
+];
+function _dataSizeVal(key){
+  return {families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,globalSettled,visits,notifications,polls,countdowns,yahrzeits,familyTree,treeScores}[key];
+}
+function _utf8Len(s){return new Blob([s]).size;}
+// Every inline photo (data:image/... string) anywhere inside a value.
+function _photoStats(v){
+  let n=0,bytes=0;
+  (function walk(x){
+    if(typeof x==='string'){if(x.startsWith('data:image')){n++;bytes+=x.length;}return;}
+    if(x&&typeof x==='object')Object.values(x).forEach(walk);
+  })(v);
+  return {n,bytes};
+}
+function _kbStr(bytes){
+  const kb=bytes/1024;
+  return (kb<10?kb.toFixed(1):Math.round(kb).toLocaleString())+' KB';
+}
+function openDataSizeBreakdown(){
+  let m=document.getElementById('dataSizeModal');
+  if(!m){
+    m=document.createElement('div');
+    m.id='dataSizeModal';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+    m.onclick=e=>{if(e.target===m)closeDataSizeBreakdown();};
+    m.innerHTML=`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:420px;max-height:85vh;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:15px;font-weight:800;color:var(--text)">📦 מה תופס מקום</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onclick="closeDataSizeBreakdown();openSettingsHubModal()" style="background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;color:var(--blue-mid);font-family:var(--font);padding:0">↩ הגדרות</button>
+          <button onclick="closeDataSizeBreakdown()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1;padding:0">✕</button>
+        </div>
+      </div>
+      <div style="padding:14px 18px;overflow-y:auto;flex:1;min-height:0" id="dataSizeModalContent"></div>
+    </div>`;
+    document.body.appendChild(m);
+  }
+  renderDataSizeBreakdown();
+  m.style.display='flex';
+}
+function closeDataSizeBreakdown(){
+  const m=document.getElementById('dataSizeModal');if(m)m.style.display='none';
+}
+function renderDataSizeBreakdown(){
+  const el=document.getElementById('dataSizeModalContent');if(!el)return;
+  const total=_dataSizeBytes();
+  const rows=_DATA_SIZE_CATS.map(c=>{
+    const v=_dataSizeVal(c.key);
+    const bytes=_utf8Len(JSON.stringify(v===undefined?null:v));
+    const count=c.count?c.count(v):(Array.isArray(v)?v.length:null);
+    return {...c,bytes,count,photos:_photoStats(v)};
+  }).sort((a,b)=>b.bytes-a.bytes);
+  const allPhotos=rows.reduce((s,r)=>({n:s.n+r.photos.n,bytes:s.bytes+r.photos.bytes}),{n:0,bytes:0});
+  const max=rows[0]?rows[0].bytes:1;
+  const big=rows.filter(r=>r.bytes>=1024);
+  const small=rows.filter(r=>r.bytes<1024);
+  const smallBytes=small.reduce((s,r)=>s+r.bytes,0);
+  const rowHtml=r=>{
+    const pct=total?Math.round(r.bytes/total*100):0;
+    const w=Math.max(2,Math.round(r.bytes/max*100));
+    const sub=[];
+    if(r.count!=null&&r.items)sub.push(`${r.count.toLocaleString()} ${r.items}`);
+    if(r.photos.n)sub.push(`📷 ${r.photos.n} תמונות = ${_kbStr(r.photos.bytes)}`);
+    return `<div style="padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:18px;flex-shrink:0">${r.icon}</span>
+        <span style="flex:1;font-size:13px;font-weight:800;color:var(--text)">${r.label}</span>
+        <span style="font-size:13px;font-weight:800;color:var(--text);white-space:nowrap">${_kbStr(r.bytes)}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text2);width:34px;text-align:left">${pct}%</span>
+      </div>
+      <div class="pbar"><div class="pfill part" style="width:${w}%"></div></div>
+      ${sub.length?`<div style="font-size:11.5px;color:var(--text2);margin-top:6px">${sub.join(' · ')}</div>`:''}
+      ${r.tip&&pct>=5?`<div style="font-size:11.5px;color:var(--text3);margin-top:4px;line-height:1.5">💡 ${r.tip}</div>`:''}
+    </div>`;
+  };
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">סה״כ <b style="color:var(--text)">${_kbStr(total)}</b> מתוך 1,024 KB. מסודר מהגדול לקטן.</div>
+    ${allPhotos.n?`<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--text);line-height:1.6">📷 <b>תמונות:</b> ${allPhotos.n} תמונות תופסות <b>${_kbStr(allPhotos.bytes)}</b> (${total?Math.round(allPhotos.bytes/total*100):0}% מהכל). כל תמונה בערך ${_kbStr(allPhotos.bytes/allPhotos.n)}.</div>`:''}
+    ${big.map(rowHtml).join('')}
+    ${small.length?`<div style="font-size:11.5px;color:var(--text3);margin:4px 2px 12px;line-height:1.6">פחות מ-1 KB כל אחד (${_kbStr(smallBytes)} ביחד): ${small.map(r=>r.icon+' '+r.label).join(' · ')}</div>`:''}
+    <div style="font-size:11.5px;color:var(--text3);line-height:1.6;border-top:1px solid var(--border);padding-top:10px">🍲 מתכונים נשמרים כל אחד בנפרד, ולכן לא נכנסים לחשבון הזה ולא מקרבים לגבול.</div>`;
 }
 
 // EmailJS settings — read/written via /api/settings/emailjs (Admin SDK,
