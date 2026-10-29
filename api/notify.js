@@ -7,6 +7,7 @@
 // the app's shared-family data) so random internet traffic can't spam pushes
 // to the family.
 const { getDb, getMessaging, checkAdminPass, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isYomTovNow } = require('./_lib/firebaseAdmin');
+const { loadAppData } = require('./_lib/appData');
 const { yemotConfigured, phoneEntriesFor, callOrQueue } = require('./_lib/yemot');
 
 module.exports = async (req, res) => {
@@ -25,8 +26,8 @@ module.exports = async (req, res) => {
   let phone = {};
   if (yemotConfigured() && kind) {
     try {
-      const snap = await db.doc('appData/familyPayments').get();
-      phone = await callOrQueue(db, phoneEntriesFor(snap.data()?.families, kind, { target, excludeFamIds, relatedFamIds: Array.isArray(phoneFamIds) ? phoneFamIds : relatedFamIds, noPhone }, body));
+      const shared = await loadAppData(db);
+      phone = await callOrQueue(db, phoneEntriesFor(shared?.families, kind, { target, excludeFamIds, relatedFamIds: Array.isArray(phoneFamIds) ? phoneFamIds : relatedFamIds, noPhone }, body));
       console.log(`notify: kind=${kind} phone ${JSON.stringify(phone)}`);
     } catch (e) {
       console.error('notify: phone calls failed', e);

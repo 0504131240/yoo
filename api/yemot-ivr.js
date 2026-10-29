@@ -14,6 +14,7 @@
 // The extension passes key=YEMOT_IVR_KEY (api_add_0), so nobody else can
 // vote or read family data through this address.
 const { getDb } = require('./_lib/firebaseAdmin');
+const { loadAppData, updateFields } = require('./_lib/appData');
 const { normalizePhone, speakable } = require('./_lib/yemot');
 const { evAdjBalance } = require('./_lib/debtCalc');
 const { allOccasions, bmLabel } = require('./_lib/birthdayCalc');
@@ -84,10 +85,8 @@ async function saveAnswers(db, who, steps) {
     const m = /^q(\d+)x(\d+)$/.exec(s.what);
     if (m) answers[m[1] + ':' + m[2]] = s.digit;
   });
-  const ref = db.doc('appData/familyPayments');
-  if (!Object.keys(answers).length) return { saved: 0, data: (await ref.get()).data() || {} };
-  return db.runTransaction(async tx => {
-    const data = (await tx.get(ref)).data() || {};
+  if (!Object.keys(answers).length) return { saved: 0, data: (await loadAppData(db)) || {} };
+  const r = await updateFields(db, ['polls'], async data => {
     const polls = data.polls || [];
     let saved = 0;
     for (const p of openPollsFor(polls, who.famId)) {
@@ -110,9 +109,10 @@ async function saveAnswers(db, who, steps) {
         delete p.votes[String(who.famId)];
       }
     }
-    if (saved) tx.update(ref, { polls });
-    return { saved, data };
+    data.polls = polls;
+    return { saved, changed: saved ? ['polls'] : [] };
   });
+  return { saved: r.saved, data: (await loadAppData(db)) || {} };
 }
 
 // ── Information from the site ────────────────────────────────────────────
@@ -217,7 +217,7 @@ module.exports = async (req, res) => {
 
   const db = getDb();
   const phone = normalizePhone(last(values.ApiPhone));
-  const families = phone ? ((await db.doc('appData/familyPayments').get()).data() || {}).families : null;
+  const families = phone ? ((await loadAppData(db)) || {}).families : null;
   const caller = phone && findCaller(families, phone);
   const fam = caller && caller.fam;
   // One id per call (Yemot sends the same ApiCallId on every step of it).

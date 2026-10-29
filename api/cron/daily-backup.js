@@ -18,6 +18,7 @@ const { getDb, getMessaging, dedupeTokenDocs, notifPrefAllows, isShabbatNow, isY
 const { allOccasions, occasionText } = require('../_lib/birthdayCalc');
 const { sendWeeklyDebtReminders } = require('../_lib/weeklyDebtReminder');
 const { flushPhoneQueue, occasionPhoneEntries } = require('../_lib/yemot');
+const { loadAppData, backupParts, deleteBackup, cleanupPhotos } = require('../_lib/appData');
 
 const BACKUP_RETENTION_DAYS = 30;
 
@@ -177,18 +178,29 @@ module.exports = async (req, res) => {
   if (isShabbatNow() || isYomTovNow()) { res.status(200).json({ ok: true, skipped: 'shabbat' }); return; }
 
   const db = getDb();
-  const snap = await db.doc('appData/familyPayments').get();
-  if (!snap.exists) { res.status(200).json({ ok: true, skipped: true }); return; }
-  const data = snap.data();
+  const data = await loadAppData(db);
+  if (!data) { res.status(200).json({ ok: true, skipped: true }); return; }
 
   const today = new Date().toISOString().slice(0, 10);
   // The Shabbat log lives in its own doc (appData/shabbat) — back it up too.
   const shb = await db.doc('appData/shabbat').get();
-  await db.doc(`backups/${today}`).set({ data, shabbat: shb.exists ? shb.data() : null, backedUpAt: new Date().toISOString() });
+  const extra = { shabbat: shb.exists ? shb.data() : null, backedUpAt: new Date().toISOString() };
+  // Since the move to appParts the data can pass 1MB in total, so the backup
+  // copies each part on its own (see _lib/appData.js) — the old one-doc
+  // backup only until then.
+  const split = await backupParts(db, today, extra);
+  if (!split) await db.doc(`backups/${today}`).set({ data, ...extra });
 
   const cutoff = new Date(Date.now() - BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const old = await db.collection('backups').where('__name__', '<', db.doc(`backups/${cutoff}`)).get();
-  await Promise.all(old.docs.map(d => d.ref.delete()));
+  await Promise.all(old.docs.map(d => deleteBackup(db, d)));
+
+  let photos = {};
+  try {
+    photos = await cleanupPhotos(db);
+  } catch (e) {
+    console.error('dailyBackup: photo cleanup failed', e);
+  }
 
   let reminders = { occasions: 0, sent: 0 };
   try {
@@ -216,5 +228,5 @@ module.exports = async (req, res) => {
   }
   delete debtReminders.phoneEntries;
 
-  res.status(200).json({ ok: true, date: today, deletedOld: old.docs.length, reminders, debtReminders, phoneCalls });
+  res.status(200).json({ ok: true, date: today, split: !!split, deletedOld: old.docs.length, photos, reminders, debtReminders, phoneCalls });
 };
