@@ -68,7 +68,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);direction:rt
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, documentId } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA0MZMuGBBIXckhdiOZRZXRC_NPEte7pMA",
@@ -87,14 +87,21 @@ const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 const evId = parseInt(new URLSearchParams(location.search).get('ev'));
 let ev=null, families=[], selFam=null, rows=[], seq=1;
 
-// The site's data lives in appParts (one doc per field, JSON string, long
-// ones continued in <field>~1, ~2...; see app.js "Split storage"), or — before
-// the move, or if appParts isn't readable — in the old single document.
+// The site's data lives in appData/part_<field> (one doc per field, JSON
+// string, long ones continued in part_<field>~1, ~2...; see app.js "Split
+// storage"), in the first version's appParts collection, or — before the
+// move, or if the parts aren't readable — in the old single document.
 async function loadShared(){
-  let parts=null;
-  try{ parts = await getDocs(collection(db,'appParts')); }catch(e){ if(!e||e.code!=='permission-denied') throw e; }
-  if(parts && parts.docs.some(d=>d.id==='_meta')){
-    const byId={}; parts.docs.forEach(d=>byId[d.id]=d.data());
+  const tryGet = async q => { try{ return await getDocs(q); }catch(e){ if(!e||e.code!=='permission-denied') throw e; return null; } };
+  const locs = [
+    { pre:'part_', q: () => query(collection(db,'appData'), where(documentId(),'>=','part_'), where(documentId(),'<','part`')) },
+    { pre:'', q: () => collection(db,'appParts') },
+  ];
+  for(const loc of locs){
+    const parts = await tryGet(loc.q());
+    if(!parts) continue;
+    const byId={}; parts.docs.forEach(d=>byId[d.id.slice(loc.pre.length)]=d.data());
+    if(!byId._meta) continue;
     const field=f=>{
       const h=byId[f]; if(!h) return undefined;
       let j=h.j; for(let i=1;i<(h.n||1);i++){ const c=byId[f+'~'+i]; if(!c||c.ver!==h.ver) throw new Error('incomplete '+f); j+=c.j; }
