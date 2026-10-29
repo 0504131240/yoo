@@ -269,7 +269,7 @@ async function fbInit(){
   _fbApp=appMod.initializeApp(firebaseConfig);
   const db=fsMod.getFirestore(_fbApp);
   _fb={db,doc:fsMod.doc,getDoc:fsMod.getDoc,setDoc:fsMod.setDoc,onSnapshot:fsMod.onSnapshot,collection:fsMod.collection,
-    getDocs:fsMod.getDocs,query:fsMod.query,where:fsMod.where,deleteDoc:fsMod.deleteDoc,arrayUnion:fsMod.arrayUnion,arrayRemove:fsMod.arrayRemove};
+    getDocs:fsMod.getDocs,query:fsMod.query,where:fsMod.where,deleteDoc:fsMod.deleteDoc,writeBatch:fsMod.writeBatch,arrayUnion:fsMod.arrayUnion,arrayRemove:fsMod.arrayRemove};
   return _fb;
 }
 
@@ -308,6 +308,23 @@ function _dataSizeBytes(){
 }
 function renderDataSizeCheck(){
   const el=document.getElementById('dataSizeCheck');if(!el)return;
+  if(_splitMode){
+    // Each kind of data has its own document now (and every photo its own),
+    // so no single 1MB limit applies — what's left is Firebase's overall
+    // 1GB of free storage.
+    const total=_DATA_SIZE_CATS.reduce((sum,c)=>{const v=_dataSizeVal(c.key);return sum+_utf8Len(JSON.stringify(v===undefined?null:v));},0);
+    const gb=1024*1024*1024;
+    const pct=total/gb*100;
+    const mb=total/1024/1024;
+    el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">כל סוג נתונים (אילן יוחסין, צ'אט, אירועים, תשלומים...) נשמר במסמך נפרד בפיירבייס, וכל תמונה במסמך משלה — כך שאין יותר גבול משותף של 1MB. הגבול היחיד הוא נפח האחסון החינמי של פיירבייס: 1GB.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span style="font-size:13px;font-weight:700;color:var(--text)">${mb<1?Math.round(total/1024).toLocaleString()+' KB':mb.toFixed(1)+' MB'} מתוך 1 GB</span>
+      <span style="font-size:13px;font-weight:700;color:var(--text2)">${pct<1?pct.toFixed(2):Math.round(pct)}%</span>
+    </div>
+    <div class="pbar"><div class="pfill part" style="width:${Math.max(1,Math.min(100,pct))}%"></div></div>
+    <button onclick="closeSettingsHubModal();openDataSizeBreakdown()" style="width:100%;margin-top:12px;padding:9px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🔍 מה תופס מקום?</button>`;
+    return;
+  }
   const bytes=_dataSizeBytes();
   const kb=Math.round(bytes/1024);
   const limitKb=1024;
@@ -409,7 +426,7 @@ function renderDataSizeBreakdown(){
     const w=Math.max(2,Math.round(r.bytes/max*100));
     const sub=[];
     if(r.count!=null&&r.items)sub.push(`${r.count.toLocaleString()} ${r.items}`);
-    if(r.photos.n)sub.push(`📷 ${r.photos.n} תמונות = ${_kbStr(r.photos.bytes)}`);
+    if(r.photos.n)sub.push(`📷 ${r.photos.n} תמונות = ${_kbStr(r.photos.bytes)}${_splitMode?' (כל אחת במסמך משלה)':''}`);
     return `<div style="padding:10px 12px;border-radius:var(--r2);border:1.5px solid var(--border);margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <span style="font-size:18px;flex-shrink:0">${r.icon}</span>
@@ -419,14 +436,16 @@ function renderDataSizeBreakdown(){
       </div>
       <div class="pbar"><div class="pfill part" style="width:${w}%"></div></div>
       ${sub.length?`<div style="font-size:11.5px;color:var(--text2);margin-top:6px">${sub.join(' · ')}</div>`:''}
-      ${r.tip&&pct>=5?`<div style="font-size:11.5px;color:var(--text3);margin-top:4px;line-height:1.5">💡 ${r.tip}</div>`:''}
+      ${r.tip&&pct>=5&&!_splitMode?`<div style="font-size:11.5px;color:var(--text3);margin-top:4px;line-height:1.5">💡 ${r.tip}</div>`:''}
     </div>`;
   };
-  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">סה״כ <b style="color:var(--text)">${_kbStr(total)}</b> מתוך 1,024 KB. מסודר מהגדול לקטן.</div>
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">${_splitMode
+      ?`סה״כ <b style="color:var(--text)">${_kbStr(total)}</b> מתוך 1 GB. כל סוג נשמר במסמך נפרד וכל תמונה במסמך משלה, אז אין גבול של 1MB לשום חלק. מסודר מהגדול לקטן.`
+      :`סה״כ <b style="color:var(--text)">${_kbStr(total)}</b> מתוך 1,024 KB. מסודר מהגדול לקטן.`}</div>
     ${allPhotos.n?`<div style="background:var(--surface2);border-radius:var(--r2);padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--text);line-height:1.6">📷 <b>תמונות:</b> ${allPhotos.n} תמונות תופסות <b>${_kbStr(allPhotos.bytes)}</b> (${total?Math.round(allPhotos.bytes/total*100):0}% מהכל). כל תמונה בערך ${_kbStr(allPhotos.bytes/allPhotos.n)}.</div>`:''}
     ${big.map(rowHtml).join('')}
     ${small.length?`<div style="font-size:11.5px;color:var(--text3);margin:4px 2px 12px;line-height:1.6">פחות מ-1 KB כל אחד (${_kbStr(smallBytes)} ביחד): ${small.map(r=>r.icon+' '+r.label).join(' · ')}</div>`:''}
-    <div style="font-size:11.5px;color:var(--text3);line-height:1.6;border-top:1px solid var(--border);padding-top:10px">🍲 מתכונים נשמרים כל אחד בנפרד, ולכן לא נכנסים לחשבון הזה ולא מקרבים לגבול.</div>`;
+    <div style="font-size:11.5px;color:var(--text3);line-height:1.6;border-top:1px solid var(--border);padding-top:10px">🍲 מתכונים נשמרים כל אחד בנפרד, ולכן לא נכנסים לחשבון הזה${_splitMode?'':' ולא מקרבים לגבול'}.</div>`;
 }
 
 // EmailJS settings — read/written via /api/settings/emailjs (Admin SDK,
@@ -1112,11 +1131,196 @@ function _captureSyncBaseline(){
   const snap={};
   _SYNC_FIELDS.forEach(f=>{snap[f]=JSON.parse(JSON.stringify(_getSyncFieldValue(f)));});
   _syncBaseline=snap;
+  _PART_FIELDS.forEach(f=>{_baseJson[f]=_fieldJson(f,null);});
 }
 // How long without hearing from the realtime listener before local state
 // for a field this save doesn't touch can no longer be trusted — see
 // save()'s own check, and _lastSnapshotAt above.
 const _STALE_MS=45000;
+
+// ── Split storage ──────────────────────────────────────────────────────────
+// Everything used to live in ONE document (appData/familyPayments), and a
+// Firestore document can't pass 1MiB — photos alone were eating most of it.
+// Now each field gets its own document in appParts (appParts/familyTree,
+// appParts/messages...), stored as a JSON string so a field that ever grows
+// past ~900KB simply continues in appParts/<field>~1, ~2... (head doc holds
+// the chunk count n; every chunk of one write shares the same ver, so a
+// half-seen write is never assembled). Photos (base64 data: URLs) are cut
+// out of that JSON and stored one per document in appPhotos/<hash>,
+// replaced in the field by "fsphoto://<hash>" — content-addressed, so a
+// photo is written once and never changes. appParts/_meta marks that the
+// move happened; appData/familyPayments keeps only adminPass (the server
+// checks it there). If appParts can't be read at all (Firestore rules),
+// everything stays in the old single document as before.
+const _PART_FIELDS=_SYNC_FIELDS.filter(f=>f!=='adminPass');
+const _PARTS_COL='appParts',_PHOTOS_COL='appPhotos',_PHOTO_REF='fsphoto://';
+const _CHUNK_CHARS=300000; // ≤900KB even if every char took 3 bytes
+let _splitMode=null;   // null = not known yet, true = appParts, false = old single doc
+let _needMeta=false;   // the next save is the move itself: also write _meta
+let _baseJson={};      // field → stored (photo-less) JSON as of the last known sync
+let _rawParts={};      // field → JSON currently in appParts
+let _partChunks={};    // field → how many chunk docs it has in appParts now
+let _remoteAdminPass='';
+const _photoCache={};  // hash → data URL
+const _photoKnown=new Set(); // hashes already stored in appPhotos
+const _hashMemo=new Map();
+function _cyrb53(str,seed){
+  let h1=0xdeadbeef^seed,h2=0x41c6ce57^seed;
+  for(let i=0;i<str.length;i++){const ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}
+  h1=Math.imul(h1^(h1>>>16),2246822507);h1^=Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507);h2^=Math.imul(h1^(h1>>>13),3266489909);
+  return (h2>>>0).toString(36).padStart(7,'0')+(h1>>>0).toString(36).padStart(7,'0');
+}
+function _photoHash(url){
+  let h=_hashMemo.get(url);
+  if(!h){h=_cyrb53(url,1)+_cyrb53(url,2)+url.length.toString(36);_hashMemo.set(url,h);}
+  return h;
+}
+const _PHOTO_RE=/"(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+\/=]+)"/g;
+const _REF_RE=/"fsphoto:\/\/([0-9a-z]+)"/g;
+// JSON with every inline photo swapped for its fsphoto:// ref. Photos not
+// stored yet are added to newPhotos (hash → data URL).
+function _dehydrateJson(json,newPhotos){
+  return json.replace(_PHOTO_RE,(m,url)=>{
+    const h=_photoHash(url);
+    _photoCache[h]=url;
+    if(newPhotos&&!_photoKnown.has(h))newPhotos[h]=url;
+    return '"'+_PHOTO_REF+h+'"';
+  });
+}
+// The reverse. A ref whose photo hasn't been fetched yet stays as is (and
+// is added to missing) — saving it back keeps the same ref, so nothing is
+// lost while it loads.
+function _hydrateJson(json,missing){
+  return json.replace(_REF_RE,(m,h)=>{
+    const u=_photoCache[h];
+    if(u)return '"'+u+'"';
+    if(missing)missing.add(h);
+    return m;
+  });
+}
+function _fieldJson(f,newPhotos){
+  const v=_getSyncFieldValue(f);
+  return _dehydrateJson(JSON.stringify(v===undefined?null:v),newPhotos);
+}
+function _chunksOf(json){
+  const out=[];let i=0;
+  while(i<json.length||!out.length){
+    let end=Math.min(json.length,i+_CHUNK_CHARS);
+    // Never cut an emoji (surrogate pair) in half.
+    if(end<json.length){const c=json.charCodeAt(end-1);if(c>=0xD800&&c<=0xDBFF)end--;}
+    out.push(json.slice(i,end));i=end;
+  }
+  return out;
+}
+// appParts snapshot docs → fills _rawParts/_partChunks for every field whose
+// chunks are all there with the same ver. Returns whether _meta exists.
+function _ingestParts(docs){
+  const byId={};let meta=false;
+  docs.forEach(d=>{if(d.id==='_meta')meta=true;else byId[d.id]=d.data();});
+  _PART_FIELDS.forEach(f=>{
+    const head=byId[f];if(!head||typeof head.j!=='string')return;
+    const n=head.n||1;const parts=[head.j];
+    for(let i=1;i<n;i++){
+      const c=byId[f+'~'+i];
+      if(!c||c.ver!==head.ver||typeof c.j!=='string')return; // half-seen write: keep what we had
+      parts.push(c.j);
+    }
+    _rawParts[f]=parts.join('');_partChunks[f]=n;
+  });
+  return meta;
+}
+// Every field as stored, photos filled in — same shape as the old single doc.
+function _assembleFromParts(missing){
+  const d={};
+  _PART_FIELDS.forEach(f=>{
+    if(_rawParts[f]==null)return;
+    try{d[f]=JSON.parse(_hydrateJson(_rawParts[f],missing));}catch(e){console.warn('bad part',f,e);}
+  });
+  d.adminPass=_remoteAdminPass;
+  return d;
+}
+async function _fetchPhotos(hashes){
+  const {db,doc,getDoc}=await fbInit();
+  let got=0;
+  await Promise.all(hashes.map(async h=>{
+    try{const s=await getDoc(doc(db,_PHOTOS_COL,h));if(s.exists()&&s.data().d){_photoCache[h]=s.data().d;_photoKnown.add(h);got++;}}
+    catch(e){console.warn('photo fetch failed',h,e);}
+  }));
+  return got;
+}
+async function _loadAllPhotos(){
+  const {db,collection,getDocs}=await fbInit();
+  const snap=await getDocs(collection(db,_PHOTOS_COL));
+  snap.docs.forEach(d=>{const u=d.data().d;if(u){_photoCache[d.id]=u;_photoKnown.add(d.id);}});
+}
+// Which storage this database uses. Reading appParts is the test: if the
+// rules refuse it, stay on the old single document.
+async function _detectSplitMode(){
+  const {db,doc,getDoc,collection,getDocs}=await fbInit();
+  let partsSnap;
+  try{partsSnap=await getDocs(collection(db,_PARTS_COL));}
+  catch(e){
+    if(e&&e.code==='permission-denied'){console.warn('appParts not readable — staying on the single document');_splitMode=false;return{split:false,canSplit:false};}
+    throw e;
+  }
+  const meta=_ingestParts(partsSnap.docs);
+  if(meta){
+    const main=await getDoc(doc(db,'appData','familyPayments'));
+    _remoteAdminPass=(main.exists()&&main.data().adminPass)||'';
+    await _loadAllPhotos();
+    _splitMode=true;
+  }
+  return{split:meta,canSplit:true};
+}
+function _hasLocalChanges(){
+  if(!_splitMode)return false;
+  if(_needMeta)return true;
+  if(adminPass!==_remoteAdminPass)return true;
+  return _PART_FIELDS.some(f=>_fieldJson(f,null)!==_baseJson[f]);
+}
+// Writes only the fields that changed since the last sync (or all of them
+// on the move), new photos first. A field this device didn't touch is never
+// written, so a stale copy here can't overwrite someone else's edit to it.
+async function _saveParts(){
+  const {db,doc,setDoc,writeBatch}=await fbInit();
+  const newPhotos={},changed=[];
+  _PART_FIELDS.forEach(f=>{const j=_fieldJson(f,newPhotos);if(_needMeta||j!==_baseJson[f])changed.push([f,j]);});
+  // Photos: immutable, so writing them ahead is always safe. Batches stay
+  // well under Firestore's 10MiB request limit.
+  let batch=writeBatch(db),size=0,count=0;
+  for(const [h,url] of Object.entries(newPhotos)){
+    if(size+url.length>4000000||count>=400){await batch.commit();batch=writeBatch(db);size=0;count=0;}
+    batch.set(doc(db,_PHOTOS_COL,h),{d:url,at:Date.now()});size+=url.length;count++;
+  }
+  if(count)await batch.commit();
+  Object.keys(newPhotos).forEach(h=>_photoKnown.add(h));
+  const passChanged=adminPass!==_remoteAdminPass;
+  if(!changed.length&&!passChanged&&!_needMeta)return;
+  const b=writeBatch(db),written=[];
+  const ver=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  changed.forEach(([f,j])=>{
+    const chunks=_chunksOf(j);
+    b.set(doc(db,_PARTS_COL,f),{j:chunks[0],n:chunks.length,ver,at:Date.now()});
+    for(let i=1;i<chunks.length;i++)b.set(doc(db,_PARTS_COL,f+'~'+i),{j:chunks[i],ver});
+    for(let i=chunks.length;i<(_partChunks[f]||0);i++)b.delete(doc(db,_PARTS_COL,f+'~'+i));
+    written.push([f,j,chunks.length]);
+  });
+  if(_needMeta)b.set(doc(db,_PARTS_COL,'_meta'),{v:1,movedAt:new Date().toISOString()});
+  if(passChanged&&!_needMeta)b.set(doc(db,'appData','familyPayments'),{adminPass},{merge:true});
+  await b.commit();
+  written.forEach(([f,j,n])=>{_baseJson[f]=j;_rawParts[f]=j;_partChunks[f]=n;});
+  if(_needMeta){
+    _needMeta=false;
+    // The move is done: the old document keeps only the password. A device
+    // still on the old code then sees an empty site (and its saves land in
+    // this doc, which nobody reads any more) instead of silently editing
+    // stale data — a refresh brings it to the new code.
+    try{await setDoc(doc(db,'appData','familyPayments'),{adminPass,movedToAppPartsAt:new Date().toISOString()});}
+    catch(e){console.warn('could not trim the old document',e);}
+  }
+  _remoteAdminPass=adminPass;
+}
 async function save(){
   saveLocal();
   localStorage.setItem('pendingSave','1');
@@ -1126,6 +1330,15 @@ async function save(){
   if(_retryTimer){clearTimeout(_retryTimer);_retryTimer=null;}
   showSyncStatus('שומר...');
   try{
+    if(_splitMode===null){
+      // load() never reached Firestore (offline...) — find out now, before
+      // writing anywhere.
+      const m=await _detectSplitMode();
+      if(m.split===false)_splitMode=false;
+    }
+    if(_splitMode){
+      await _saveParts();
+    }else{
     const {db,doc,setDoc,getDoc}=await fbInit();
     // save() always pushes ALL of these fields, from whatever's sitting in
     // memory. A tab that's gone stale (backgrounded, missed a realtime
@@ -1159,12 +1372,16 @@ async function save(){
     }
     await setDoc(doc(db,'appData','familyPayments'),{families,events,fund,goalFunds,savingsPot,adminPass,messages,calItems,birthdays,paymentClaims,globalSettled,visits,notifications,polls,countdowns,yahrzeits,familyTree,treeScores});
     _captureSyncBaseline();
+    }
     localStorage.removeItem('pendingSave');
     localStorage.removeItem('pendingSaveAt');
     showSyncStatus('✓ נשמר',2000);
     render();
   }catch(e){
     console.warn('save failed, will retry:',e);
+    // The move to appParts itself was refused (rules allow reading it but
+    // not writing): stay on the single document.
+    if(_needMeta&&e&&e.code==='permission-denied'){_needMeta=false;_splitMode=false;_saving=false;save();return;}
     // The generic "שמור מקומי" text alone gave no way to tell WHY a save
     // keeps failing without opening devtools (which most people using this
     // app never will) — show the actual error on screen too, long enough
@@ -1178,6 +1395,9 @@ async function save(){
     return;
   }
   _saving=false;
+  // Something changed while that write was in flight (a second save() call
+  // returns early while one is running) — send it too.
+  if(_splitMode&&_hasLocalChanges())save();
 }
 
 
@@ -1186,8 +1406,22 @@ async function load(){
   showSyncStatus('טוען...');
   try{
     const {db,doc,getDoc}=await fbInit();
-    const snap=await getDoc(doc(db,'appData','familyPayments'));
-    const d=snap.exists()?snap.data():{};
+    const mode=await _detectSplitMode();
+    let d,migrate=false;
+    if(mode.split){
+      const missing=new Set();
+      d=_assembleFromParts(missing);
+      if(missing.size)_fetchPhotos([...missing]).then(n=>{if(n&&!_saving)_adoptFromRaw();});
+    }else{
+      const snap=await getDoc(doc(db,'appData','familyPayments'));
+      d=snap.exists()?snap.data():{};
+      _splitMode=false;
+      // First open on this version: move everything to appParts (see the
+      // split storage notes above). Not when the old doc says it was
+      // already moved — that would mean _meta went missing, and moving an
+      // empty doc would wipe the parts.
+      if(mode.canSplit&&snap.exists()&&!d.movedToAppPartsAt)migrate=true;
+    }
     families=d.families||[];
     events=d.events||[];
     fund=d.fund||{famBalances:{},transactions:[]};
@@ -1231,6 +1465,7 @@ async function load(){
     // stale flag instead and keep the fresh data we already loaded above.
     const _pendingAt=parseInt(localStorage.getItem('pendingSaveAt')||'0');
     const _pendingFresh=_pendingAt>0&&(Date.now()-_pendingAt)<3*60*1000;
+    if(migrate){_splitMode=true;_needMeta=true;_partChunks={};}
     if(localStorage.getItem('pendingSave')==='1'&&!_pendingFresh){
       localStorage.removeItem('pendingSave');
       localStorage.removeItem('pendingSaveAt');
@@ -1284,7 +1519,7 @@ async function load(){
     });
     let _pollsMigrated=false;
     polls.forEach(p=>{if(_migratePoll(p))_pollsMigrated=true;});
-    if(_savAmtMigrated||_kidsMigrated||_bdaysCleared||_treeMigrated||_pollsMigrated)save();
+    if(_needMeta||_savAmtMigrated||_kidsMigrated||_bdaysCleared||_treeMigrated||_pollsMigrated)save();
     render();setTimeout(handleHash,100);
     if(!_isAdminPage()){
       const savedFamId=localStorage.getItem('deviceFamId3');
@@ -4022,58 +4257,98 @@ function _adoptIfChanged(snapVal,getLocal,setLocal,recount){
   if(recount)recount();
   return true;
 }
+// Applies a fresh copy of the shared data (the old single doc, or appParts
+// assembled) to the live variables.
+function _adoptRemoteData(d){
+    // In appParts mode a field missing from d (half-seen write) is left
+    // alone; the old single doc just defaulted it to empty.
+    const has=f=>!_splitMode||(f in d);
+    if(has('messages')){
+      const snapMsgs=d.messages||[];
+      const snapMax=snapMsgs.length?Math.max(...snapMsgs.map(m=>m.id)):0;
+      const localMax=messages.length?Math.max(...messages.map(m=>m.id)):0;
+      // appParts: a full compare, so a deleted message disappears here too.
+      if(_splitMode?JSON.stringify(snapMsgs)!==JSON.stringify(messages):snapMax!==localMax){
+        messages=snapMsgs;
+        nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
+        renderMessages();
+      }
+    }
+    let changed=false;
+    changed=(has('families')&&_adoptIfChanged(d.families||[],()=>families,v=>families=v,
+      ()=>{nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;}))||changed;
+    changed=(has('events')&&_adoptIfChanged(d.events||[],()=>events,v=>events=v,
+      ()=>{nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;}))||changed;
+    changed=(has('fund')&&_adoptIfChanged(d.fund||{famBalances:{},transactions:[]},()=>fund,v=>fund=v,
+      ()=>{if(!fund.famBalances)fund.famBalances={};nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;}))||changed;
+    changed=(has('goalFunds')&&_adoptIfChanged(d.goalFunds||[],()=>goalFunds,v=>goalFunds=v,
+      ()=>{nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;}))||changed;
+    changed=(has('savingsPot')&&_adoptIfChanged(d.savingsPot||{expenses:[],nxtExpId:1},()=>savingsPot,v=>savingsPot=v,
+      ()=>{if(!savingsPot.nxtExpId)savingsPot.nxtExpId=(savingsPot.expenses||[]).length?Math.max(...savingsPot.expenses.map(e=>e.id))+1:1;}))||changed;
+    changed=(has('calItems')&&_adoptIfChanged(d.calItems||[],()=>calItems,v=>calItems=v,
+      ()=>{nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;}))||changed;
+    changed=(has('paymentClaims')&&_adoptIfChanged(d.paymentClaims||[],()=>paymentClaims,v=>paymentClaims=v,
+      ()=>{nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;}))||changed;
+    changed=(has('globalSettled')&&_adoptIfChanged(d.globalSettled||[],()=>globalSettled,v=>globalSettled=v))||changed;
+    changed=(has('visits')&&_adoptIfChanged(d.visits||[],()=>visits,v=>visits=v))||changed;
+    changed=(has('notifications')&&_adoptIfChanged(d.notifications||[],()=>notifications,v=>notifications=v,
+      ()=>{nxtNotif=notifications.length?Math.max(...notifications.map(n=>n.id))+1:1;}))||changed;
+    changed=(has('polls')&&_adoptIfChanged(d.polls||[],()=>polls,v=>polls=v,
+      ()=>{polls.forEach(_migratePoll);nxtPoll=polls.length?Math.max(...polls.map(p=>p.id))+1:1;}))||changed;
+    changed=(has('countdowns')&&_adoptIfChanged(d.countdowns||[],()=>countdowns,v=>countdowns=v,
+      ()=>{nxtCountdown=countdowns.length?Math.max(...countdowns.map(c=>c.id))+1:1;}))||changed;
+    changed=(has('yahrzeits')&&_adoptIfChanged(d.yahrzeits||[],()=>yahrzeits,v=>yahrzeits=v,
+      ()=>{nxtYahrzeit=yahrzeits.length?Math.max(...yahrzeits.map(y=>y.id))+1:1;}))||changed;
+    changed=(has('familyTree')&&_adoptIfChanged(d.familyTree||[],()=>familyTree,v=>familyTree=v,
+      ()=>{nxtTreePerson=familyTree.length?Math.max(...familyTree.map(p=>p.id))+1:1;}))||changed;
+    changed=(has('treeScores')&&_adoptIfChanged(d.treeScores||{},()=>treeScores,v=>treeScores=v))||changed;
+    if((d.adminPass||'')!==adminPass){adminPass=d.adminPass||'';}
+    // Whatever we just adopted (or already matched) now matches
+    // Firestore as far as this device knows — refresh the baseline
+    // save()'s own staleness check compares against.
+    _captureSyncBaseline();
+    if(changed)render();
+}
+// appParts mode: re-apply what the listener last delivered (also after a
+// late photo arrives).
+function _adoptFromRaw(){
+  const missing=new Set();
+  _adoptRemoteData(_assembleFromParts(missing));
+  if(missing.size)_fetchPhotos([...missing]).then(n=>{if(n&&!_saving)_adoptFromRaw();});
+}
+let _mainDocUnsub=null;
 async function startRealtimeSync(){
   if(_realtimeUnsub)return;
   try{
-    const {db,doc,onSnapshot}=await fbInit();
+    const {db,doc,onSnapshot,collection}=await fbInit();
+    if(_splitMode===null){try{const m=await _detectSplitMode();if(m.split===false)_splitMode=false;}catch(e){}}
+    if(_splitMode){
+      _realtimeUnsub=onSnapshot(collection(db,_PARTS_COL),snap=>{
+        _lastSnapshotAt=Date.now();
+        _ingestParts(snap.docs);
+        if(!_saving&&!_needMeta)_adoptFromRaw();
+      });
+      _mainDocUnsub=onSnapshot(doc(db,'appData','familyPayments'),snap=>{
+        _lastSnapshotAt=Date.now();
+        const p=(snap.exists()&&snap.data().adminPass)||'';
+        if(p===_remoteAdminPass)return;
+        _remoteAdminPass=p;
+        if(!_saving)adminPass=p;
+      });
+      return;
+    }
     _realtimeUnsub=onSnapshot(doc(db,'appData','familyPayments'),snap=>{
       if(!snap.exists())return;
       _lastSnapshotAt=Date.now();
       const d=snap.data();
-      if(!_initialSync&&!_saving){
-        const snapMsgs=d.messages||[];
-        const snapMax=snapMsgs.length?Math.max(...snapMsgs.map(m=>m.id)):0;
-        const localMax=messages.length?Math.max(...messages.map(m=>m.id)):0;
-        if(snapMax!==localMax){
-          messages=snapMsgs;
-          nxtMsg=messages.length?Math.max(...messages.map(m=>m.id))+1:1;
-          renderMessages();
-        }
-        let changed=false;
-        changed=_adoptIfChanged(d.families||[],()=>families,v=>families=v,
-          ()=>{nxtFam=families.length?Math.max(...families.map(f=>f.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.events||[],()=>events,v=>events=v,
-          ()=>{nxtId=events.length?Math.max(...events.map(e=>e.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.fund||{famBalances:{},transactions:[]},()=>fund,v=>fund=v,
-          ()=>{if(!fund.famBalances)fund.famBalances={};nxtTx=(fund.transactions||[]).length?Math.max(...fund.transactions.map(t=>t.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.goalFunds||[],()=>goalFunds,v=>goalFunds=v,
-          ()=>{nxtGoal=goalFunds.length?Math.max(...goalFunds.map(g=>g.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.savingsPot||{expenses:[],nxtExpId:1},()=>savingsPot,v=>savingsPot=v,
-          ()=>{if(!savingsPot.nxtExpId)savingsPot.nxtExpId=(savingsPot.expenses||[]).length?Math.max(...savingsPot.expenses.map(e=>e.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.calItems||[],()=>calItems,v=>calItems=v,
-          ()=>{nxtCal=calItems.length?Math.max(...calItems.map(c=>c.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.paymentClaims||[],()=>paymentClaims,v=>paymentClaims=v,
-          ()=>{nxtClaim=paymentClaims.length?Math.max(...paymentClaims.map(c=>c.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.globalSettled||[],()=>globalSettled,v=>globalSettled=v)||changed;
-        changed=_adoptIfChanged(d.visits||[],()=>visits,v=>visits=v)||changed;
-        changed=_adoptIfChanged(d.notifications||[],()=>notifications,v=>notifications=v,
-          ()=>{nxtNotif=notifications.length?Math.max(...notifications.map(n=>n.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.polls||[],()=>polls,v=>polls=v,
-          ()=>{polls.forEach(_migratePoll);nxtPoll=polls.length?Math.max(...polls.map(p=>p.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.countdowns||[],()=>countdowns,v=>countdowns=v,
-          ()=>{nxtCountdown=countdowns.length?Math.max(...countdowns.map(c=>c.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.yahrzeits||[],()=>yahrzeits,v=>yahrzeits=v,
-          ()=>{nxtYahrzeit=yahrzeits.length?Math.max(...yahrzeits.map(y=>y.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.familyTree||[],()=>familyTree,v=>familyTree=v,
-          ()=>{nxtTreePerson=familyTree.length?Math.max(...familyTree.map(p=>p.id))+1:1;})||changed;
-        changed=_adoptIfChanged(d.treeScores||{},()=>treeScores,v=>treeScores=v)||changed;
-        if((d.adminPass||'')!==adminPass){adminPass=d.adminPass||'';}
-        // Whatever we just adopted (or already matched) now matches
-        // Firestore as far as this device knows — refresh the baseline
-        // save()'s own staleness check compares against.
-        _captureSyncBaseline();
-        if(changed)render();
+      // Another device just moved everything to appParts. Reload (once)
+      // so this one switches too, instead of adopting the emptied doc.
+      if(d.movedToAppPartsAt&&!_splitMode){
+        let again=false;try{again=sessionStorage.getItem('partsReload')==='1';sessionStorage.setItem('partsReload','1');}catch(e){}
+        if(!again){location.reload();return;}
+        return;
       }
+      if(!_initialSync&&!_saving)_adoptRemoteData(d);
       _initialSync=false;
     });
   }catch(e){console.warn('realtime sync:',e);}

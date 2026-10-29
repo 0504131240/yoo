@@ -68,7 +68,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);direction:rt
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA0MZMuGBBIXckhdiOZRZXRC_NPEte7pMA",
@@ -87,13 +87,31 @@ const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 const evId = parseInt(new URLSearchParams(location.search).get('ev'));
 let ev=null, families=[], selFam=null, rows=[], seq=1;
 
+// The site's data lives in appParts (one doc per field, JSON string, long
+// ones continued in <field>~1, ~2...; see app.js "Split storage"), or — before
+// the move, or if appParts isn't readable — in the old single document.
+async function loadShared(){
+  let parts=null;
+  try{ parts = await getDocs(collection(db,'appParts')); }catch(e){ if(!e||e.code!=='permission-denied') throw e; }
+  if(parts && parts.docs.some(d=>d.id==='_meta')){
+    const byId={}; parts.docs.forEach(d=>byId[d.id]=d.data());
+    const field=f=>{
+      const h=byId[f]; if(!h) return undefined;
+      let j=h.j; for(let i=1;i<(h.n||1);i++){ const c=byId[f+'~'+i]; if(!c||c.ver!==h.ver) throw new Error('incomplete '+f); j+=c.j; }
+      return JSON.parse(j);
+    };
+    return { families: field('families'), events: field('events') };
+  }
+  const snap = await getDoc(doc(db,'appData','familyPayments'));
+  return snap.exists() ? snap.data() : null;
+}
+
 async function boot(){
   if(!evId){ return fail('קישור לא תקין — חסר מזהה אירוע.'); }
-  let snap;
-  try{ snap = await getDoc(doc(db,'appData','familyPayments')); }
+  let data;
+  try{ data = await loadShared(); }
   catch(e){ return fail('שגיאה בטעינת הנתונים. נסו שוב מאוחר יותר.'); }
-  if(!snap.exists()) return fail('לא נמצאו נתונים.');
-  const data = snap.data();
+  if(!data) return fail('לא נמצאו נתונים.');
   families = data.families||[];
   ev = (data.events||[]).find(e=>e.id===evId);
   if(!ev) return fail('האירוע לא נמצא (אולי נמחק).');

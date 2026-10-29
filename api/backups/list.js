@@ -11,12 +11,13 @@ module.exports = async (req, res) => {
   }
   const snap = await db.collection('backups').orderBy('__name__', 'desc').limit(30).get();
   const list = snap.docs.map(d => {
-    const data = d.data().data || {};
+    const b = d.data();
+    const data = b.data || {};
     return {
       date: d.id,
-      backedUpAt: d.data().backedUpAt,
-      families: (data.families || []).length,
-      events: (data.events || []).length,
+      backedUpAt: b.backedUpAt,
+      families: b.format === 2 ? (b.summary || {}).families : (data.families || []).length,
+      events: b.format === 2 ? (b.summary || {}).events : (data.events || []).length,
     };
   });
   res.status(200).json(list);
