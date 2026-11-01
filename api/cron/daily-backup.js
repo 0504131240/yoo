@@ -73,71 +73,73 @@ async function sendBirthdayReminders(db, data) {
   // Adar variant as interchangeable (same fix as app.js's calendar matching).
   const hebMonthEq = (a, b) => a === b || (!!a && !!b && a.startsWith('אדר') && b.startsWith('אדר'));
 
-  // One message per day (today / tomorrow) covering every occasion on it —
-  // two birthdays on the same day used to send two emails and two pushes.
-  // Each device gets the names its own "כולם/רק שלנו" choice allows.
-  let sent = 0, occasions = 0;
-  for (let i = 0; i <= 1; i++) {
+  // ONE message covering today AND tomorrow — a birthday today and another
+  // tomorrow used to arrive as two separate pushes/emails. Each device gets
+  // the occasions its own "כולם/רק שלנו" choice allows.
+  const days = [0, 1].map(i => {
     const d = new Date(today); d.setDate(d.getDate() + i);
     const hd = parseInt(dayFmt.format(d)), hm = monthFmt.format(d);
-    const occHebYear = parseInt(yearFmt.format(d));
-    const todays = all.filter(x => x.hebDay === hd && hebMonthEq(x.hebMonth, hm));
-    if (!todays.length) continue;
-    occasions += todays.length;
+    return { i, hy: parseInt(yearFmt.format(d)), list: all.filter(x => x.hebDay === hd && hebMonthEq(x.hebMonth, hm)) };
+  });
+  const occasions = days[0].list.length + days[1].list.length;
+  if (!occasions) return { occasions: 0, sent: 0 };
+  // Each day's own title/sentence (occasionText), joined when both have some.
+  const text = lists => {
+    const parts = days.map((day, k) => lists[k].length ? occasionText(lists[k], day.i, day.hy) : null).filter(Boolean);
+    if (parts.length === 1) return parts[0];
+    return { title: parts[0].title.replace(/!$/, '') + ' · ' + parts[1].title, body: parts.map(p => p.body).join('\n') };
+  };
+  let sent = 0;
 
-    for (const [page, allDocs] of Object.entries(groups)) {
-      // A family device's own notifPref only filters family-page pushes — the
-      // admin device always gets everything. b.famId (yahrzeits have none) is
-      // who a "רק שלנו" device needs to match.
-      const byList = new Map();
-      allDocs.forEach(doc => {
-        const t = doc.data();
-        const mine = page === 'index'
-          ? todays.filter(b => notifPrefAllows(t.notifPref, 'birthday', b.famId != null ? [b.famId] : undefined, t.famId, undefined, { cats: t.pushCats, scopes: t.pushScopes }))
-          : todays;
-        if (!mine.length) return;
-        const k = mine.map(b => todays.indexOf(b)).join(',');
-        if (!byList.has(k)) byList.set(k, { list: mine, docs: [] });
-        byList.get(k).docs.push(doc);
-      });
-      for (const { list, docs } of byList.values()) {
-        const { title, body } = occasionText(list, i, occHebYear);
-        try {
-          // Data-only (no top-level `notification`) — see notify.js for why:
-          // a notification payload gets auto-displayed by the browser's push
-          // service AND by our own onBackgroundMessage handler, doubling it.
-          const resp = await getMessaging().sendEachForMulticast({
-            tokens: docs.map(x => x.data().token),
-            data: { title, body, icon: 'https://yankeleviz.vercel.app/icon.jpg', link: LINKS[page] },
-          });
-          sent += resp.successCount;
-          const dead = docs.filter((_, j) => !resp.responses[j]?.success);
-          if (dead.length) {
-            await Promise.all(dead.map(x => x.ref.delete()));
-            groups[page] = groups[page].filter(x => !dead.includes(x));
-          }
-        } catch (e) {
-          console.error(`dailyBackup: birthday push failed [${page}]`, e);
-        }
+  for (const [page, allDocs] of Object.entries(groups)) {
+    // A family device's own notifPref only filters family-page pushes — the
+    // admin device always gets everything. b.famId (yahrzeits have none) is
+    // who a "רק שלנו" device needs to match.
+    const byList = new Map();
+    allDocs.forEach(doc => {
+      const t = doc.data();
+      const mine = days.map(day => page === 'index'
+        ? day.list.filter(b => notifPrefAllows(t.notifPref, 'birthday', b.famId != null ? [b.famId] : undefined, t.famId, undefined, { cats: t.pushCats, scopes: t.pushScopes }))
+        : day.list);
+      if (!mine[0].length && !mine[1].length) return;
+      const k = mine.map((l, j) => l.map(b => days[j].list.indexOf(b)).join(',')).join('|');
+      if (!byList.has(k)) byList.set(k, { lists: mine, docs: [] });
+      byList.get(k).docs.push(doc);
+    });
+    for (const { lists, docs } of byList.values()) {
+      const { title, body } = text(lists);
+      try {
+        // Data-only (no top-level `notification`) — see notify.js for why:
+        // a notification payload gets auto-displayed by the browser's push
+        // service AND by our own onBackgroundMessage handler, doubling it.
+        const resp = await getMessaging().sendEachForMulticast({
+          tokens: docs.map(x => x.data().token),
+          data: { title, body, icon: 'https://yankeleviz.vercel.app/icon.jpg', link: LINKS[page] },
+        });
+        sent += resp.successCount;
+        const dead = docs.filter((_, j) => !resp.responses[j]?.success);
+        if (dead.length) await Promise.all(dead.map(x => x.ref.delete()));
+      } catch (e) {
+        console.error(`dailyBackup: birthday push failed [${page}]`, e);
       }
     }
+  }
 
-    if (ejsCreds?.publicKey && ejsCreds?.serviceId && ejsCreds?.templateId) {
-      const { title, body } = occasionText(todays, i, occHebYear);
-      for (const key of emailSlots) {
-        const [fidStr, slotStr] = key.split(':');
-        const fam = (data.families || []).find(f => f.id === parseInt(fidStr));
-        if (!fam) continue;
-        const email = slotStr === '2' ? fam.email2 : fam.email;
-        if (!email) continue;
-        const famName = fam.name.replace('משפחת', '').trim();
-        const html = notifEmailHtml(title.split(' ')[0], title, body);
-        try {
-          await sendViaEmailJS(ejsCreds.publicKey, ejsCreds.serviceId, ejsCreds.templateId, email, famName, title + ' · ינקלביץ', body, html);
-          sent++;
-        } catch (e) {
-          console.error('dailyBackup: birthday email failed for', email, e);
-        }
+  if (ejsCreds?.publicKey && ejsCreds?.serviceId && ejsCreds?.templateId) {
+    const { title, body } = text(days.map(day => day.list));
+    for (const key of emailSlots) {
+      const [fidStr, slotStr] = key.split(':');
+      const fam = (data.families || []).find(f => f.id === parseInt(fidStr));
+      if (!fam) continue;
+      const email = slotStr === '2' ? fam.email2 : fam.email;
+      if (!email) continue;
+      const famName = fam.name.replace('משפחת', '').trim();
+      const html = notifEmailHtml(title.split(' ')[0], title, body);
+      try {
+        await sendViaEmailJS(ejsCreds.publicKey, ejsCreds.serviceId, ejsCreds.templateId, email, famName, title + ' · ינקלביץ', body, html);
+        sent++;
+      } catch (e) {
+        console.error('dailyBackup: birthday email failed for', email, e);
       }
     }
   }

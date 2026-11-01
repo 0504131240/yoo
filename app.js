@@ -9962,7 +9962,10 @@ function confirmFamTransfer(){
   // always sees everything regardless of hiddenFrom (see _hideFromAllBut/
   // the admin-device push rule in api/notify.js), same scoping confirmDeposit
   // already uses for a plain wallet deposit/withdraw.
-  addNotif('🔁',fromName+' העביר/ה ₪'+amt.toLocaleString()+' למשפחת '+toName,undefined,_hideFromAllBut([fromFid,toFid]),'deposit',[fromFid,toFid]);
+  // The note rides along in the text, so the kosher-phone call (and the
+  // tzintuk message read out on calling back) says what the money was for.
+  const noteTxt=note?' · הערה: '+note.replace(/\s+/g,' ').slice(0,200):'';
+  addNotif('🔁',fromName+' העביר/ה ₪'+amt.toLocaleString()+' למשפחת '+toName+noteTxt,undefined,_hideFromAllBut([fromFid,toFid]),'deposit',[fromFid,toFid]);
   sendFundUpdateEmail(fromFid,amt,'העברה למשפחת '+toName,note);
   sendFundUpdateEmail(toFid,amt,'העברה ממשפחת '+fromName,note);
 }
