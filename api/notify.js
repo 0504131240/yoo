@@ -12,7 +12,7 @@ const { yemotConfigured, phoneEntriesFor, callOrQueue } = require('./_lib/yemot'
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-  const { adminPass, title, body, target, excludeFamIds, kind, relatedFamIds, excludeSlots, noPhone, phoneFamIds } = req.body || {};
+  const { adminPass, title, body, target, excludeFamIds, kind, relatedFamIds, excludeSlots, noPhone, phoneFamIds, onlyFamIds, linkHash } = req.body || {};
   if (!title || !body) { res.status(400).json({ error: 'title and body required' }); return; }
 
   // No pushes during Shabbat or Yom Tov, regardless of who triggered this or why.
@@ -62,6 +62,11 @@ module.exports = async (req, res) => {
   // that — "famId:slot" strings for the specific registered emails that
   // opted into email-instead-of-push (see app.js's notifEmailSection),
   // dropping only that one parent's devices rather than the whole family's.
+  // onlyFamIds: a push meant for specific families only (e.g. a poker
+  // invite) — every other device, admin ones included, is skipped.
+  const onlySet = Array.isArray(onlyFamIds) ? new Set(onlyFamIds) : null;
+  // linkHash: open a specific screen on tap (e.g. 'poker' → /#poker).
+  const hash = typeof linkHash === 'string' && /^[a-z0-9-]{1,40}$/.test(linkHash) ? '#' + linkHash : '';
   const excludeSlotSet = new Set(Array.isArray(excludeSlots) ? excludeSlots : []);
   const groups = { admin: [], index: [] };
   tokenDocs.forEach(d => {
@@ -75,6 +80,7 @@ module.exports = async (req, res) => {
     const page = data.page === 'admin' ? 'admin' : 'index';
     const isAdminDevice = page === 'admin' || data.isAdmin === true;
     if (target === 'admin' && !isAdminDevice) return;
+    if (onlySet && !onlySet.has(data.famId)) return;
     if (Array.isArray(excludeFamIds) && excludeFamIds.includes(data.famId)) return;
     if (data.famId != null && data.slot != null && excludeSlotSet.has(data.famId + ':' + data.slot)) return;
     // A family device's own notifPref only ever filters family-page pushes —
@@ -95,7 +101,7 @@ module.exports = async (req, res) => {
     // exactly once.
     const resp = await getMessaging().sendEachForMulticast({
       tokens: docs.map(d => d.data().token),
-      data: { title, body, icon: 'https://yankeleviz.vercel.app/icon.jpg', link: LINKS[page] },
+      data: { title, body, icon: 'https://yankeleviz.vercel.app/icon.jpg', link: LINKS[page] + hash },
     });
     sent += resp.successCount;
     resp.responses.forEach((r, i) => {
