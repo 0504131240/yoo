@@ -7,7 +7,8 @@
 // Storage (everything under appData/*, which the Firestore rules already
 // open to the client):
 //   appData/pokerLobby   { bal:{famId:chips}, tables:{id:{host,players,invited,created,status}},
-//                          invites:{famId:{tableId:{from,ts}}} }
+//                          invites:{famId:{tableId:{from,ts}}},
+//                          loans:{id:{id,by,to,amt,status,ts,done}} }
 //   appData/poker_<id>   one table: seats, the hand in progress and a short log
 // Every family starts with START chips in its bank. Sitting at a table moves
 // a buy-in from the bank to the table; leaving moves the stack back.
@@ -15,7 +16,11 @@
 // the same moment can't break the hand.
 //
 // Inviting a family sends a push (api/notify.js onlyFamIds) and, while the
-// app is open, a banner on the home page.
+// app is open, a banner on the home page. A family that ran out of chips can
+// ask another family for a loan (same push + banner); the lender approves or
+// declines, and the borrower pays it back from its bank later.
+// "איך משחקים?" opens a short animated video (with Hebrew narration when the
+// device has a Hebrew voice) that teaches the game.
 (function(){
 'use strict';
 
@@ -26,6 +31,8 @@ const MAX_SEATS=6;
 const TURN_SECS=60;         // after this, the others may fold a player who doesn't answer
 const NEXT_HAND_SECS=7;     // pause on the result before the next deal
 const BUYINS=[1000,2000,5000];
+const LOAN_AMTS=[1000,2000,5000];
+const LOAN_KEEP=7*864e5;    // finished loans stay listed this long
 const INVITE_TTL=6*3600e3;  // invites older than this are ignored
 
 const S={fid:null,view:'lobby',tid:null,L:{},T:null,unsubL:null,unsubT:null,fs:null,tick:null,raise:null,busy:false,modal:null,bannerShown:{}};
@@ -337,15 +344,16 @@ function subscribeTable(tid){
 }
 
 // ── push ───────────────────────────────────────────────────────────────────
-function sendInvitePush(fids,tid){
+function pushTo(fids,title,body){
   if(!fids.length)return;
   let pass='';try{pass=typeof adminPass!=='undefined'?adminPass:'';}catch(e){}
-  if(window.POKER_FAKE_FS){console.log('poker push →',fids);return;}
+  if(window.POKER_FAKE_FS){console.log('poker push →',fids,title,body);return;}
   fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    adminPass:pass,title:'🃏 הזמנה לפוקר',
-    body:`משפחת ${short(S.fid)} מזמינה אתכם לשולחן פוקר — לחצו כדי להצטרף`,
-    onlyFamIds:fids,relatedFamIds:fids,kind:'poker',noPhone:true,linkHash:'poker'
+    adminPass:pass,title,body,onlyFamIds:fids,relatedFamIds:fids,kind:'poker',noPhone:true,linkHash:'poker'
   })}).catch(()=>{});
+}
+function sendInvitePush(fids){
+  pushTo(fids,'🃏 הזמנה לפוקר',`משפחת ${short(S.fid)} מזמינה אתכם לשולחן פוקר — לחצו כדי להצטרף`);
 }
 
 // ── actions ────────────────────────────────────────────────────────────────
@@ -456,16 +464,101 @@ async function kickSlow(){
 async function dismissInvite(tid){
   await txn(null,L=>{if(L.invites&&L.invites[S.fid])delete L.invites[S.fid][tid];});
 }
+// ── loans between families ─────────────────────────────────────────────────
+function loansOf(L){return Object.values(L.loans||{});}
+function pruneLoans(L){
+  const keep={};
+  loansOf(L).forEach(l=>{if(l.status==='pending'||l.status==='active'||now()-(l.done||l.ts)<LOAN_KEEP)keep[l.id]=l;});
+  L.loans=keep;
+}
+function moveChips(L,from,to,amt){
+  L.bal=L.bal||{};
+  const b=bal(L,from);
+  L.bal[from]=b-amt;L.bal[to]=bal(L,to)+amt;
+}
+async function requestLoan(to,amt){
+  const id=rid();
+  const ok=await txn(null,L=>{
+    pruneLoans(L);
+    if(loansOf(L).some(l=>l.by===S.fid&&l.to===to&&l.status==='pending'))throw new Error('כבר ביקשתם מהם — מחכים לתשובה');
+    L.loans[id]={id,by:S.fid,to,amt,status:'pending',ts:now()};
+  });
+  if(ok){pushTo([to],'🙏 בקשת הלוואה בפוקר',`משפחת ${short(S.fid)} מבקשת מכם הלוואה של ${fmt(amt)} צ׳יפים`);toast('📨 הבקשה נשלחה ל'+short(to));}
+}
+async function answerLoan(id,yes){
+  let done=null;
+  const ok=await txn(null,L=>{
+    const l=(L.loans||{})[id];
+    if(!l||l.status!=='pending')throw new Error('הבקשה כבר לא פעילה');
+    if(l.to!==S.fid)throw new Error('הבקשה לא מופנית אליכם');
+    if(yes){
+      if(l.amt>bal(L,S.fid))throw new Error('אין לכם מספיק צ׳יפים בקופה כדי להלוות');
+      moveChips(L,S.fid,l.by,l.amt);l.status='active';
+    }else l.status='declined';
+    l.done=now();done=Object.assign({},l);
+  });
+  if(ok&&done){
+    if(yes){pushTo([done.by],'✅ ההלוואה אושרה',`משפחת ${short(S.fid)} הלוו לכם ${fmt(done.amt)} צ׳יפים — הם כבר בקופה שלכם`);toast('✅ הלוויתם '+fmt(done.amt)+' צ׳יפים');}
+    else pushTo([done.by],'ההלוואה לא אושרה',`משפחת ${short(S.fid)} לא יכולים להלוות לכם הפעם`);
+  }
+}
+async function repayLoan(id){
+  let done=null;
+  const ok=await txn(null,L=>{
+    const l=(L.loans||{})[id];
+    if(!l||l.status!=='active'||l.by!==S.fid)throw new Error('אין הלוואה פתוחה כזאת');
+    if(l.amt>bal(L,S.fid))throw new Error('אין מספיק צ׳יפים בקופה להחזר של '+fmt(l.amt));
+    moveChips(L,S.fid,l.to,l.amt);l.status='repaid';l.done=now();done=Object.assign({},l);
+  });
+  if(ok&&done){pushTo([done.to],'💰 החזר הלוואה',`משפחת ${short(S.fid)} החזירו לכם ${fmt(done.amt)} צ׳יפים`);toast('✅ ההלוואה הוחזרה');}
+}
+async function forgiveLoan(id){
+  if(!confirm('למחול על ההלוואה? הם לא יצטרכו להחזיר אותה.'))return;
+  let done=null;
+  const ok=await txn(null,L=>{
+    const l=(L.loans||{})[id];
+    if(!l||l.status!=='active'||l.to!==S.fid)throw new Error('אין הלוואה פתוחה כזאת');
+    l.status='forgiven';l.done=now();done=Object.assign({},l);
+  });
+  if(ok&&done)pushTo([done.by],'🎁 מחלו לכם על ההלוואה',`משפחת ${short(S.fid)} מחלו לכם על ההלוואה של ${fmt(done.amt)} צ׳יפים`);
+}
+async function cancelLoan(id){
+  await txn(null,L=>{const l=(L.loans||{})[id];if(l&&l.status==='pending'&&l.by===S.fid)delete L.loans[id];});
+}
+function loanRow(fid,title,sub,btns){
+  return `<div class="pk-trow">${ava(fid,30)}<div class="pk-tinfo"><b>${title}</b>${sub?`<small>${sub}</small>`:''}</div>${btns||''}</div>`;
+}
+function loansSection(L){
+  const ls=loansOf(L).sort((a,b)=>b.ts-a.ts);
+  const me=S.fid;
+  const rows=[];
+  ls.filter(l=>l.to===me&&l.status==='pending').forEach(l=>rows.push(loanRow(l.by,`${E(short(l.by))} מבקשים ${fmt(l.amt)} צ׳יפים`,'בקשת הלוואה מכם',
+    `<div class="pk-tbtns"><button class="pk-btn pk-green" onclick="pokerUI.answerLoan('${l.id}',true)">להלוות</button><button class="pk-btn pk-ghost" onclick="pokerUI.answerLoan('${l.id}',false)">לא הפעם</button></div>`)));
+  ls.filter(l=>l.by===me&&l.status==='active').forEach(l=>rows.push(loanRow(l.to,`אתם חייבים ${fmt(l.amt)} ל${E(short(l.to))}`,'מחזירים מהקופה מתי שרוצים',
+    `<button class="pk-btn pk-gold" onclick="pokerUI.repayLoan('${l.id}')">להחזיר</button>`)));
+  ls.filter(l=>l.to===me&&l.status==='active').forEach(l=>rows.push(loanRow(l.by,`${E(short(l.by))} חייבים לכם ${fmt(l.amt)}`,'',
+    `<button class="pk-btn pk-ghost" onclick="pokerUI.forgiveLoan('${l.id}')">למחול</button>`)));
+  ls.filter(l=>l.by===me&&l.status==='pending').forEach(l=>rows.push(loanRow(l.to,`ביקשתם ${fmt(l.amt)} מ${E(short(l.to))}`,'מחכים לתשובה…',
+    `<button class="pk-btn pk-ghost" onclick="pokerUI.cancelLoan('${l.id}')">ביטול</button>`)));
+  const msg={declined:'לא אישרו את הבקשה',repaid:'ההלוואה הוחזרה ✓',forgiven:'מחלו על ההלוואה 🎁'};
+  ls.filter(l=>(l.by===me||l.to===me)&&msg[l.status]&&now()-(l.done||0)<864e5).forEach(l=>{
+    const other=l.by===me?l.to:l.by;
+    rows.push(loanRow(other,`${fmt(l.amt)} · ${l.by===me?'מ':'ל'}${E(short(other))}`,msg[l.status],''));
+  });
+  return `<div class="pk-sec"><h4>🙏 הלוואות</h4>${rows.join('')}
+    ${rows.length?'':'<p class="pk-muted" style="margin-bottom:8px">נגמרו הצ׳יפים? אפשר לבקש הלוואה ממשפחה אחרת. הם יקבלו התראה ויחליטו אם להלוות.</p>'}
+    <button class="pk-btn pk-ghost pk-big" style="margin-top:6px" onclick="pokerUI.openLoan()">🙏 לבקש הלוואה ממשפחה אחרת</button></div>`;
+}
 async function resetBanks(){
   if(!isAdmin())return;
-  if(!confirm('לאפס את הקופות של כל המשפחות ל-'+fmt(START)+' ולסגור את כל השולחנות?'))return;
+  if(!confirm('לאפס את הקופות של כל המשפחות ל-'+fmt(START)+', לסגור את כל השולחנות ולמחוק את כל ההלוואות?'))return;
   const fs=await fsCtx();
   const tids=Object.keys((S.L||{}).tables||{});
   try{
     await fs.runTransaction(fs.db,async tx=>{
       const snaps=[];for(const t of tids)snaps.push([t,await tx.get(tableRef(fs,t))]);
       snaps.forEach(([t,sn])=>{if(sn.exists()){const T=clean(sn.data());T.status='closed';tx.set(tableRef(fs,t),T);}});
-      tx.set(lobbyRef(fs),{bal:{},tables:{},invites:{}});
+      tx.set(lobbyRef(fs),{bal:{},tables:{},invites:{},loans:{}});
     });
     toast('✅ כל הקופות אופסו');
   }catch(e){console.warn(e);toast('⚠️ האיפוס נכשל');}
@@ -504,19 +597,23 @@ function lobbyView(){
   tables.forEach(t=>Object.keys(t.stacks||{}).forEach(f=>{onT[f]=(onT[f]||0)+t.stacks[f];}));
   const board=fams.map(f=>({fid:f.id,bank:bal(L,f.id),onT:onT[f.id]||0})).map(r=>Object.assign(r,{tot:r.bank+r.onT}));
   board.sort((a,b)=>b.tot-a.tot);
+  const debt={};loansOf(L).filter(l=>l.status==='active').forEach(l=>{debt[l.by]=(debt[l.by]||0)+l.amt;});
   const row=(t,btn)=>`<div class="pk-trow"><div class="pk-tavas">${(t.players||[]).map(f=>ava(f,28)).join('')}</div>
     <div class="pk-tinfo"><b>השולחן של ${E(short(t.host))}</b><small>${(t.players||[]).length}/${MAX_SEATS} משפחות · ${fmt(t.stake)} צ׳יפים על השולחן</small></div>${btn}</div>`;
   return `
   <div class="pk-hero"><div class="pk-hero-suits">♠ ♥ ♦ ♣</div>
     <div class="pk-hero-me">${ava(S.fid,44)}<div><b>משפחת ${E(short(S.fid))}</b><small>בקופה: ${fmt(bal(L,S.fid))} צ׳יפים <button class="pk-link" onclick="pokerUI.changeFam()">החלפה</button></small></div></div>
     <button class="pk-btn pk-gold pk-big" onclick="pokerUI.openNew()">🃏 שולחן חדש והזמנת משפחות</button>
+    <button class="pk-btn pk-ghost pk-big pk-howto" onclick="pokerUI.tutorial()">🎬 איך משחקים פוקר? · סרטון הסבר</button>
   </div>
   ${inv.length?`<div class="pk-sec"><h4>📨 הזמנות בשבילכם</h4>${inv.map(i=>{const t=L.tables[i.tid];return row(Object.assign({id:i.tid},t),`<div class="pk-tbtns"><button class="pk-btn pk-green" onclick="pokerUI.askJoin('${i.tid}')">הצטרפו</button><button class="pk-btn pk-ghost" onclick="pokerUI.dismiss('${i.tid}')">לא עכשיו</button></div>`);}).join('')}</div>`:''}
+  ${loansOf(L).some(l=>l.to===S.fid&&l.status==='pending')?loansSection(L):''}
   ${mine.length?`<div class="pk-sec"><h4>🪑 השולחנות שלכם</h4>${mine.map(t=>row(t,`<button class="pk-btn pk-green" onclick="pokerUI.openTable('${t.id}')">לשולחן</button>`)).join('')}</div>`:''}
   ${others.length?`<div class="pk-sec"><h4>🟢 שולחנות פתוחים</h4>${others.map(t=>row(t,`<button class="pk-btn pk-ghost" onclick="pokerUI.askJoin('${t.id}')">${(t.players||[]).length>=MAX_SEATS?'מלא':'הצטרפו'}</button>`)).join('')}</div>`:''}
   ${!tables.length&&!inv.length?`<div class="pk-empty">אין כרגע שולחנות פתוחים.<br>פתחו שולחן והזמינו משפחה לשחק!</div>`:''}
+  ${loansOf(L).some(l=>l.to===S.fid&&l.status==='pending')?'':loansSection(L)}
   <div class="pk-sec"><h4>💰 הקופות של המשפחות</h4>
-    <div class="pk-board">${board.map((r,i)=>`<div class="pk-brow ${r.fid===S.fid?'me':''}"><span class="pk-rank">${i<3?['🥇','🥈','🥉'][i]:i+1}</span>${ava(r.fid,26)}<span class="pk-bname">${E(short(r.fid))}</span><span class="pk-bval">${fmt(r.tot)}${r.onT?`<small>${fmt(r.onT)} על שולחן</small>`:''}</span></div>`).join('')}</div>
+    <div class="pk-board">${board.map((r,i)=>`<div class="pk-brow ${r.fid===S.fid?'me':''}"><span class="pk-rank">${i<3?['🥇','🥈','🥉'][i]:i+1}</span>${ava(r.fid,26)}<span class="pk-bname">${E(short(r.fid))}</span><span class="pk-bval">${fmt(r.tot)}${r.onT?`<small>${fmt(r.onT)} על שולחן</small>`:''}${debt[r.fid]?`<small class="pk-debt">חוב ${fmt(debt[r.fid])}</small>`:''}</span></div>`).join('')}</div>
     <p class="pk-muted" style="margin-top:8px">צ׳יפים שיושבים על שולחן חוזרים לקופה כשקמים מהשולחן. משחק בצ׳יפים בלבד — בלי כסף אמיתי.</p>
     ${isAdmin()?`<button class="pk-btn pk-ghost" style="margin-top:8px" onclick="pokerUI.resetBanks()">♻️ איפוס כל הקופות ל-${fmt(START)}</button>`:''}
   </div>`;
@@ -583,6 +680,7 @@ function tableView(){
       <button class="pk-btn pk-ghost" onclick="pokerUI.openInvite()">📨 הזמנת משפחה</button>
       <button class="pk-btn pk-ghost" onclick="pokerUI.openRebuy()">➕ צ׳יפים</button>
       <button class="pk-btn pk-ghost" onclick="pokerUI.leave()">🚪 לקום</button>
+      <button class="pk-btn pk-ghost pk-q" onclick="pokerUI.tutorial()" title="איך משחקים?">🎬</button>
     </div>
     <div class="pk-sec"><h4>מה קרה</h4><div class="pk-log">${(T.log||[]).slice().reverse().slice(0,12).map(l=>`<div>${E(l.txt)}</div>`).join('')}</div>
     <p class="pk-muted" style="margin-top:8px">בליינדים ${SB}/${BB} · מי שלא עונה ${TURN_SECS} שניות — אפשר לדלג עליו</p></div>`;
@@ -638,7 +736,7 @@ function modalView(){
   const buyBtns=(fn)=>{
     const opts=BUYINS.filter(x=>x<=b);
     if(b>0&&!opts.includes(b))opts.push(b);
-    if(!opts.length)return `<p class="pk-muted">אין לכם צ׳יפים בקופה 😅</p>`;
+    if(!opts.length)return `<p class="pk-muted">אין לכם צ׳יפים בקופה 😅</p><button class="pk-btn pk-ghost pk-big" style="margin-top:8px" onclick="pokerUI.openLoan()">🙏 לבקש הלוואה ממשפחה אחרת</button>`;
     return `<div class="pk-buyins">${opts.map(x=>`<button class="pk-btn ${m.buy===x?'pk-gold':'pk-ghost'}" onclick="pokerUI.pickBuy(${x})">${x===b&&!BUYINS.includes(x)?'הכל · ':''}${fmt(x)}</button>`).join('')}</div>`;
   };
   let inner='';
@@ -658,32 +756,48 @@ function modalView(){
       <div class="pk-arow" style="margin-top:14px"><button class="pk-btn pk-ghost" onclick="pokerUI.closeModal()">ביטול</button>
       <button class="pk-btn pk-gold" ${m.buy?'':'disabled'} onclick="pokerUI.confirmModal()">${m.kind==='join'?'לשבת':'להוסיף'}</button></div>`;
   }
+  else if(m.kind==='loan'){
+    const list=allFams().filter(f=>f.id!==S.fid);
+    inner=`<h3>🙏 בקשת הלוואה</h3>
+      <p class="pk-muted">ממי לבקש? הם יקבלו התראה ויחליטו אם להלוות. מחזירים מהקופה מתי שרוצים.</p>
+      <div class="pk-fams">${list.map(f=>`<button class="pk-fam ${m.to===f.id?'on':''}" onclick="pokerUI.pickTo(${f.id})">${ava(f.id,30)}<span>${E(short(f.id))}<small class="pk-fam-bal">${fmt(bal(L,f.id))}</small></span>${m.to===f.id?'<em>✓</em>':''}</button>`).join('')}</div>
+      <p class="pk-muted" style="margin-top:12px">כמה צ׳יפים?</p>
+      <div class="pk-buyins">${LOAN_AMTS.map(x=>`<button class="pk-btn ${m.buy===x?'pk-gold':'pk-ghost'}" onclick="pokerUI.pickBuy(${x})">${fmt(x)}</button>`).join('')}</div>
+      <div class="pk-arow" style="margin-top:14px"><button class="pk-btn pk-ghost" onclick="pokerUI.closeModal()">ביטול</button>
+      <button class="pk-btn pk-gold" ${m.to!=null&&m.buy?'':'disabled'} onclick="pokerUI.confirmModal()">שלחו בקשה</button></div>`;
+  }
   return `<div class="pk-mbg" onclick="if(event.target===this)pokerUI.closeModal()"><div class="pk-mbox">${inner}</div></div>`;
 }
 function defaultBuy(){const b=bal(S.L||{},S.fid);return b>=2000?2000:b>0?b:null;}
 
 // ── home page: tile subtitle, invite badge and banner ─────────────────────
+function myLoanReqs(L){return loansOf(L).filter(l=>l.to===S.fid&&l.status==='pending');}
 function homeUpdate(){
   if(S.fid==null)S.fid=resolveFam();
   const sub=$('homeTilePokerSub'),badge=$('pokerInviteBadge');
   if(S.fid==null){if(sub)sub.textContent='כל משפחה מתחילה עם '+fmt(START)+' צ׳יפים';return;}
   const L=S.L||{};
-  const inv=myInvites(L);
-  if(sub)sub.textContent=inv.length?('📨 '+short(inv[0].from)+' מזמינים אתכם לשחק!'):('בקופה: '+fmt(bal(L,S.fid))+' צ׳יפים');
-  if(badge){badge.style.display=inv.length?'flex':'none';badge.textContent=inv.length;}
-  // banner for a fresh invite while the app is open (once per invite)
+  const inv=myInvites(L),reqs=myLoanReqs(L);
+  const n=inv.length+reqs.length;
+  if(sub)sub.textContent=inv.length?('📨 '+short(inv[0].from)+' מזמינים אתכם לשחק!'):reqs.length?('🙏 '+short(reqs[0].by)+' מבקשים מכם הלוואה'):('בקופה: '+fmt(bal(L,S.fid))+' צ׳יפים');
+  if(badge){badge.style.display=n?'flex':'none';badge.textContent=n;}
+  // banner for something new while the app is open (once per item)
   const o=$('pokerOverlay');
   if(o&&o.classList.contains('open'))return;
   const seen=lsGet('pkSeenInv',{});
-  const fresh=inv.find(i=>!seen[i.tid+':'+i.ts]);
-  if(!fresh){const bn=$('pkBanner');if(bn)bn.remove();return;}
-  if($('pkBanner'))return;
-  const bn=document.createElement('div');bn.id='pkBanner';
-  bn.innerHTML=`<div class="pk-bn-ico">🃏</div><div class="pk-bn-txt"><b>הזמנה לפוקר!</b><small>משפחת ${E(short(fresh.from))} מזמינה אתכם לשחק</small></div>
-    <button class="pk-bn-go" onclick="pokerUI.bannerGo('${fresh.tid}',${fresh.ts})">לשחק</button><button class="pk-bn-x" onclick="pokerUI.bannerX('${fresh.tid}',${fresh.ts})">✕</button>`;
+  const items=inv.map(i=>({key:i.tid+':'+i.ts,ico:'🃏',title:'הזמנה לפוקר!',txt:`משפחת ${short(i.from)} מזמינה אתכם לשחק`,go:'לשחק',tid:i.tid}))
+    .concat(reqs.map(l=>({key:'loan:'+l.id,ico:'🙏',title:'בקשת הלוואה',txt:`משפחת ${short(l.by)} מבקשת ${fmt(l.amt)} צ׳יפים`,go:'לראות'})));
+  const fresh=items.find(i=>!seen[i.key]);
+  const cur=$('pkBanner');
+  if(!fresh){if(cur)cur.remove();return;}
+  if(cur&&cur.dataset.key===fresh.key)return;
+  if(cur)cur.remove();
+  const bn=document.createElement('div');bn.id='pkBanner';bn.dataset.key=fresh.key;
+  bn.innerHTML=`<div class="pk-bn-ico">${fresh.ico}</div><div class="pk-bn-txt"><b>${fresh.title}</b><small>${E(fresh.txt)}</small></div>
+    <button class="pk-bn-go" onclick="pokerUI.bannerGo('${fresh.key}','${fresh.tid||''}')">${fresh.go}</button><button class="pk-bn-x" onclick="pokerUI.bannerX('${fresh.key}')">✕</button>`;
   document.body.appendChild(bn);
 }
-function markSeen(tid,ts){const seen=lsGet('pkSeenInv',{});seen[tid+':'+ts]=1;lsSet('pkSeenInv',seen);const bn=$('pkBanner');if(bn)bn.remove();}
+function markSeen(key){const seen=lsGet('pkSeenInv',{});seen[key]=1;lsSet('pkSeenInv',seen);const bn=$('pkBanner');if(bn)bn.remove();}
 function resolveFam(){
   const saved=lsGet('pkFam',null);
   const id=saved!=null?saved:myDeviceFam();
@@ -722,10 +836,138 @@ function close(){
   const o=$('pokerOverlay');if(o)o.classList.remove('open');
   document.body.style.overflow='';clearInterval(S.tick);
   if(S.unsubT){S.unsubT();S.unsubT=null;}
+  tutClose();
   if(typeof _clearHash==='function')_clearHash('poker');
   homeUpdate();
 }
-function back(){if(S.modal){S.modal=null;render();return;}if(S.view==='table'){closeTableView();return;}close();}
+function back(){if($('pkTut')){tutClose();return;}if(S.modal){S.modal=null;render();return;}if(S.view==='table'){closeTableView();return;}close();}
+
+// ── "איך משחקים?" — a short animated video ─────────────────────────────────
+// Built from the game's own cards and avatars (no video file to load), with
+// subtitles and, where the device has a Hebrew voice, spoken narration.
+// Each scene is a stage (animated with CSS delays) + the line read out.
+const T_={i:0,playing:false,muted:lsGet('pkTutMute',false),t0:0,el:0,timer:null,utt:null,spoke:false,voice:null};
+function A(html,d,cls){return `<span class="pt-a ${cls||''}" style="--d:${d}s">${html}</span>`;}
+function cards(list,d0,step,cls){return list.map((c,i)=>A(cardHtml(c,cls),d0+i*step)).join('');}
+function chipStack(n,d){return A(`<span class="pt-chips">${'<span class="pk-chip-ico"></span>'.repeat(n)}</span>`,d);}
+function demoFams(){const f=allFams().slice(0,3).map(x=>x.id);return f.length?f:[null,null,null];}
+function demoAva(fid,size){return fid==null?`<span class="pk-ava0" style="width:${size}px;height:${size}px">🙂</span>`:ava(fid,size);}
+const TUT=[
+  {t:'♠ ♥ פוקר משפחתי ♦ ♣',say:'ברוכים הבאים לפוקר המשפחתי! בסרטון קצר נלמד איך משחקים טקסס הולדם — המשחק הכי מפורסם בעולם.',
+   stage:()=>`<div class="pt-row">${cards(['As','Kh','Qd','Jc','Ts'],.2,.25)}</div>${A('<div class="pt-big">טקסס הולדם</div>',1.6)}`},
+  {t:'🎯 המטרה',say:'המטרה היא לזכות בצ׳יפים שבאמצע השולחן — הקופה. מי שמחזיק את היד הכי טובה בסוף, או מי שנשאר אחרון כשכל השאר ויתרו, לוקח את כל הקופה.',
+   stage:()=>`<div class="pt-felt">${chipStack(3,.2)}${chipStack(5,.5)}${chipStack(4,.8)}${A('<div class="pt-pot">הקופה</div>',1.2)}</div>${A('<div class="pt-note">🏆 היד הכי טובה לוקחת הכל</div>',3)}`},
+  {t:'🂠 שני קלפים לכל משפחה',say:'כל משפחה מקבלת שני קלפים סגורים. רק אתם רואים אותם — אל תגלו לאף אחד!',
+   stage:()=>{const f=demoFams();return `<div class="pt-players">${[1,2].map((k,i)=>`<div class="pt-pl">${A(demoAva(f[k],32),.1)}<div class="pt-row">${A(cardHtml(null,'sm'),.4+i*.2)}${A(cardHtml(null,'sm'),.5+i*.2)}</div></div>`).join('')}</div>
+     <div class="pt-pl me">${A('<b class="pt-you">אתם</b>',.2)}<div class="pt-row">${A(cardHtml('Ah'),1.2,'pt-flip')}${A(cardHtml('Kd'),1.5,'pt-flip')}</div></div>${A('<div class="pt-note">🤫 סודי!</div>',2.5)}`;}},
+  {t:'🔘 דילר ובליינדים',say:'לפני כל יד, שתי המשפחות שאחרי הדילר שמות סכום קבוע מראש: חמישים ומאה. זה נקרא בליינדים, וככה תמיד יש על מה לשחק. הכפתור של הדילר עובר משפחה בכל יד.',
+   stage:()=>{const f=demoFams();return `<div class="pt-players">
+     <div class="pt-pl">${A(demoAva(f[0],34),.1)}${A('<span class="pk-dealer pt-d">D</span>',.6)}<small>דילר</small></div>
+     <div class="pt-pl">${A(demoAva(f[1],34),.1)}${A('<span class="pt-blind">50</span>',2.4)}<small>בליינד קטן</small></div>
+     <div class="pt-pl">${A(demoAva(f[2],34),.1)}${A('<span class="pt-blind">100</span>',3.4)}<small>בליינד גדול</small></div></div>`;}},
+  {t:'👆 מה עושים בתור שלכם?',say:'כשמגיע התור שלכם יש ארבע אפשרויות. קיפול — מוותרים על היד. צ׳ק — ממשיכים בלי לשים כלום, אם אף אחד עוד לא הימר. השוואה — שמים בדיוק כמו ההימור הגבוה. והעלאה — מגדילים את ההימור, ואז כל השאר צריכים להשוות או לקפל.',
+   stage:()=>`<div class="pt-acts">
+     ${A('<div><span class="pk-btn pk-red">קיפול</span><small>מוותרים על היד</small></div>',.5)}
+     ${A('<div><span class="pk-btn pk-green">צ׳ק</span><small>ממשיכים בלי לשים (אם אף אחד לא הימר)</small></div>',2.6)}
+     ${A('<div><span class="pk-btn pk-green">השוואה</span><small>שמים כמו ההימור הגבוה</small></div>',6)}
+     ${A('<div><span class="pk-btn pk-gold">העלאה</span><small>מגדילים את ההימור</small></div>',8.6)}</div>`},
+  {t:'🃏 הפלופ — 3 קלפים באמצע',say:'אחרי סבב ההימורים הראשון נפתחים שלושה קלפים באמצע — זה נקרא הפלופ. הקלפים האלה משותפים לכולם. ושוב יש סבב הימורים.',
+   stage:()=>`<div class="pt-felt"><div class="pt-row">${cards(['9c','Kh','4s'],.6,.35,'pt-flip')}${A('<span class="pk-card pk-slot"></span>',.2)}${A('<span class="pk-card pk-slot"></span>',.2)}</div></div>${A('<div class="pt-note">משותפים לכל המשפחות</div>',2.4)}`},
+  {t:'🃏 הטרן והריבר',say:'אחר כך נפתח קלף רביעי — הטרן — ועוד סבב הימורים. ובסוף קלף חמישי — הריבר — והסבב האחרון.',
+   stage:()=>`<div class="pt-felt"><div class="pt-row">${cardHtml('9c')}${cardHtml('Kh')}${cardHtml('4s')}${A(cardHtml('Kd'),.8,'pt-flip')}${A(cardHtml('2h'),4,'pt-flip')}</div></div>
+     <div class="pt-row pt-lbls">${A('<small>טרן ←</small>',1.2)}${A('<small>ריבר ←</small>',4.4)}</div>`},
+  {t:'✋ היד שלכם',say:'היד שלכם היא חמשת הקלפים הכי טובים מתוך שבעה: שני הקלפים שלכם, וחמשת הקלפים שבאמצע. כאן, למשל, יש לכם פול האוס — שלוש תשיעיות ושני מלכים!',
+   stage:()=>`<div class="pt-felt"><div class="pt-row">${A(cardHtml('9c'),.1,'pt-hl')}${A(cardHtml('Kh'),.1,'pt-hl')}${A(cardHtml('4s'),.1,'pt-dim')}${A(cardHtml('Kd'),.1,'pt-hl')}${A(cardHtml('2h'),.1,'pt-dim')}</div></div>
+     <div class="pt-pl me"><b class="pt-you">שלכם</b><div class="pt-row">${A(cardHtml('9s'),.1,'pt-hl')}${A(cardHtml('9d'),.1,'pt-hl')}</div></div>${A('<div class="pt-big">פול האוס! 🎉</div>',5.5)}`},
+  {t:'🏅 סדר הידיים — מהחזקה לחלשה',dur:16,say:'וזה הסדר של הידיים, מהחזקה לחלשה: רויאל פלאש, רצף בצבע, רביעייה, פול האוס, צבע, רצף, שלישייה, שני זוגות, זוג, ובסוף — קלף גבוה.',
+   stage:()=>{const H=[['רויאל פלאש','As Ks Qs Js Ts'],['רצף בצבע','9h 8h 7h 6h 5h'],['רביעייה','Qc Qd Qh Qs 3d'],['פול האוס','9c 9d 9s Kh Kd'],['צבע','Ad Jd 8d 5d 2d'],['רצף','Ts 9h 8c 7d 6s'],['שלישייה','7c 7d 7s Kh 2c'],['שני זוגות','Jc Jd 4s 4h Ad'],['זוג','Ac Ad 9s 6h 3c'],['קלף גבוה','Ah Jc 8d 5s 2c']];
+     return `<div class="pt-ranks">${H.map(([n,c],i)=>A(`<div class="pt-rk"><span class="pt-rkn">${i+1}. ${n}</span><span class="pt-row">${c.split(' ').map(x=>cardHtml(x,'sm')).join('')}</span></div>`,1+i*1.05)).join('')}</div>`;}},
+  {t:'🏆 מי מנצח?',say:'בסוף, מי שעוד במשחק חושפים את הקלפים, והיד הכי טובה לוקחת את הקופה. ואם כל השאר קיפלו — לוקחים את הקופה בלי להראות כלום!',
+   stage:()=>{const f=demoFams();return `<div class="pt-players">
+     <div class="pt-pl">${demoAva(f[1],32)}<div class="pt-row">${A(cardHtml('Qc','sm'),.8,'pt-flip')}${A(cardHtml('Jd','sm'),1,'pt-flip')}</div>${A('<small>זוג</small>',1.6)}</div>
+     <div class="pt-pl">${demoAva(f[0],32)}<div class="pt-row">${A(cardHtml('9s','sm'),.8,'pt-flip')}${A(cardHtml('9d','sm'),1,'pt-flip')}</div>${A('<small class="pt-win">פול האוס 🏆</small>',2.6)}</div></div>
+     ${A('<div class="pt-note">+ הקופה עוברת למנצחים</div>',3.4)}`;}},
+  {t:'💡 עוד כמה דברים',say:'אול-אין זה לשים את כל הצ׳יפים שלכם בבת אחת. ואם נגמרו לכם הצ׳יפים — אפשר לבקש הלוואה ממשפחה אחרת. זהו, אתם מוכנים! בהצלחה, ושיהיה משחק כיף!',
+   stage:()=>`<div class="pt-acts">
+     ${A('<div><span class="pk-btn pk-gold">אול-אין</span><small>כל הצ׳יפים בבת אחת</small></div>',.5)}
+     ${A('<div><span class="pk-btn pk-ghost">🙏 הלוואה</span><small>נגמרו הצ׳יפים? מבקשים ממשפחה אחרת</small></div>',4)}</div>
+     ${A('<div class="pt-big">בהצלחה! 🍀</div>',8)}`}
+];
+function tutDur(sc){return (sc.dur||Math.max(6,sc.say.length*0.075+1.5))*1000;}
+function heVoice(){
+  if(T_.voice!==null)return T_.voice;
+  try{const vs=speechSynthesis.getVoices();if(!vs.length)return null;T_.voice=vs.find(v=>/^he|^iw/i.test(v.lang))||false;}catch(e){T_.voice=false;}
+  return T_.voice;
+}
+function canSpeak(){return !!(window.speechSynthesis&&heVoice());}
+function stopSpeech(){try{if(window.speechSynthesis)speechSynthesis.cancel();}catch(e){}T_.utt=null;}
+function speak(text){
+  stopSpeech();T_.spoke=false;
+  if(T_.muted||!canSpeak())return;
+  try{const u=new SpeechSynthesisUtterance(text);u.lang='he-IL';u.voice=heVoice();u.rate=1;
+    u.onend=()=>{if(T_.utt===u){T_.spoke=true;}};T_.utt=u;speechSynthesis.speak(u);}catch(e){}
+}
+function tutOpen(){
+  ensureOverlay();
+  let el=$('pkTut');
+  if(!el){el=document.createElement('div');el.id='pkTut';$('pokerOverlay').appendChild(el);}
+  el.innerHTML=`<div class="pt-bars">${TUT.map((_,i)=>`<span class="pt-bar" onclick="pokerUI.tut.go(${i})"><i></i></span>`).join('')}</div>
+    <button class="pt-x" onclick="pokerUI.tut.close()" aria-label="סגירה">✕</button>
+    <div class="pt-screen"><div class="pt-title" id="ptTitle"></div><div class="pt-stage" id="ptStage"></div></div>
+    <div class="pt-cap" id="ptCap"></div>
+    <div class="pt-ctl"><button onclick="pokerUI.tut.prev()" aria-label="הקודם">⏭</button><button class="pt-play" id="ptPlay" onclick="pokerUI.tut.play()">⏸</button><button onclick="pokerUI.tut.next()" aria-label="הבא">⏮</button><button id="ptMute" onclick="pokerUI.tut.mute()"></button></div>`;
+  // voices load asynchronously on some browsers
+  try{if(window.speechSynthesis&&!speechSynthesis.getVoices().length)speechSynthesis.onvoiceschanged=()=>{T_.voice=null;tutMuteUI();};}catch(e){}
+  T_.playing=true;tutGo(0);
+}
+function tutMuteUI(){const b=$('ptMute');if(!b)return;const ok=canSpeak();b.textContent=!ok?'🔇':T_.muted?'🔇':'🔊';b.title=ok?'קול':'אין קול עברי במכשיר — יש כתוביות';b.style.opacity=ok?1:.4;}
+function tutGo(i){
+  if(!$('pkTut'))return;
+  if(i<0)i=0;
+  if(i>=TUT.length){T_.playing=false;T_.i=TUT.length-1;tutBars();$('ptPlay').textContent='↻';stopSpeech();return;}
+  T_.i=i;T_.el=0;T_.t0=now();
+  const sc=TUT[i];
+  $('ptTitle').textContent=sc.t;
+  $('ptStage').innerHTML=sc.stage();
+  $('ptCap').textContent=sc.say;
+  $('pkTut').classList.toggle('paused',!T_.playing);
+  $('ptPlay').textContent=T_.playing?'⏸':'▶';
+  tutMuteUI();
+  if(T_.playing)speak(sc.say);else stopSpeech();
+  tutBars();
+  clearInterval(T_.timer);T_.timer=setInterval(tutTick,100);
+}
+function tutTick(){
+  if(!$('pkTut')){clearInterval(T_.timer);return;}
+  if(!T_.playing)return;
+  const el=T_.el+(now()-T_.t0);
+  const d=tutDur(TUT[T_.i]);
+  tutBars(Math.min(1,el/d));
+  // move on when the time is up — and, if it's talking, when it finished the line
+  const talking=T_.utt&&!T_.spoke;
+  if(el>=d&&(!talking||el>=d*2.2))tutGo(T_.i+1);
+}
+function tutBars(frac){
+  document.querySelectorAll('#pkTut .pt-bar').forEach((b,i)=>{
+    const w=i<T_.i?100:i>T_.i?0:Math.round((frac||0)*100);
+    b.firstChild.style.width=w+'%';
+  });
+}
+function tutToggle(){
+  if(!$('pkTut'))return;
+  if(!T_.playing&&T_.i===TUT.length-1&&$('ptPlay').textContent==='↻'){T_.playing=true;tutGo(0);return;}
+  if(T_.playing){T_.playing=false;T_.el+=now()-T_.t0;try{speechSynthesis.pause();}catch(e){}}
+  else{T_.playing=true;T_.t0=now();try{if(T_.utt)speechSynthesis.resume();else speak(TUT[T_.i].say);}catch(e){}}
+  $('pkTut').classList.toggle('paused',!T_.playing);
+  $('ptPlay').textContent=T_.playing?'⏸':'▶';
+}
+function tutMute(){
+  if(!canSpeak()){toast('אין במכשיר הזה קול בעברית — הכתוביות מופיעות למטה');return;}
+  T_.muted=!T_.muted;lsSet('pkTutMute',T_.muted);
+  if(T_.muted)stopSpeech();else if(T_.playing)speak(TUT[T_.i].say);
+  tutMuteUI();
+}
+function tutClose(){clearInterval(T_.timer);stopSpeech();const el=$('pkTut');if(el)el.remove();}
 
 // Start listening for invites once the app has loaded the families.
 function boot(){
@@ -759,9 +1001,18 @@ window.pokerUI={
     else if(m.kind==='invite')inviteMore(m.sel);
     else if(m.kind==='join')joinTable(m.tid,m.buy);
     else if(m.kind==='rebuy')rebuy(m.buy);
+    else if(m.kind==='loan')requestLoan(m.to,m.buy);
   },
-  bannerGo(tid,ts){markSeen(tid,ts);open();S.modal={kind:'join',tid,buy:defaultBuy()};render();},
-  bannerX(tid,ts){markSeen(tid,ts);}
+  bannerGo(key,tid){markSeen(key);open();if(tid){S.modal={kind:'join',tid,buy:defaultBuy()};}else{S.view='lobby';}render();},
+  bannerX(key){markSeen(key);},
+  openLoan(){S.modal={kind:'loan',to:null,buy:2000};render();},
+  pickTo(id){S.modal.to=id;render();},
+  answerLoan(id,yes){answerLoan(id,yes);},
+  repayLoan(id){repayLoan(id);},
+  forgiveLoan(id){forgiveLoan(id);},
+  cancelLoan(id){cancelLoan(id);},
+  tutorial(){tutOpen();},
+  tut:{play:tutToggle,next:()=>tutGo(T_.i+1),prev:()=>tutGo(T_.i-1),go:i=>tutGo(i),mute:tutMute,close:tutClose}
 };
 // exposed for tests
 window.__poker={eval5,best7,startHand,act,canStart,pot,S};
