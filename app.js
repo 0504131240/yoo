@@ -5899,7 +5899,9 @@ function evCard(ev){
   const addExpBtn=`<div style="padding:8px 14px 10px;display:flex;gap:8px" class="edit-only">
     <button onclick="openAddExpItem(${ev.id})" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">➕ הוצאה</button>
     <button onclick="openCumPot(${ev.id})" style="flex:1;padding:9px;border-radius:var(--r2);border:1.5px dashed var(--amber);background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">💰 הפקד לקופה</button>
-  </div>`;
+  </div>${_walletPullCands(ev).length?`<div style="padding:0 14px 10px" class="edit-only">
+    <button onclick="openWalletPull(${ev.id})" style="width:100%;padding:9px;border-radius:var(--r2);border:1.5px solid var(--blue-mid);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">🏦 גבייה מרוכזת מהארנקים (${_walletPullCands(ev).length})</button>
+  </div>`:''}`;
   const exclLine=excl.length?`<div class="excl">לא משתתפים: ${excl.map(f=>esc(f.name.replace('משפחת','').trim())).join(', ')}</div>`:'';
   const settleLines=transfers.map(t=>{
     return`<div class="settle-row" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 0">
@@ -11228,6 +11230,118 @@ function doDepositToCumPot(){
   }
 }
 
+// ── Bulk "pay from wallet" into an event's pot ─────────────────────────────
+// One window listing every participant who still owes on this event AND has
+// money in their wallet; the admin ticks who to collect from and it moves
+// min(owed, wallet) of each straight into the event pot — the same bookkeeping
+// as depositing one family at a time with "💰 הפקד לקופה" → "מהארנק".
+function _walletPullCands(ev){
+  const adj=evAdjBalance(ev);
+  return ev.participants.map(fid=>{
+    const owed=Math.round(Math.max(0,-(adj[fid]||0)));
+    const bal=Math.round(famFundBal(fid)*100)/100;
+    // within a shekel of the debt counts as enough (doWalletPull then takes the exact balance)
+    const amt=bal+1>owed?owed:Math.floor(bal);
+    return{fid,owed,bal,amt};
+  }).filter(c=>getFam(c.fid)&&c.owed>0&&c.amt>0);
+}
+let _wpEvId=null,_wpSel={},_wpAmt={};
+function openWalletPull(evId){
+  const ev=events.find(e=>e.id===evId);if(!ev)return;
+  _wpEvId=evId;_wpSel={};_wpAmt={};
+  _walletPullCands(ev).forEach(c=>{_wpSel[c.fid]=true;_wpAmt[c.fid]=c.amt;});
+  let o=document.getElementById('walletPullOverlay');
+  if(!o){
+    o=document.createElement('div');o.id='walletPullOverlay';
+    o.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+    o.onclick=e=>{if(e.target===o)closeWalletPull();};
+    document.body.appendChild(o);
+  }
+  o.style.display='flex';
+  renderWalletPull();
+}
+function closeWalletPull(){const o=document.getElementById('walletPullOverlay');if(o)o.style.display='none';_wpEvId=null;}
+function renderWalletPull(){
+  const o=document.getElementById('walletPullOverlay');if(!o)return;
+  const ev=events.find(e=>e.id===_wpEvId);if(!ev){closeWalletPull();return;}
+  const cands=_walletPullCands(ev);
+  const sel=cands.filter(c=>_wpSel[c.fid]);
+  const total=sel.reduce((s,c)=>s+(_wpAmt[c.fid]||0),0);
+  const all=cands.length&&sel.length===cands.length;
+  const rows=cands.map(c=>{
+    const f=getFam(c.fid),on=!!_wpSel[c.fid];
+    const name=esc(f.name.replace('משפחת','').trim());
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-top:1px solid var(--border)">
+      <input type="checkbox" ${on?'checked':''} onchange="_wpToggle(${c.fid},this.checked)" style="width:20px;height:20px;accent-color:var(--blue-mid);flex-shrink:0;cursor:pointer">
+      ${famAva(f,32)}
+      <div style="flex:1;min-width:0" onclick="_wpToggle(${c.fid},${!on})">
+        <div style="font-size:14px;font-weight:700">${name}</div>
+        <div style="font-size:11px;color:var(--text2)">חייבים ₪${c.owed.toLocaleString()} · בארנק ₪${Math.round(c.bal).toLocaleString()}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+        <span style="font-size:13px;color:var(--text2)">₪</span>
+        <input type="number" inputmode="numeric" min="1" max="${c.amt}" value="${_wpAmt[c.fid]||''}" ${on?'':'disabled'} oninput="_wpSetAmt(${c.fid},this.value,${c.amt})"
+          style="width:70px;padding:6px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-weight:700;font-family:var(--font);text-align:center;background:var(--surface);color:var(--text)">
+      </div>
+    </div>`;
+  }).join('');
+  o.innerHTML=`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;box-sizing:border-box;direction:rtl">
+    <div style="font-size:15px;font-weight:800;margin-bottom:4px">🏦 גבייה מרוכזת מהארנקים</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">"${esc(ev.name)}" · מי שחייב ויש לו כסף בארנק. מסמנים ומעבירים לקופת האירוע בבת אחת.</div>
+    ${cands.length?`
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:4px;cursor:pointer">
+        <input type="checkbox" ${all?'checked':''} onchange="_wpAll(this.checked)" style="width:18px;height:18px;accent-color:var(--blue-mid)"> סמן את כולם
+      </label>
+      ${rows}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px 4px;border-top:1px solid var(--border);font-size:14px">
+        <span>${sel.length} משפחות</span><b>סה״כ ₪${total.toLocaleString()}</b>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="closeWalletPull()" style="flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">ביטול</button>
+        <button onclick="doWalletPull()" ${sel.length&&total>0?'':'disabled'} style="flex:2;padding:12px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;${sel.length&&total>0?'':'opacity:.4'}">העבר ₪${total.toLocaleString()} לקופה</button>
+      </div>`
+    :`<div style="text-align:center;color:var(--text2);padding:20px 0">אין כרגע משפחה שחייבת באירוע ויש לה כסף בארנק ✓</div>
+      <button onclick="closeWalletPull()" style="width:100%;padding:12px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text2);font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">סגור</button>`}
+  </div>`;
+}
+function _wpToggle(fid,on){_wpSel[fid]=!!on;renderWalletPull();}
+function _wpAll(on){const ev=events.find(e=>e.id===_wpEvId);if(!ev)return;_walletPullCands(ev).forEach(c=>{_wpSel[c.fid]=!!on;});renderWalletPull();}
+// Typing keeps focus in the box, so only the totals line/button are refreshed.
+function _wpSetAmt(fid,v,max){
+  let n=Math.round(parseFloat(v)||0);if(n>max)n=max;if(n<0)n=0;_wpAmt[fid]=n;
+  const ev=events.find(e=>e.id===_wpEvId);if(!ev)return;
+  const total=_walletPullCands(ev).filter(c=>_wpSel[c.fid]).reduce((s,c)=>s+(_wpAmt[c.fid]||0),0);
+  const o=document.getElementById('walletPullOverlay');if(!o)return;
+  const b=o.querySelector('b');if(b)b.textContent='סה״כ ₪'+total.toLocaleString();
+  const btn=o.querySelector('button[onclick="doWalletPull()"]');if(btn){btn.textContent='העבר ₪'+total.toLocaleString()+' לקופה';btn.disabled=!(total>0);btn.style.opacity=total>0?'':'.4';}
+}
+function doWalletPull(){
+  const ev=events.find(e=>e.id===_wpEvId);if(!ev)return;
+  const cands=_walletPullCands(ev).filter(c=>_wpSel[c.fid]&&(_wpAmt[c.fid]||0)>0);
+  if(!cands.length)return;
+  if(!ev.potPayments)ev.potPayments=[];
+  const done=[];
+  cands.forEach(c=>{
+    const key=String(c.fid);
+    const bal=fund.famBalances[key]||0;
+    let amt=Math.min(_wpAmt[c.fid],c.owed);
+    if(amt>bal&&amt-bal<1)amt=bal;
+    if(amt<=0||bal<amt)return;
+    fund.famBalances[key]=bal-amt;
+    const nm=(getFam(c.fid)||{}).name?.replace('משפחת','').trim()||'';
+    fund.transactions.push({id:nxtTx++,type:'payout',famId:c.fid,amount:amt,evId:ev.id,
+      desc:'העברה לקופת האירוע · '+ev.name+' → '+nm,date:new Date().toLocaleDateString('he-IL')});
+    ev.potPayments.push({famId:c.fid,amt,fromFund:true});
+    done.push({fid:c.fid,nm,amt});
+  });
+  if(!done.length){alert('לא הועבר כלום — היתרות בארנקים השתנו');renderWalletPull();return;}
+  const total=done.reduce((s,d)=>s+d.amt,0);
+  const fids=done.map(d=>d.fid);
+  _notifMoney('🏦','הועברו מהארנקים לקופת "'+ev.name+'": '+done.map(d=>d.nm+' ₪'+Math.round(d.amt).toLocaleString()).join(', '),ev.participants,_hideFromAllBut(ev.participants),fids,false,fids);
+  closeWalletPull();
+  save();render();
+  showToast('✅ הועברו ₪'+Math.round(total).toLocaleString()+' מ-'+done.length+' ארנקים לקופה',3500);
+}
 function applyEditMode(){
   document.body.classList.toggle('edit-mode',editMode);
   const icon=document.getElementById('lockIcon');
