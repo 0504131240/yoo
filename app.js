@@ -917,6 +917,52 @@ function testSingleEmail(inputId,btnId){
     })
     .catch(e=>{if(btn){btn.textContent='✗ שגיאה';btn.style.color='var(--red)';btn.disabled=false;}setTimeout(()=>{if(btn){btn.textContent='בדוק';btn.style.color='var(--text2)';btn.style.fontWeight='';}},3000);});
 }
+// Email failures: instead of one toast per recipient (a new event mails every
+// family, so the screen used to fill with the same error), collect them for a
+// moment and show one clear message in Hebrew saying what went wrong and what
+// to do. The raw EmailJS text stays at the bottom for diagnosis.
+const _emailFails={list:[],timer:null};
+function _emailFail(e,addr){
+  _emailFails.list.push({e,addr});
+  clearTimeout(_emailFails.timer);
+  _emailFails.timer=setTimeout(_emailFailShow,2500);
+}
+function _emailFailReason(e){
+  const st=e?.status||0;
+  const t=String(e?.text||e?.message||'').toLowerCase();
+  if(st===426||/quota|limit|exceed|upgrade/.test(t))
+    return{title:'נגמרה המכסה החודשית של המיילים',fix:'בחבילה החינמית של EmailJS יש מספר מיילים מוגבל בחודש, והוא נגמר. אפשר לחכות לתחילת החודש, או להיכנס ל-emailjs.com ולעבור לחבילה גדולה יותר.'};
+  if(st===412||/gmail|invalid grant|reconnect|oauth|token|insufficient/.test(t))
+    return{title:'החיבור של המיילים לג׳ימייל נותק',fix:'נכנסים ל-emailjs.com עם החשבון ששולח את המיילים → Email Services → לוחצים Reconnect ומתחברים שוב לג׳ימייל. אחרי זה המיילים יחזרו לצאת.'};
+  if(/public key|user id|service id|template id|not found|invalid/.test(t)||st===400||st===401||st===403)
+    return{title:'הגדרות המייל לא תקינות',fix:'אחד הפרטים של EmailJS (Public Key, Service ID או Template ID) שגוי או נמחק. בודקים אותם בהגדרות ← הגדרות מייל.'};
+  if(st===429||/too many|rate/.test(t))
+    return{title:'נשלחו יותר מדי מיילים בבת אחת',fix:'EmailJS עצר לרגע את השליחה. מחכים דקה ומנסים שוב.'};
+  if(!st||/network|fetch|failed to fetch|offline/.test(t))
+    return{title:'אין חיבור לאינטרנט',fix:'המיילים לא יצאו כי המכשיר לא היה מחובר. בודקים את החיבור ומנסים שוב.'};
+  return{title:'המיילים לא נשלחו',fix:'שירות המיילים (EmailJS) סירב לשלוח. אפשר לנסות שוב מאוחר יותר, או להיכנס ל-emailjs.com ולבדוק מה כתוב שם.'};
+}
+function _emailFailShow(){
+  const list=_emailFails.list.splice(0);if(!list.length)return;
+  const r=_emailFailReason(list[0].e);
+  const raw=list[0].e?.text||list[0].e?.message||'';
+  const n=new Set(list.map(x=>x.addr)).size;
+  document.getElementById('emailFailBox')?.remove();
+  const box=document.createElement('div');box.id='emailFailBox';
+  box.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));z-index:3001;width:calc(100% - 24px);max-width:420px;background:#fff;color:#1A1A18;border:2px solid #E5484D;border-radius:16px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.25);direction:rtl;font-family:var(--font)';
+  box.innerHTML=`<div style="display:flex;align-items:flex-start;gap:10px">
+    <div style="font-size:24px;line-height:1">📧</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:800;font-size:15px;color:#C62828">❌ ${_esc(r.title)}</div>
+      <div style="font-size:12px;color:#6B6B67;margin-top:2px">${n===1?'מייל אחד לא נשלח':n+' מיילים לא נשלחו'}</div>
+      <div style="font-size:13px;line-height:1.55;margin-top:8px">${_esc(r.fix)}</div>
+      ${raw?`<div style="font-size:11px;color:#A0A09B;margin-top:8px;direction:ltr;text-align:left;word-break:break-word">${_esc(String(raw).slice(0,160))}</div>`:''}
+    </div>
+    <button onclick="this.closest('#emailFailBox').remove()" aria-label="סגירה" style="background:none;border:none;font-size:18px;color:#6B6B67;cursor:pointer;padding:0 2px">✕</button>
+  </div>`;
+  document.body.appendChild(box);
+  setTimeout(()=>box.remove(),30000);
+}
 function sendEmailNotif(recipients,subject,message,html){
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
@@ -931,7 +977,7 @@ function sendEmailNotif(recipients,subject,message,html){
   addrs.forEach((a,i)=>setTimeout(()=>{
     emailjs.send(svc,tpl,{to_email:a.email,to_name:a.name,subject,message,message_html})
       .then(()=>console.log('📧 מייל נשלח ל-'+a.email))
-      .catch(e=>{console.error('📧 שגיאת מייל:',e);showToast('❌ שגיאה בשליחת מייל: '+(e?.text||e?.message||JSON.stringify(e)));});
+      .catch(e=>{console.error('📧 שגיאת מייל:',e);_emailFail(e,a.email);});
   },i*600));
 }
 function sendFundUpdateEmail(famId,changeAmt,desc,note){
