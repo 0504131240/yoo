@@ -317,6 +317,7 @@ body:not(.at-home){padding-bottom:140px}
 .msg-ts{font-size:10px;color:var(--text3)}
 .msg-text{font-size:13px;color:var(--text2);line-height:1.5;white-space:pre-wrap;word-break:break-word}
 /* Calendar */
+.fh-cal-card{direction:rtl}
 .fh-cal-nav{padding:10px 14px 2px;display:flex;align-items:center;justify-content:space-between}
 .fh-cal-month{font-size:16px;font-weight:700;color:var(--text)}
 .fh-cal-arrow{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);padding:2px 8px;line-height:1}
