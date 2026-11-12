@@ -615,7 +615,10 @@ function render(){
   // Live updates re-render everything — keep a half-written text and its focus.
   const old=S.openTxt&&$('scTxt_'+S.openTxt),val=old?old.value:null,foc=!old||document.activeElement===old;
   o.classList.toggle('side-open',!!S.sideOpen);
-  $('scSide').innerHTML=S.fid!=null?sidePanel():'';
+  // The "all laws" list doesn't change with live updates — leave it alone so
+  // an open law or a search in progress isn't wiped by someone else's tick.
+  const side=$('scSide');
+  if(!(S.halAll&&S.fid!=null&&side.querySelector('.sc-hla')))side.innerHTML=S.fid!=null?sidePanel():'';
   $('scSideTab').hidden=S.fid==null;
   $('scSideTab').classList.toggle('todo',S.fid!=null&&today()<=4&&!(F(S.fid).h||{})[today()]&&!locked());
   body.innerHTML=hero()+(S.showHelp?help():'')+(S.tab==='tasks'?tasksTab():S.tab==='games'?gamesTab():S.tab==='board'?boardTab():torahTab());
@@ -741,7 +744,52 @@ function tasksTab(){
 }
 // The daily law lives in its own side panel: a column beside the page on a
 // wide screen, a drawer pulled from the edge on a phone.
+// Every law that has already come up since the contest began — weeks before
+// this one in full, this week up to today — each with the day it last
+// appeared. Returned in the list's own order (it follows the Kitzur).
+const CONTEST_START_WN=Math.round((new Date(2026,9,4).getTime()-new Date(2026,0,4).getTime())/(7*864e5));
+function pastHalachot(){
+  const wn=Math.round((weekStart(S.wk)-new Date(2026,0,4).getTime())/(7*864e5)),td=Math.min(today(),4),seen={};
+  for(let w=wn;w>=CONTEST_START_WN&&Object.keys(seen).length<HALACHOT.length;w--){
+    for(let i=4;i>=0;i--){
+      if(w===wn&&i>td)continue;
+      const idx=(((w*5+i)%HALACHOT.length)+HALACHOT.length)%HALACHOT.length;
+      if(seen[idx]==null)seen[idx]=new Date(2026,0,4+w*7+i).getTime();
+    }
+  }
+  return Object.keys(seen).map(Number).sort((a,b)=>a-b).map(i=>({i,h:HALACHOT[i],at:seen[i]}));
+}
+function allHalachotView(){
+  const list=pastHalachot(),groups=[];
+  list.forEach(it=>{const g=it.h.k?it.h.k[0]:0;let G=groups[groups.length-1];if(!G||G.g!==g)groups.push(G={g,items:[]});G.items.push(it);});
+  const fmt=t=>{const d=new Date(t);return 'יום '+DAYS[d.getDay()].name+' · '+d.getDate()+'.'+(d.getMonth()+1);};
+  const body=groups.map(G=>`<div class="sc-hla-grp">
+      ${G.g?`<div class="sc-hla-gh">סימן ${gem(G.g)}</div>`:''}
+      ${G.items.map(it=>`<details class="sc-hla-it" data-q="${E(it.h.t+' '+it.h.x)}">
+        <summary><span class="sc-hla-n">${it.i+1}</span><b>${E(it.h.t)}</b><span class="sc-hla-chev">‹</span></summary>
+        <p>${E(it.h.x)}</p>
+        <div class="sc-hla-foot"><span>הופיעה ב${fmt(it.at)}</span>${it.h.k?`<a href="${srcUrl(it.h)}" target="_blank" rel="noopener">${E(srcTxt(it.h))} ↗</a>`:''}</div>
+      </details>`).join('')}
+    </div>`).join('');
+  return `<div class="sc-side-hdr"><b>📚 כל ההלכות</b><small>${list.length} הלכות שלמדנו עד היום בתחרות</small>
+      <button class="sc-side-x" onclick="contestUI.toggleSide(false)" aria-label="סגירה">✕</button></div>
+    <button class="sc-hla-back" onclick="contestUI.showAllHal(false)">→ חזרה להלכה היומית</button>
+    <input class="sc-hla-q" type="search" placeholder="🔍 חיפוש בהלכות…" oninput="contestUI.filterHal(this.value)">
+    <div class="sc-hla">${body||'<div class="sc-hla-empty">עוד לא הופיעו הלכות</div>'}</div>
+    <div class="sc-hla-empty" id="scHlaNone" hidden>לא נמצאו הלכות</div>
+    <div class="sc-hal-note">מתוך קיצור שולחן ערוך. למעשה — כל משפחה כמנהגה, ובשאלה שואלים רב.</div>`;
+}
+function showAllHal(v){S.halAll=!!v;render();const s=$('scSide');if(s)s.scrollTop=0;}
+function filterHal(q){
+  q=String(q||'').trim();let any=false;
+  document.querySelectorAll('.sc-hla-grp').forEach(g=>{
+    let n=0;g.querySelectorAll('.sc-hla-it').forEach(it=>{const ok=!q||it.dataset.q.includes(q);it.hidden=!ok;if(ok)n++;});
+    g.hidden=!n;if(n)any=true;
+  });
+  const none=$('scHlaNone');if(none)none.hidden=any;
+}
 function sidePanel(){
+  if(S.halAll)return allHalachotView();
   const td=Math.min(today(),4);
   if(S.halDay==null)S.halDay=td;
   const h=F(S.fid).h||{};
@@ -750,7 +798,8 @@ function sidePanel(){
   return `<div class="sc-side-hdr"><b>📜 הלכה יומית</b><small>מקיצור שולחן ערוך · למדתם ${n}/5 השבוע</small>
       <button class="sc-side-x" onclick="contestUI.toggleSide(false)" aria-label="סגירה">✕</button></div>
     <div class="sc-side-days">${chips}</div>
-    ${halachaCard(S.halDay)}`;
+    ${halachaCard(S.halDay)}
+    <button class="sc-hla-open" onclick="contestUI.showAllHal(true)">📚 כל ההלכות</button>`;
 }
 function halachaCard(d){
   const P=plan(S.wk),h=HALACHOT[P.halacha[d]],read=(F(S.fid).h||{})[d],lk=locked()&&!isAdmin();
@@ -996,5 +1045,5 @@ window.contestSummary=async function(){
 };
 window.openContestOverlay=open;
 window.closeContestOverlay=close;
-window.contestUI={setTab,pickDay,toggleTask,saveTxt,setFam,answer,toggleBingo,spin,addCustom,delCustom,toggleHelp,toggleFamDetail,switchToggle,readHalacha,cheer,toggleSide,pickHal,askReady,askCheck,askDay,closeAsk,saveReady,toggleMusic};
+window.contestUI={setTab,pickDay,toggleTask,saveTxt,setFam,answer,toggleBingo,spin,addCustom,delCustom,toggleHelp,toggleFamDetail,switchToggle,readHalacha,cheer,toggleSide,pickHal,showAllHal,filterHal,askReady,askCheck,askDay,closeAsk,saveReady,toggleMusic};
 })();
