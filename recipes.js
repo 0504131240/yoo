@@ -328,6 +328,7 @@ window.openRecipesOverlay=function(){
   $('recipesOverlay').classList.add('open');
   document.body.style.overflow='hidden';
   history.replaceState(null,'','#recipes'); // a refresh reopens the recipes
+  rcMarkSeen();
   updateShopBadge();
   checkScan();
   if(!S.store){
@@ -341,11 +342,28 @@ window.openRecipesOverlay=function(){
     }).then(u=>S.unsub=u).catch(e=>{console.warn(e);S.loaded=true;renderList();toast('⚠️ לא ניתן להתחבר למאגר המתכונים');});
   }else renderList();
 };
+// ── home tile badge: recipes added since this device last opened the screen.
+// A server-side count (no recipe docs/photos downloaded). First visit just
+// starts the clock, so a new device doesn't show every recipe as new.
+function rcMarkSeen(){try{localStorage.setItem('rcLastSeen',String(Date.now()));}catch(e){}const b=$('rcNewBadge');if(b)b.style.display='none';}
+async function rcHomeBadge(){
+  const b=$('rcNewBadge');if(!b||window.RECIPES_MOCK)return;
+  let since=0;try{since=parseInt(localStorage.getItem('rcLastSeen')||'0');}catch(e){}
+  if(!since){rcMarkSeen();return;}
+  try{
+    const fb=await fbInit(),fs=await import(FS_URL);
+    const snap=await fs.getCountFromServer(fs.query(fs.collection(fb.db,'recipes'),fs.where('createdAt','>',since)));
+    if($('recipesOverlay')?.classList.contains('open'))return;
+    const n=snap.data().count;b.style.display=n?'flex':'none';b.textContent=n>99?'99+':String(n);
+  }catch(e){console.warn('recipes badge:',e);}
+}
+setTimeout(rcHomeBadge,2500);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')rcHomeBadge();});
 window.closeRecipesOverlay=function(){
   const o=$('recipesOverlay');if(!o)return;
   if($('rcCook').classList.contains('open')){rcCloseCook();return;}
   if($('rcPage').classList.contains('open')){rcClosePage();return;}
-  o.classList.remove('open');
+  o.classList.remove('open');rcMarkSeen();
   document.body.style.overflow='';
   if(location.hash==='#recipes')history.replaceState(null,'',location.pathname+location.search);
 };

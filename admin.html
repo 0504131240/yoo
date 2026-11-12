@@ -83,12 +83,15 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
           <span class="fh-tile-ico">💬</span><span class="fh-tile-txt"><b>צ'אט</b></span>
         </button>
         <button class="fh-tile" style="background:linear-gradient(135deg,#43E97B,#0ABDE3);box-shadow:0 6px 20px rgba(10,189,227,0.3)" onclick="switchShell('pay')">
+          <span id="payNewBadge" class="fh-tile-badge" style="display:none"></span>
           <span class="fh-tile-ico">💰</span><span class="fh-tile-txt"><b>תשלומים</b><small id="homeTilePaySub"></small></span>
         </button>
         <button class="fh-tile" style="background:linear-gradient(135deg,#FBBF24,#E2711D);box-shadow:0 6px 20px rgba(226,113,29,0.3)" onclick="openRecipesOverlay()">
+          <span id="rcNewBadge" class="fh-tile-badge" style="display:none"></span>
           <span class="fh-tile-ico">🍲</span><span class="fh-tile-txt"><b>מתכונים</b></span>
         </button>
         <button class="fh-tile" style="background:linear-gradient(135deg,#8FBC5A,#4E9A4E);box-shadow:0 6px 20px rgba(78,154,78,0.3)" onclick="openFamilyTreeOverlay()">
+          <span id="treeNewBadge" class="fh-tile-badge" style="display:none"></span>
           <span class="fh-tile-ico">🌳</span><span class="fh-tile-txt"><b>אילן יוחסין</b></span>
         </button>
         <button class="fh-tile fh-tile-wide" id="pollBannerBtn" style="display:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:0 6px 20px rgba(124,58,237,0.3)" onclick="openPollSheet()">
