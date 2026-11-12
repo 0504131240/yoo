@@ -192,6 +192,9 @@ async function sendViaEmailJS(publicKey, serviceId, templateId, toEmail, toName,
   // General → API Keys) sent as accessToken — set via the EMAILJS_PRIVATE_KEY
   // env var in Vercel, never stored in Firestore or served to the browser
   // (unlike the public key, which /api/settings/emailjs.js does expose).
+  // EmailJS HTML-escapes {{subject}} ("/" → "&#x2F;", shown raw in the inbox) —
+  // use the look-alike division slash U+2215 instead.
+  subject = String(subject || '').replace(/\//g, '∕');
   const body = {
     service_id: serviceId,
     template_id: templateId,

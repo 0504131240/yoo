@@ -964,6 +964,9 @@ function _emailFailShow(){
   setTimeout(()=>box.remove(),30000);
 }
 function sendEmailNotif(recipients,subject,message,html){
+  // EmailJS HTML-escapes {{subject}} ("/" → "&#x2F;"), which shows raw in the
+  // inbox subject line — swap for the look-alike division slash U+2215.
+  subject=String(subject||'').replace(/\//g,'∕');
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
