@@ -8313,6 +8313,7 @@ function handleHash(){
   if(h==='shabbat'){openShabbatModal();return;}
   if(h==='contest'){if(window.openContestOverlay)openContestOverlay();return;}
   if(h==='poker'){if(window.openPokerOverlay)openPokerOverlay();return;}
+  if(h==='conclusions'){if(window.openConclusionsOverlay)openConclusionsOverlay();return;}
   if(h==='fund'){_enterPayShell();openFundDetail();return;}
   const tabMap={events:'nb-events',families:'nb-families'};
   if(tabMap[h]){_enterPayShell();goTab(h,document.getElementById(tabMap[h]),true);return;}

@@ -23,6 +23,7 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
 <link rel="stylesheet" href="recipes.css">
 <link rel="stylesheet" href="contest.css">
 <link rel="stylesheet" href="poker.css">
+<link rel="stylesheet" href="conclusions.css">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body class="at-home">
@@ -68,6 +69,11 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
       <button class="fh-tile fh-tile-wide" style="background:linear-gradient(135deg,#1E7A4C,#13573A 60%,#0F1A17);box-shadow:0 6px 20px rgba(19,87,58,0.35)" onclick="openPokerOverlay()">
         <span id="pokerInviteBadge" class="fh-tile-badge" style="display:none"></span>
         <span class="fh-tile-ico">🃏</span><span class="fh-tile-txt"><b>פוקר משפחתי</b><small id="homeTilePokerSub">כל משפחה מתחילה עם 10,000 צ׳יפים</small></span>
+      </button>
+      <!-- Family conclusions (conclusions.js) — topics + anonymous lessons learned, with a report -->
+      <button class="fh-tile fh-tile-wide" style="background:linear-gradient(135deg,#2F6DB5,#1E4E8C 55%,#163A69);box-shadow:0 6px 20px rgba(30,78,140,0.3)" onclick="openConclusionsOverlay()">
+        <span id="cnHomeBadge" class="fh-tile-badge" style="display:none"></span>
+        <span class="fh-tile-ico">📒</span><span class="fh-tile-txt"><b>מסקנות משפחתיות</b><small id="homeTileCnSub">מה למדנו? פותחים נושא ומוסיפים מסקנות</small></span>
       </button>
       <!-- Shabbat at the parents' — this week's parsha, tap a family to mark it -->
       <div id="shabbatHomeCard" class="fh-shb-card"></div>
@@ -528,6 +534,7 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
 <script src="recipes.js"></script>
 <script src="contest.js"></script>
 <script src="poker.js"></script>
+<script src="conclusions.js"></script>
 
 <!-- Add expense item modal (cumulative events) -->
 <div id="addExpItemOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeAddExpItem()">
