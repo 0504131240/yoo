@@ -61,6 +61,11 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
     <div class="fh-pill-btns">
       <!-- Countdown clocks — above the chat button, beside the calendar on desktop -->
       <div id="countdownSection"></div>
+      <!-- Family conclusions (conclusions.js) — topics + anonymous lessons learned, with a report -->
+      <button class="fh-tile fh-tile-wide" style="background:linear-gradient(135deg,#2F6DB5,#1E4E8C 55%,#163A69);box-shadow:0 6px 20px rgba(30,78,140,0.3)" onclick="openConclusionsOverlay()">
+        <span id="cnHomeBadge" class="fh-tile-badge" style="display:none"></span>
+        <span class="fh-tile-ico">📒</span><span class="fh-tile-txt"><b>מסקנות משפחתיות</b><small id="homeTileCnSub">מה למדנו? פותחים נושא ומוסיפים מסקנות</small></span>
+      </button>
       <!-- The families' Shabbat-prep contest (contest.js) -->
       <button class="fh-tile fh-tile-wide fh-tile-contest" style="background:linear-gradient(135deg,#14919B,#0E7490 55%,#0B2E3F);box-shadow:0 6px 20px rgba(14,116,144,0.3)" onclick="openContestOverlay()">
         <span class="fh-tile-ico">😜</span><span class="fh-tile-txt"><b>תחרות הכנות לשבת</b><small>משימות, משחקים ונקודות · ננעל בשישי ב-10:00</small></span>
@@ -69,11 +74,6 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
       <button class="fh-tile fh-tile-wide" style="background:linear-gradient(135deg,#1E7A4C,#13573A 60%,#0F1A17);box-shadow:0 6px 20px rgba(19,87,58,0.35)" onclick="openPokerOverlay()">
         <span id="pokerInviteBadge" class="fh-tile-badge" style="display:none"></span>
         <span class="fh-tile-ico">🃏</span><span class="fh-tile-txt"><b>פוקר משפחתי</b><small id="homeTilePokerSub">כל משפחה מתחילה עם 10,000 צ׳יפים</small></span>
-      </button>
-      <!-- Family conclusions (conclusions.js) — topics + anonymous lessons learned, with a report -->
-      <button class="fh-tile fh-tile-wide" style="background:linear-gradient(135deg,#2F6DB5,#1E4E8C 55%,#163A69);box-shadow:0 6px 20px rgba(30,78,140,0.3)" onclick="openConclusionsOverlay()">
-        <span id="cnHomeBadge" class="fh-tile-badge" style="display:none"></span>
-        <span class="fh-tile-ico">📒</span><span class="fh-tile-txt"><b>מסקנות משפחתיות</b><small id="homeTileCnSub">מה למדנו? פותחים נושא ומוסיפים מסקנות</small></span>
       </button>
       <!-- Shabbat at the parents' — this week's parsha, tap a family to mark it -->
       <div id="shabbatHomeCard" class="fh-shb-card"></div>
