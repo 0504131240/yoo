@@ -6904,7 +6904,6 @@ function openKidDatePicker(){
   document.getElementById('kidDatePickerModal').style.display='flex';
 }
 function closeKidDatePicker(){
-  if(_dateBtnTargetId==='personAnnivBtn')_restoreKidBday();
   document.getElementById('kidDatePickerModal').style.display='none';
   closeKidYearList();
 }
@@ -6984,10 +6983,6 @@ function renderKidDatePicker(){
   document.getElementById('kidPickerGrid').innerHTML=html;
 }
 function selectKidPickerDay(hebYear,hebMonth,hebDay){
-  if(_dateBtnTargetId==='personAnnivBtn'){
-    _kidAnnivPending={hebYear,hebMonth,hebDay};
-    _restoreKidBday();renderKidAnnivBtn();closeKidDatePicker();return;
-  }
   _kidPickedDate={hebYear,hebMonth,hebDay};
   _kidLegacyDate=null;
   if(_dateBtnTargetId==='famAnniversaryDateBtn'){
@@ -7007,49 +7002,6 @@ function _currentBdayValue(){
   if(_kidLegacyDate)return{hebMonth:_kidLegacyDate.hebMonth,hebDay:_kidLegacyDate.hebDay,hebYear:null};
   return null;
 }
-// ── A kid's wedding date (kid edit window) ────────────────────────────────
-// _kidAnnivPending: the date being edited in the open window (null = none).
-// The shared Hebrew date picker holds one date at a time, so while it's
-// picking the wedding date the birth date is set aside and put back after.
-let _kidAnnivPending=undefined,_kidBdayStash=null;
-function _kidAnnivOf(k){
-  if(!k)return null;
-  const sub=_kidSubFam(k);
-  if(sub)return sub.anniversaryDay&&sub.anniversaryMonth?{hebDay:sub.anniversaryDay,hebMonth:sub.anniversaryMonth,hebYear:sub.anniversaryYear||null}:null;
-  return k.annivDay&&k.annivMonth?{hebDay:k.annivDay,hebMonth:k.annivMonth,hebYear:k.annivYear||null}:null;
-}
-// Writes the window's wedding date to the kid's sub-family when it has one
-// (so the family card's 💍 circle and this stay the same date), else to the kid.
-function _applyKidAnniv(k){
-  if(_kidAnnivPending===undefined)return;
-  const a=_kidAnnivPending,sub=_kidSubFam(k);
-  if(sub){
-    if(a){sub.anniversaryDay=a.hebDay;sub.anniversaryMonth=a.hebMonth;sub.anniversaryYear=a.hebYear||null;}
-    else{delete sub.anniversaryDay;delete sub.anniversaryMonth;delete sub.anniversaryYear;}
-    delete k.annivDay;delete k.annivMonth;delete k.annivYear;
-  }else if(a){k.annivDay=a.hebDay;k.annivMonth=a.hebMonth;k.annivYear=a.hebYear||null;}
-  else{delete k.annivDay;delete k.annivMonth;delete k.annivYear;}
-}
-function renderKidAnnivBtn(){
-  const b=document.getElementById('personAnnivBtn'),x=document.getElementById('personAnnivClear');if(!b)return;
-  const a=_kidAnnivPending;
-  b.textContent=a?('💍 '+HEB_DAY_NUM[a.hebDay]+' ב'+a.hebMonth+(a.hebYear?' '+toHebrewYear(a.hebYear):' (לחצו לבחירת שנה)')):'💍 הוסף יום נישואין';
-  if(x)x.style.display=a?'block':'none';
-}
-function openKidAnnivPicker(){
-  _kidBdayStash={p:_kidPickedDate,l:_kidLegacyDate};
-  _dateBtnTargetId='personAnnivBtn';_dateBtnPlaceholder='💍 הוסף יום נישואין';
-  const a=_kidAnnivPending;
-  if(a&&a.hebYear){_kidPickedDate={hebYear:a.hebYear,hebMonth:a.hebMonth,hebDay:a.hebDay};_kidLegacyDate=null;}
-  else if(a){_kidPickedDate=null;_kidLegacyDate={hebMonth:a.hebMonth,hebDay:a.hebDay};}
-  else{_kidPickedDate=null;_kidLegacyDate=null;}
-  openKidDatePicker();
-}
-function _restoreKidBday(){
-  if(_kidBdayStash){_kidPickedDate=_kidBdayStash.p;_kidLegacyDate=_kidBdayStash.l;_kidBdayStash=null;}
-  _dateBtnTargetId='personDateBtn';_dateBtnPlaceholder='📅 בחר תאריך לידה';
-}
-function clearKidAnniv(){_kidAnnivPending=null;renderKidAnnivBtn();}
 function openPersonModal(mode,kidId){
   if(_famEditId==null)return;
   const f=families.find(x=>x.id===_famEditId);if(!f)return;
@@ -7079,8 +7031,6 @@ function openPersonModal(mode,kidId){
     deleteBtn.style.display=(email||nameInp.value||bday)?'block':'none';
     _renderPersonPhoneSection(f,isP1?1:2);
     _renderPersonUsernameSection(f,isP1?1:2);
-    const aw=document.getElementById('personAnnivWrap');if(aw)aw.style.display='none';
-    _kidAnnivPending=undefined;
   }else{
     emailWrap.style.display='none';
     genderWrap.style.display='flex';
@@ -7091,9 +7041,6 @@ function openPersonModal(mode,kidId){
     else if(k&&k.hebDay&&k.hebMonth){_kidPickedDate=null;_kidLegacyDate={hebMonth:k.hebMonth,hebDay:k.hebDay};}
     else{_kidPickedDate=null;_kidLegacyDate=null;}
     title.textContent=k?'✏️ ערוך ילד':'👶 הוסף ילד';
-    _kidAnnivPending=_kidAnnivOf(k);
-    const aw=document.getElementById('personAnnivWrap');if(aw)aw.style.display='block';
-    renderKidAnnivBtn();
     deleteBtn.style.display=k?'block':'none';
   }
   if(mode!=='p1'&&mode!=='p2'){_renderPersonPhoneSection(f,null);_renderPersonUsernameSection(f,null);}
@@ -7140,11 +7087,10 @@ function savePerson(){
     if(!f.kids)f.kids=[];
     if(_personKidId!=null){
       const k=f.kids.find(x=>x.id===_personKidId);
-      if(k){k.name=name;k.gender=_kidGender;k.hebMonth=bday?bday.hebMonth:'';k.hebDay=bday?bday.hebDay:null;k.hebYear=bday?bday.hebYear:null;_applyKidAnniv(k);}
+      if(k){k.name=name;k.gender=_kidGender;k.hebMonth=bday?bday.hebMonth:'';k.hebDay=bday?bday.hebDay:null;k.hebYear=bday?bday.hebYear:null;}
     }else{
       const nid=f.kids.length?Math.max(...f.kids.map(k=>k.id))+1:1;
-      const nk={id:nid,name,gender:_kidGender,hebMonth:bday?bday.hebMonth:'',hebDay:bday?bday.hebDay:null,hebYear:bday?bday.hebYear:null};
-      f.kids.push(nk);_applyKidAnniv(nk);
+      f.kids.push({id:nid,name,gender:_kidGender,hebMonth:bday?bday.hebMonth:'',hebDay:bday?bday.hebDay:null,hebYear:bday?bday.hebYear:null});
     }
     f.children=f.kids.length;
   }
@@ -7456,18 +7402,10 @@ function allYahrzeits(){
   return yahrzeits;
 }
 function allAnniversaries(){
-  const fams=families.filter(f=>f.anniversaryDay&&f.anniversaryMonth).map(f=>({
+  return families.filter(f=>f.anniversaryDay&&f.anniversaryMonth).map(f=>({
     id:f.id,name:_annivName(f),
     hebDay:f.anniversaryDay,hebMonth:f.anniversaryMonth,hebYear:f.anniversaryYear
   }));
-  // A married kid's wedding date saved on the kid itself (the kid's edit
-  // window). Once the kid has its own sub-family the date lives there
-  // instead (see _applyKidAnniv), so it's never counted twice.
-  const kids=families.flatMap(f=>(f.kids||[]).filter(k=>k.annivDay&&k.annivMonth&&!_kidSubFam(k)).map(k=>({
-    id:'k'+f.id+'_'+k.id,name:(k.name||'ילד/ה')+' ('+f.name.replace('משפחת','').trim()+')',
-    hebDay:k.annivDay,hebMonth:k.annivMonth,hebYear:k.annivYear||null
-  })));
-  return[...fams,...kids];
 }
 // A married kid's household is often saved under the kid's name alone
 // ("מנדי") — show the couple ("מנדי ויוטי") when the spouse's name is known.
@@ -7477,7 +7415,6 @@ function _annivName(f){
   if(!f.subFamily||!sp||n.includes(sp))return n;
   return((f.emailName||'').trim()||n)+' ו'+sp;
 }
-const _kidSubFam=k=>k&&k.spouseFamilyId!=null?families.find(x=>x.id===k.spouseFamilyId)||null:null;
 function _currentHebYear(){
   return parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew-nu-latn',{year:'numeric'}).format(new Date()));
 }
@@ -7535,12 +7472,8 @@ function createKidSubFamily(kidId){
   const k=(f.kids||[]).find(x=>x.id===kidId);if(!k)return;
   if(k.spouseFamilyId)return;
   const nid=nxtFam++;
-  const sub={id:nid,subFamily:true,parentFamilyId:f.id,parentKidId:kidId,
-    name:k.name||'משפחה חדשה',emailName:k.name||'',children:0,photo:null};
-  // a wedding date already saved on the kid moves to its new household
-  if(k.annivDay&&k.annivMonth){sub.anniversaryDay=k.annivDay;sub.anniversaryMonth=k.annivMonth;sub.anniversaryYear=k.annivYear||null;}
-  delete k.annivDay;delete k.annivMonth;delete k.annivYear;
-  families.push(sub);
+  families.push({id:nid,subFamily:true,parentFamilyId:f.id,parentKidId:kidId,
+    name:k.name||'משפחה חדשה',emailName:k.name||'',children:0,photo:null});
   k.spouseFamilyId=nid;
   save();
   openFamEditSheet(nid);

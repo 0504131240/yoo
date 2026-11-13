@@ -1486,13 +1486,6 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
       </div>
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">תאריך לידה עברי (אופציונלי)</div>
       <button type="button" id="personDateBtn" onclick="openKidDatePicker()" style="width:100%;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);margin-bottom:18px;box-sizing:border-box;cursor:pointer;text-align:center">📅 בחר תאריך לידה</button>
-      <div id="personAnnivWrap" style="display:none">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">💍 יום נישואין עברי (אם התחתן/ה)</div>
-        <div style="display:flex;gap:6px;margin-bottom:18px">
-          <button type="button" id="personAnnivBtn" onclick="openKidAnnivPicker()" style="flex:1;border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);box-sizing:border-box;cursor:pointer;text-align:center">💍 הוסף יום נישואין</button>
-          <button type="button" id="personAnnivClear" onclick="clearKidAnniv()" title="הסר" style="display:none;flex-shrink:0;width:42px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg);color:var(--text2);font-size:14px;cursor:pointer">✕</button>
-        </div>
-      </div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <button onclick="savePerson()" style="flex:1;padding:11px;border-radius:var(--r2);border:none;background:var(--blue-mid);color:#fff;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer">✓ שמור</button>
         <button onclick="closePersonModal()" style="flex:1;padding:11px;border-radius:var(--r2);border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">ביטול</button>

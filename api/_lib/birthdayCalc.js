@@ -27,18 +27,10 @@ function allAnniversaries(families) {
     if (!f.subFamily || !sp || n.includes(sp)) return n;
     return ((f.emailName || '').trim() || n) + ' ו' + sp;
   };
-  const fams = families.filter(f => f.anniversaryDay && f.anniversaryMonth).map(f => ({
+  return families.filter(f => f.anniversaryDay && f.anniversaryMonth).map(f => ({
     name: coupleName(f),
     hebDay: f.anniversaryDay, hebMonth: f.anniversaryMonth, hebYear: f.anniversaryYear || null, famId: f.id,
   }));
-  // A married kid's wedding date saved on the kid (skipped once the kid has
-  // its own sub-family, which then holds the date).
-  const hasSub = k => k.spouseFamilyId != null && families.some(x => x.id === k.spouseFamilyId);
-  const kids = families.flatMap(f => (f.kids || []).filter(k => k.annivDay && k.annivMonth && !hasSub(k)).map(k => ({
-    name: (k.name ? k.name : 'ילד/ה') + ' ' + f.name.replace('משפחת', '').trim(),
-    hebDay: k.annivDay, hebMonth: k.annivMonth, hebYear: k.annivYear || null, famId: f.id,
-  })));
-  return [...fams, ...kids];
 }
 
 function allYahrzeits(yahrzeits) {
