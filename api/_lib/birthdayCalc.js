@@ -20,8 +20,15 @@ function allBirthdays(families) {
 }
 
 function allAnniversaries(families) {
+  // a married kid's household: the couple's names when the spouse's is known
+  const coupleName = f => {
+    const n = f.name.replace('משפחת', '').trim();
+    const sp = (f.emailName2 || '').trim();
+    if (!f.subFamily || !sp || n.includes(sp)) return n;
+    return ((f.emailName || '').trim() || n) + ' ו' + sp;
+  };
   const fams = families.filter(f => f.anniversaryDay && f.anniversaryMonth).map(f => ({
-    name: f.name.replace('משפחת', '').trim(),
+    name: coupleName(f),
     hebDay: f.anniversaryDay, hebMonth: f.anniversaryMonth, hebYear: f.anniversaryYear || null, famId: f.id,
   }));
   // A married kid's wedding date saved on the kid (skipped once the kid has
