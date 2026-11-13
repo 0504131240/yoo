@@ -7457,7 +7457,7 @@ function allYahrzeits(){
 }
 function allAnniversaries(){
   const fams=families.filter(f=>f.anniversaryDay&&f.anniversaryMonth).map(f=>({
-    id:f.id,name:f.name.replace('משפחת','').trim(),
+    id:f.id,name:_annivName(f),
     hebDay:f.anniversaryDay,hebMonth:f.anniversaryMonth,hebYear:f.anniversaryYear
   }));
   // A married kid's wedding date saved on the kid itself (the kid's edit
@@ -7468,6 +7468,14 @@ function allAnniversaries(){
     hebDay:k.annivDay,hebMonth:k.annivMonth,hebYear:k.annivYear||null
   })));
   return[...fams,...kids];
+}
+// A married kid's household is often saved under the kid's name alone
+// ("מנדי") — show the couple ("מנדי ויוטי") when the spouse's name is known.
+function _annivName(f){
+  const n=f.name.replace('משפחת','').trim();
+  const sp=(f.emailName2||'').trim();
+  if(!f.subFamily||!sp||n.includes(sp))return n;
+  return((f.emailName||'').trim()||n)+' ו'+sp;
 }
 const _kidSubFam=k=>k&&k.spouseFamilyId!=null?families.find(x=>x.id===k.spouseFamilyId)||null:null;
 function _currentHebYear(){
