@@ -317,9 +317,10 @@ body:not(.at-home){padding-bottom:140px}
 .msg-ts{font-size:10px;color:var(--text3)}
 .msg-text{font-size:13px;color:var(--text2);line-height:1.5;white-space:pre-wrap;word-break:break-word}
 /* Calendar */
+.fh-cal-card{direction:rtl}
 .fh-cal-nav{padding:10px 14px 2px;display:flex;align-items:center;justify-content:space-between}
 .fh-cal-month{font-size:16px;font-weight:700;color:var(--text)}
-.fh-cal-arrow{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);padding:2px 8px;line-height:1}
+.fh-cal-arrow{direction:ltr;unicode-bidi:isolate;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2);padding:2px 8px;line-height:1}
 .fh-cal-grid{padding:4px 8px 6px;display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
 .fh-cal-dow{text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:2px 0}
 .fh-cal-day{height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-radius:8px;font-size:12.5px;cursor:pointer;position:relative;font-weight:600;color:var(--text);padding:2px 1px;box-sizing:border-box}

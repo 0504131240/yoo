@@ -964,6 +964,9 @@ function _emailFailShow(){
   setTimeout(()=>box.remove(),30000);
 }
 function sendEmailNotif(recipients,subject,message,html){
+  // EmailJS HTML-escapes {{subject}} ("/" → "&#x2F;"), which shows raw in the
+  // inbox subject line — swap for the look-alike division slash U+2215.
+  subject=String(subject||'').replace(/\//g,'∕');
   const key=localStorage.getItem('ejsPublicKey');
   const svc=localStorage.getItem('ejsServiceId');
   const tpl=localStorage.getItem('ejsTemplateId');
@@ -1675,6 +1678,7 @@ function renderOpenList(){
 function _setHash(h){history.replaceState(null,'',h?'#'+h:location.pathname+location.search);}
 function _clearHash(h){if(location.hash==='#'+h)_setHash('');}
 function switchShell(s){
+  if(currentShell==='pay'||s==='pay')markPaySeen();
   currentShell=s;
   closeChatSheet();
   document.body.classList.toggle('at-home',s==='home');
@@ -2065,7 +2069,7 @@ function _importTreePeople(data){
   showToast(`📥 יובאו ${remapped.length} אנשים לעץ`);
 }
 function openFamilyTreeOverlay(){
-  seedFamilyTreeIfEmpty();
+  seedFamilyTreeIfEmpty();markTreeSeen();
   document.getElementById('familyTreeOverlay').style.display='flex';_setHash('tree');
   // Always open in normal (non-stats) mode with a clean selection.
   _treeStatsMode=false;_treeSel.clear();_treeInfoId=null;
@@ -2079,6 +2083,7 @@ function openFamilyTreeOverlay(){
   _fitTreeWhenReady(0,true); // canvas needs a layout pass first for its size to be known; opens centered on the root couple
 }
 function closeFamilyTreeOverlay(){
+  markTreeSeen();
   document.getElementById('familyTreeOverlay').style.display='none';_clearHash('tree');
 }
 function renderFamilyTreeIfOpen(){
@@ -4484,8 +4489,40 @@ function renderChatBadge(){
   if(unread>0){badge.style.display='flex';badge.textContent=unread>99?'99+':String(unread);}
   else badge.style.display='none';
 }
+// ── "New since your last visit" badges on the home tiles ──────────────────
+// Per device (localStorage), like chatLastSeen: each tile keeps the ids it
+// last showed you; anything not in that set counts as new. The very first
+// time a key is seen everything current is taken as already seen, so a new
+// device doesn't light up every tile at once.
+function _seenIds(k){try{const v=localStorage.getItem('seenIds_'+k);return v?new Set(JSON.parse(v)):null;}catch(e){return null;}}
+function _setSeenIds(k,ids){try{localStorage.setItem('seenIds_'+k,JSON.stringify([...new Set(ids)]));}catch(e){}}
+function _setTileBadge(id,n){
+  const b=document.getElementById(id);if(!b)return;
+  b.style.display=n>0?'flex':'none';b.textContent=n>99?'99+':String(n);
+}
+function _newCount(k,ids){
+  const seen=_seenIds(k);
+  if(!seen){if(ids.length)_setSeenIds(k,ids);return 0;}
+  return ids.filter(i=>!seen.has(i)).length;
+}
+function _payNewIds(){
+  const myId=_myFamId();
+  const evs=events.filter(e=>e.open&&(editMode||!myId||(e.participants||[]).includes(myId))).map(e=>'e'+e.id);
+  const gs=_visibleGoalFunds(goalFunds.filter(g=>!g.archived&&!g.transferred)).map(g=>'g'+g.id);
+  return [...evs,...gs];
+}
+function _treeNewIds(){return familyTree.map(p=>'p'+p.id);}
+function markPaySeen(){_setSeenIds('pay',_payNewIds());_setTileBadge('payNewBadge',0);}
+function markTreeSeen(){_setSeenIds('tree',_treeNewIds());_setTileBadge('treeNewBadge',0);}
+function renderHomeNewBadges(){
+  if(currentShell==='pay')markPaySeen();
+  else _setTileBadge('payNewBadge',_newCount('pay',_payNewIds()));
+  if(document.getElementById('familyTreeOverlay')?.style.display==='flex')markTreeSeen();
+  else _setTileBadge('treeNewBadge',_newCount('tree',_treeNewIds()));
+}
 function renderMessages(){
   renderChatBadge();
+  renderHomeNewBadges();
   const el=document.getElementById('msgList');if(!el)return;
   if(!messages.length){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">עדיין אין הודעות — שלח את הראשון 💬</div>';
@@ -8313,6 +8350,7 @@ function handleHash(){
   if(h==='shabbat'){openShabbatModal();return;}
   if(h==='contest'){if(window.openContestOverlay)openContestOverlay();return;}
   if(h==='poker'){if(window.openPokerOverlay)openPokerOverlay();return;}
+  if(h==='conclusions'){if(window.openConclusionsOverlay)openConclusionsOverlay();return;}
   if(h==='fund'){_enterPayShell();openFundDetail();return;}
   const tabMap={events:'nb-events',families:'nb-families'};
   if(tabMap[h]){_enterPayShell();goTab(h,document.getElementById(tabMap[h]),true);return;}

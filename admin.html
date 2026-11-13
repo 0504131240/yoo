@@ -23,6 +23,7 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
 <link rel="stylesheet" href="recipes.css">
 <link rel="stylesheet" href="contest.css">
 <link rel="stylesheet" href="poker.css">
+<link rel="stylesheet" href="conclusions.css">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body class="at-home">
@@ -60,6 +61,11 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
     <div class="fh-pill-btns">
       <!-- Countdown clocks — above the chat button, beside the calendar on desktop -->
       <div id="countdownSection"></div>
+      <!-- Family conclusions (conclusions.js) — topics + anonymous lessons learned, with a report -->
+      <button class="fh-tile fh-tile-wide" style="background:linear-gradient(135deg,#2F6DB5,#1E4E8C 55%,#163A69);box-shadow:0 6px 20px rgba(30,78,140,0.3)" onclick="openConclusionsOverlay()">
+        <span id="cnHomeBadge" class="fh-tile-badge" style="display:none"></span>
+        <span class="fh-tile-ico">📒</span><span class="fh-tile-txt"><b>מסקנות משפחתיות</b><small id="homeTileCnSub">מה למדנו? פותחים נושא ומוסיפים מסקנות</small></span>
+      </button>
       <!-- The families' Shabbat-prep contest (contest.js) -->
       <button class="fh-tile fh-tile-wide fh-tile-contest" style="background:linear-gradient(135deg,#14919B,#0E7490 55%,#0B2E3F);box-shadow:0 6px 20px rgba(14,116,144,0.3)" onclick="openContestOverlay()">
         <span class="fh-tile-ico">😜</span><span class="fh-tile-txt"><b>תחרות הכנות לשבת</b><small>משימות, משחקים ונקודות · ננעל בשישי ב-10:00</small></span>
@@ -77,12 +83,15 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
           <span class="fh-tile-ico">💬</span><span class="fh-tile-txt"><b>צ'אט</b></span>
         </button>
         <button class="fh-tile" style="background:linear-gradient(135deg,#43E97B,#0ABDE3);box-shadow:0 6px 20px rgba(10,189,227,0.3)" onclick="switchShell('pay')">
+          <span id="payNewBadge" class="fh-tile-badge" style="display:none"></span>
           <span class="fh-tile-ico">💰</span><span class="fh-tile-txt"><b>תשלומים</b><small id="homeTilePaySub"></small></span>
         </button>
         <button class="fh-tile" style="background:linear-gradient(135deg,#FBBF24,#E2711D);box-shadow:0 6px 20px rgba(226,113,29,0.3)" onclick="openRecipesOverlay()">
+          <span id="rcNewBadge" class="fh-tile-badge" style="display:none"></span>
           <span class="fh-tile-ico">🍲</span><span class="fh-tile-txt"><b>מתכונים</b></span>
         </button>
         <button class="fh-tile" style="background:linear-gradient(135deg,#8FBC5A,#4E9A4E);box-shadow:0 6px 20px rgba(78,154,78,0.3)" onclick="openFamilyTreeOverlay()">
+          <span id="treeNewBadge" class="fh-tile-badge" style="display:none"></span>
           <span class="fh-tile-ico">🌳</span><span class="fh-tile-txt"><b>אילן יוחסין</b></span>
         </button>
         <button class="fh-tile fh-tile-wide" id="pollBannerBtn" style="display:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:0 6px 20px rgba(124,58,237,0.3)" onclick="openPollSheet()">
@@ -529,6 +538,7 @@ if(/\.github\.io$/.test(location.hostname))location.replace('https://yankeleviz.
 <script src="recipes.js"></script>
 <script src="contest.js"></script>
 <script src="poker.js"></script>
+<script src="conclusions.js"></script>
 
 <!-- Add expense item modal (cumulative events) -->
 <div id="addExpItemOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;align-items:center;justify-content:center;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeAddExpItem()">

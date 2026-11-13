@@ -350,3 +350,24 @@
 .fh-tile-contest .fh-tile-ico{display:inline-block;animation:sc-wink 3.2s ease-in-out infinite;transform-origin:50% 70%}
 @keyframes sc-wink{0%,78%,100%{transform:rotate(0) scale(1)}84%{transform:rotate(-14deg) scale(1.15)}90%{transform:rotate(10deg) scale(1.1)}95%{transform:rotate(-4deg) scale(1.05)}}
 @media (prefers-reduced-motion:reduce){.fh-tile-contest .fh-tile-ico{animation:none}}
+/* "All laws" list in the daily-law side panel */
+.sc-hla-open,.sc-hla-back{display:block;width:100%;border:1.5px solid #EBCB85;background:#fff;color:#9A5B07;border-radius:14px;padding:10px 12px;font-family:inherit;font-size:14px;font-weight:800;box-shadow:0 3px 0 #E3C27F;cursor:pointer;transition:transform .1s,box-shadow .1s}
+.sc-hla-open:active,.sc-hla-back:active{transform:translateY(2px);box-shadow:0 1px 0 #E3C27F}
+.sc-hla-back{width:auto;padding:6px 12px;font-size:13px;align-self:flex-start}
+.sc-hla-q{width:100%;box-sizing:border-box;border:1.5px solid #EBCB85;border-radius:12px;padding:9px 12px;font-family:inherit;font-size:14px;background:#FFFDF6;color:#3D2604;outline:none}
+.sc-hla-q:focus{border-color:var(--sc-gold2,#E0A526)}
+.sc-hla{display:flex;flex-direction:column;gap:12px}
+.sc-hla-grp{display:flex;flex-direction:column;gap:6px}
+.sc-hla-gh{font-size:12px;font-weight:800;color:#9A5B07;padding:0 4px;letter-spacing:.3px}
+.sc-hla-it{background:linear-gradient(180deg,#FFFBEF,#FDF3D8);border:1.5px solid #EBCB85;border-radius:14px;box-shadow:0 2px 0 #E3C27F;overflow:hidden}
+.sc-hla-it summary{display:flex;align-items:center;gap:9px;padding:10px 12px;cursor:pointer;list-style:none;color:#5C3A06}
+.sc-hla-it summary::-webkit-details-marker{display:none}
+.sc-hla-it summary b{flex:1;font-size:14px;font-weight:800;font-family:var(--font-head,var(--font))}
+.sc-hla-n{flex:0 0 24px;height:24px;border-radius:50%;background:#fff;border:1.5px solid #EBCB85;color:#9A5B07;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.sc-hla-chev{color:#B98428;font-size:18px;font-weight:800;transition:transform .2s;line-height:1}
+.sc-hla-it[open] .sc-hla-chev{transform:rotate(-90deg)}
+.sc-hla-it p{margin:0;padding:0 14px 4px;font-size:14px;line-height:1.8;color:#3D2604;font-family:var(--font-head,var(--font))}
+.sc-hla-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px 11px;font-size:11px;color:#8A5A12}
+.sc-hla-foot a{font-weight:700;color:#9A5B07;text-decoration:none}
+.sc-hla-empty{text-align:center;color:#8A5A12;font-size:13px;padding:14px 0}
+.sc-hla-empty[hidden],.sc-hla-grp[hidden],.sc-hla-it[hidden]{display:none}
